@@ -15,7 +15,8 @@ jobs:
     environment: pypi
     steps:
       - uses: actions/checkout@v4
+      - run: mkdir -p dist-pkg && cp dist-wheels/*.whl dist-pkg/
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist-wheels/
+          packages-dir: dist-pkg/
           verbose: true
