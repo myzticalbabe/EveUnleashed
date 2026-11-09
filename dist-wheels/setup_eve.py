@@ -27,6 +27,10 @@ setup(
     description=meta["description"],
     package_dir={"": os.path.abspath(SRC)},
     packages=find_packages(os.path.abspath(SRC), include=["eve_unleashed*"]),
+    # numpy is imported unconditionally (engine/cache/utils/resilience/
+    # _replay_kernel); declared so bare interpreters get it via pip.
+    # numpy ships cp310+ wheels, so the 3.10 floor holds.
+    install_requires=["numpy"],
     python_requires=">=3.10",
     entry_points={"console_scripts": ["eve-unleashed=eve_unleashed.cli:main"]},
 )
