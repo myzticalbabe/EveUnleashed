@@ -19,9 +19,9 @@ The 316t free-threaded interpreter (`sys._is_gil_enabled() is False`).
 ## Gates
 
 - `python -m pytest Project_GAMORA/tests/ -q` — harness + coach, offline
-- `python -m pytest tests/ -q` — eve, langs, wasm, bible (needs `src/` on `PYTHONPATH`)
-- `python tools/bible_check.py --check` — canon corpus
-- `python tools/bible_theme.py --all --check` — themed editions
+- `python -m pytest tests/ -q` — eve, langs, wasm, arena (needs `src/` on `PYTHONPATH`). Whole-corpus bible gates stay parent-side by design: practice/statute/config references point at parent-tree paths, and rewriting canon to suit a prune is forbidden
+- `python tools/bible_check.py --check` — canon corpus (parent tree only, for the reason above)
+- `python tools/bible_theme.py --all --check` — themed editions (parent tree only)
 - `python tools/staged_scanner_gate.py` — no new anti-patterns (needs `src/` on `PYTHONPATH`)
 
 ## Provenance
