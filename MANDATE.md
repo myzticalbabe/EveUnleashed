@@ -53,3 +53,10 @@ Obsolete machines are part of the swarm, not a burden on it.
 - Freebuff dispatches and owns the mandate; opencode executes under
   swarm; kilo covers cross-env and infra. One lane executing another
   lane's brief on a shared worktree is forbidden by name in the brief.
+- Every swarm run records its shape in the status row: worker count,
+  slice per worker, wall time per slice and total. Where the brief
+  allows, the serial equivalent is timed too (same brief, one worker)
+  and the speedup factor is written down. A quoted factor is measured
+  or it is not quoted: worker count is not work, and a mandate quoting
+  a factor it never ran is narrative, not law. This clause binds all
+  lanes — opencode, kilo, and freebuff itself.
