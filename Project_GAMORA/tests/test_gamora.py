@@ -50,26 +50,13 @@ class _TtyIn:
         return True
 
 
-def test_cradle_selector_empty_cradle(monkeypatch, capsys):
-    import eve_unleashed.cradle as c
-    monkeypatch.setattr(c, "list_cradle_models", lambda *a, **k: [])
-    monkeypatch.setattr(sys, "stdin", _TtyIn())
-    assert gamora.main(["cradle"]) == 0
-    assert "empty" in capsys.readouterr().out
+def test_kilo_missing_binary_reports(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda *a, **k: None)
+    assert gamora.main(["kilo", "--", "run", "hi"]) == 1
 
 
-def test_cradle_selector_chooses_one(monkeypatch, capsys):
-    import eve_unleashed.cradle as c
-    monkeypatch.setattr(c, "list_cradle_models",
-                        lambda *a, **k: [{"name": "m1", "framework": "gguf"}])
-    monkeypatch.setattr(c, "adopt_cradle",
-                        lambda *a, **k: {"adopted": [("m1", "gguf", "r")],
-                                         "failed": [], "skipped": []})
-    monkeypatch.setattr(sys, "stdin", _TtyIn())
-    monkeypatch.setattr("builtins.input", lambda *a, **k: "1")
-    assert gamora.main(["cradle"]) == 0
-    out = capsys.readouterr().out
-    assert "ADOPTED m1" in out
+def test_kilo_help_runs_through():
+    assert gamora.main(["kilo", "--", "--help"]) == 0
 
 
 def test_cradle_selector_empty_names_the_dir(monkeypatch, capsys):

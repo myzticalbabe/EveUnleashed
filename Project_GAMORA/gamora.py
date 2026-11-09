@@ -239,6 +239,39 @@ def cmd_cradle(args) -> int:
         return 1
 
 
+def cmd_kilo(args) -> int:
+    """Absorb Kilo natively: one Jaeger span per delegation, then kilo runs.
+
+    Kilo's argv passes through untouched (its parser owns its flags); the
+    span names the road so the ledger sees the delegation. Span note goes
+    to stderr so `kilo run --format json` stdout stays parseable."""
+    import shutil
+    import subprocess
+    kilo = shutil.which("kilo")
+    if not kilo:
+        print("kilo: missing (not on PATH) -- nothing absorbed.")
+        return 1
+    kilo_args = list(args.kilo_args or [])
+    if kilo_args[:1] == ["--"]:  # argparse REMAINDER keeps the separator
+        kilo_args = kilo_args[1:]
+    try:
+        import jaeger_inject
+        out = jaeger_inject.inject(" ".join(kilo_args), capability="kilo.run",
+                                   arm_id="jaeger-316t", max_push=False)
+        print("<jaeger-316t trace_id=%s span_id=%s capability=kilo.run "
+              "recorded=%s>" % (out["trace_id"], out["span_id"],
+                                  "yes" if out["recorded"] else "header-only"),
+              file=sys.stderr)
+    except Exception as e:
+        print("kilo: untraced (%s) -- running anyway." % e, file=sys.stderr)
+    try:
+        rc = subprocess.run([kilo] + kilo_args).returncode
+        return int(rc or 0)
+    except Exception as e:
+        print("kilo: failed (%s)" % e)
+        return 1
+
+
 def cmd_lucy(args) -> int:
     """Eliza + live therapy, natively combined, offline-first."""
     repo_src = REPO / "src"
@@ -395,6 +428,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("cradle", help="passthrough to Project_CRADLE")
     p.add_argument("cradle_args", nargs=argparse.REMAINDER)
     p.set_defaults(fn=cmd_cradle)
+
+    p = sub.add_parser("kilo", help="absorbed Kilo CLI, one span per run")
+    p.add_argument("kilo_args", nargs=argparse.REMAINDER)
+    p.set_defaults(fn=cmd_kilo)
 
     p = sub.add_parser("lucy", help="Eliza + therapy, offline-first")
     p.add_argument("mood", help="how the user feels (one word)")
