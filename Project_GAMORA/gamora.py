@@ -156,7 +156,10 @@ def cmd_eve(args) -> int:
     except Exception as e:
         print("eve: unavailable (%s)" % e)
         return 1
-    sys.argv = ["eve"] + list(args.eve_args or [])
+    eve_args = list(args.eve_args or [])
+    if eve_args[:1] == ["--"]:  # argparse REMAINDER keeps the separator; eve chokes on it
+        eve_args = eve_args[1:]
+    sys.argv = ["eve"] + eve_args
     try:
         return int(eve_main() or 0)
     except SystemExit as s:
