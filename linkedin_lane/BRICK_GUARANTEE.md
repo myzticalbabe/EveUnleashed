@@ -44,6 +44,32 @@ landed while the verifier was looking the wrong way.
 6. Feed-absence-equals-failure (the lost-perspective defect) — STRUCK by the
    principal 2026-11-09. Author surface is the denominator, always.
 
+## ABSENCE-CLAIM RULE (permanent process law, 2026-11-09)
+
+No "X did not happen / is gated / is blocked" verdict is valid on one
+negative. An absence claim requires ALL of:
+
+1. The AUTHORITATIVE surface checked (for a post: the author's
+   /recent-activity/all/ + profile -- never a ranked feed, never a
+   filtered listener alone). Name the surface in the verdict.
+2. UNFILTERED traffic capture (every voyager/api XHR, not an endpoint
+   allowlist that can miss the real submit path).
+3. A timestamp match: the artifact's age must be inconsistent with the
+   attempt window before "it never submitted" is uttered (here: activity
+   showed 18m/25m/29m against attempts at :44/:48/:55 -- the post went
+   live INSIDE the attempt window while the verifier looked the wrong way).
+
+The v2 harness violated all three: feed surface, allowlisted listener, no
+timestamp check -- then enshrined the false gate in commit 12eeae8 across
+doc, memory (#2180/#2184) and board before the principal caught it. v3
+(verify_on_author_surface + full XHR capture + --verify-only) is the
+mechanical enforcement: exit 0 only on probe-found on the author surface.
+
+When a finding is falsified, correction propagates to EVERY layer that
+carried it (doc, memory with supersede judgments, board status) -- as
+7305ea4 did. A correction that lands in one layer and not the others is
+a second enshrinement of the same lie.
+
 ## Handoff state today
 
 - POST LIVE at `linkedin.com/in/clinton-oxford-4807083a/recent-activity/all/`
