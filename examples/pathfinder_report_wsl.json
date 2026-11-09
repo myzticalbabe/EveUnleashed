@@ -1,0 +1,123 @@
+{
+  "probe": {
+    "file": "baremetal_pathfinder.py",
+    "argv": [
+      "--out",
+      "/mnt/c/Azazael/EveUnleashed/examples/pathfinder_report_wsl.json"
+    ]
+  },
+  "python": "3.14.7",
+  "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "soil": {
+    "available": true,
+    "soil": "wsl2-guest",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "proc_version": "Linux version 6.18.33.2-microsoft-standard-WSL2 (root@f1bbfb02316b) (gcc (GCC) 13.2.0, GNU ld (GNU Binutils) 2.41) #1 SMP PREEMPT_DYNAMIC Thu Jun 18 21:54:43 UT"
+  },
+  "cpu": {
+    "available": true,
+    "model": "Intel(R) Core(TM) Ultra 9 285H",
+    "count": 8,
+    "flags_n": 102,
+    "hypervisor_bit": true,
+    "avx512": false,
+    "vnni": true
+  },
+  "mem": {
+    "available": true,
+    "total_gb": 7.76
+  },
+  "pci": {
+    "available": true,
+    "count": 2,
+    "devices": [
+      "0d87:00:00.0 \"3D controller [0302]\" \"Microsoft Corporation [1414]\" \"Device [008a]\" -p00 \"\" \"\"",
+      "923a:00:00.0 \"3D controller [0302]\" \"Microsoft Corporation [1414]\" \"Basic Render Driver [008e]\" -p00 \"\" \"\""
+    ],
+    "raw_lines": 4
+  },
+  "drm": {
+    "available": true,
+    "drm_cards": [],
+    "dri_nodes": [
+      "/dev/dri/renderD128"
+    ],
+    "accel_nodes": [],
+    "npu_present": false
+  },
+  "npu_module": {
+    "available": true,
+    "intel_vpu_loaded": false,
+    "vpu_npu_modules": []
+  },
+  "opencl": {
+    "available": true,
+    "platforms": 2,
+    "detail": [
+      {
+        "name": "Intel(R) OpenCL Graphics",
+        "vendor": "Intel(R) Corporation",
+        "version": "OpenCL 3.0 ",
+        "devices": [
+          {
+            "name": "Intel(R) Graphics [0x7d51]",
+            "vendor": "Intel(R) Corporation",
+            "version": "OpenCL 3.0 NEO ",
+            "compute_units": 128,
+            "max_mhz": 2350,
+            "clock_raw": {
+              "0x100c": [
+                0,
+                2350
+              ],
+              "0x100d": [
+                0,
+                64
+              ],
+              "0x100e": [
+                0,
+                128
+              ]
+            },
+            "global_mem_gb": 7.8,
+            "extensions": "cl_khr_byte_addressable_store cl_khr_device_uuid cl_khr_fp16 cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_icd cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_intel_command_queue_families cl_intel_subgroups cl_intel_required_subgroup_size cl_intel_subgroups_short cl_intel_accelerator cl_intel_driver_diagnostics cl_khr_priority_hints cl_khr_thro"
+          }
+        ]
+      },
+      {
+        "name": "Intel(R) OpenCL",
+        "vendor": "Intel(R) Corporation",
+        "version": "OpenCL 3.1 LINUX",
+        "devices": [
+          {
+            "name": "Intel(R) Core(TM) Ultra 9 285H",
+            "vendor": "Intel(R) Corporation",
+            "version": "OpenCL 3.1 (Build 0)",
+            "compute_units": 8,
+            "max_mhz": 480,
+            "clock_raw": {
+              "0x100c": [
+                0,
+                0
+              ],
+              "0x100d": [
+                0,
+                64
+              ],
+              "0x100e": [
+                0,
+                480
+              ]
+            },
+            "global_mem_gb": 7.76,
+            "extensions": "cl_khr_spirv_linkonce_odr cl_khr_fp64 cl_khr_fp16 cl_intel_bfloat16 cl_intel_sigmoid cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_ext_float_atomics cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_depth_images cl_khr_extended_bit_ops cl_khr_icd cl_khr_il_program cl_khr_suggested_local_work_si"
+          }
+        ]
+      }
+    ]
+  },
+  "rapl": {
+    "available": false,
+    "reason": "no intel-rapl zones (not Intel, no powercap, or WSL guest)"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "probe": {
+    "file": "baremetal_pathfinder.py",
+    "argv": [
+      "--out",
+      "C:/Azazael/EveUnleashed/examples/pathfinder_report_windows.json"
+    ]
+  },
+  "python": "3.16.0a1",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "soil": {
+    "available": true,
+    "soil": "windows-host",
+    "hypervisor": "unknown",
+    "note": "Windows host; Hyper-V role not probed from userland here"
+  },
+  "cpu": {
+    "available": true,
+    "model": "Intel64 Family 6 Model 197 Stepping 2, GenuineIntel",
+    "arch": "AMD64",
+    "count": 16
+  },
+  "mem": {
+    "available": true,
+    "total_gb": 15.37
+  },
+  "pci": {
+    "available": false,
+    "reason": "lspci not on PATH"
+  },
+  "drm": {
+    "available": false,
+    "reason": "sysfs DRM only exists on Linux"
+  },
+  "npu_module": {
+    "available": false,
+    "reason": "kernel modules only exist on Linux"
+  },
+  "opencl": {
+    "available": true,
+    "platforms": 2,
+    "detail": [
+      {
+        "name": "Intel(R) OpenCL Graphics",
+        "vendor": "Intel(R) Corporation",
+        "version": "OpenCL 3.0 ",
+        "devices": [
+          {
+            "name": "Intel(R) Arc(TM) 140T GPU (8GB)",
+            "vendor": "Intel(R) Corporation",
+            "version": "OpenCL 3.0 NEO ",
+            "compute_units": 128,
+            "max_mhz": 2350,
+            "clock_raw": {
+              "0x100c": [
+                0,
+                2350
+              ],
+              "0x100d": [
+                0,
+                64
+              ],
+              "0x100e": [
+                0,
+                128
+              ]
+            },
+            "global_mem_gb": 7.8,
+            "extensions": "cl_khr_byte_addressable_store cl_khr_device_uuid cl_khr_fp16 cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_icd cl_khr_icd_unloadable cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_intel_command_queue_families cl_intel_subgroups cl_intel_required_subgroup_size cl_intel_subgroups_short cl_intel_accelerator cl_intel_driver_diagnostics cl_khr_prio"
+          }
+        ]
+      },
+      {
+        "name": "Intel(R) OpenCL",
+        "vendor": "Intel(R) Corporation",
+        "version": "OpenCL 3.0 WINDOWS",
+        "devices": [
+          {
+            "name": "Intel(R) Core(TM) Ultra 9 285H",
+            "vendor": "Intel(R) Corporation",
+            "version": "OpenCL 3.0 (Build 0)",
+            "compute_units": 16,
+            "max_mhz": 480,
+            "clock_raw": {
+              "0x100c": [
+                0,
+                0
+              ],
+              "0x100d": [
+                0,
+                64
+              ],
+              "0x100e": [
+                0,
+                480
+              ]
+            },
+            "global_mem_gb": 15.37,
+            "extensions": "cl_khr_spirv_linkonce_odr cl_khr_fp64 cl_khr_fp16 cl_khr_global_int32_base_atomics cl_khr_global_int32_extended_atomics cl_khr_local_int32_base_atomics cl_khr_local_int32_extended_atomics cl_ext_float_atomics cl_khr_3d_image_writes cl_khr_byte_addressable_store cl_khr_depth_images cl_khr_extended_bit_ops cl_khr_icd cl_khr_il_program cl_khr_suggested_local_work_size cl_intel_unified_shared_memory c"
+          }
+        ]
+      }
+    ]
+  },
+  "rapl": {
+    "available": false,
+    "reason": "powercap sysfs only exists on Linux"
+  }
+}
