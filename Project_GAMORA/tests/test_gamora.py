@@ -36,3 +36,14 @@ def test_inject_no_drive_is_header_only():
 def test_swarm_command_runs_offline():
     rc = gamora.main(["swarm", "the sky is blue"])
     assert rc == 0
+
+
+def test_cradle_prefers_tree_then_installed_data(tmp_path, monkeypatch):
+    assert gamora._cradle_script() == gamora.REPO / "Project_CRADLE" / "cradle.py"
+    fake_prefix = tmp_path / "prefix"
+    (fake_prefix / "gamora_data").mkdir(parents=True)
+    shipped = fake_prefix / "gamora_data" / "cradle.py"
+    shipped.write_text("# shipped cradle\n")
+    monkeypatch.setattr(sys, "prefix", str(fake_prefix))
+    monkeypatch.setattr(gamora, "REPO", tmp_path / "empty-tree")
+    assert gamora._cradle_script() == shipped

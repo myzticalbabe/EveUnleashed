@@ -166,9 +166,21 @@ def cmd_eve(args) -> int:
         return int(s.code or 0)
 
 
+def _cradle_script():
+    """Locate cradle.py: tree first, then installed data (wheel/exe)."""
+    from pathlib import Path as _P
+    cands = [REPO / "Project_CRADLE" / "cradle.py",
+             _P(sys.prefix) / "gamora_data" / "cradle.py",
+             _P(__file__).resolve().parent / "gamora_data" / "cradle.py"]
+    for c in cands:
+        if c.is_file():
+            return c
+    return cands[0]
+
+
 def cmd_cradle(args) -> int:
     """Passthrough to Project_CRADLE/cradle.py (doctor/demo/grimoire/serve)."""
-    cradle = REPO / "Project_CRADLE" / "cradle.py"
+    cradle = _cradle_script()
     if not cradle.is_file():
         print("cradle: missing (%s)" % cradle)
         return 1

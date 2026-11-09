@@ -36,6 +36,9 @@ os.makedirs(os.path.join(STAGE, "AOA"))
 for m in TOP_MODULES:
     shutil.copy(os.path.join(GAMORA, m), STAGE)
 shutil.copy(os.path.join(GAMORA, "_vendor", "lucy.py"), STAGE)
+os.makedirs(os.path.join(STAGE, "gamora_data"), exist_ok=True)
+shutil.copy(os.path.join(HERE, "..", "Project_CRADLE", "cradle.py"),
+              os.path.join(STAGE, "gamora_data", "cradle.py"))
 for pkg in ("AOA/__init__.py", "AOA/core/__init__.py",
             "AOA/core/delegation_tracer.py", "AOA/core/contracts.py"):
     dst = os.path.join(STAGE, pkg)
@@ -51,6 +54,8 @@ setup(
     py_modules=["gamora", "berzerker", "jaeger_inject",
                 "opencode_jaeger_hook", "lucy"],
     packages=["AOA", "AOA.core"],
+    data_files=[("gamora_data", [os.path.join(STAGE, "gamora_data",
+                                               "cradle.py")])],
     install_requires=["eve-unleashed>=3.16"],
     python_requires=">=3.10",
     entry_points={"console_scripts": ["gamora=gamora:main"]},
