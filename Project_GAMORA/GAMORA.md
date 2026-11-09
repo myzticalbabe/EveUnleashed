@@ -46,8 +46,14 @@ without it.
 directive block, and one span in the tree's own ledger. The span write
 never fails the prompt (header-only degradation).
 
-Wire into OpenCode with one hook:
+Bridge into OpenCode/Kilo through the front door (verified 2026-11-09:
+opencode core has no `hooks.pre-prompt` config key, so no dead config is
+written -- routing IS the wire):
 
-    { "hooks": { "pre-prompt": "python C:/Azazael/azazael/Project_GAMORA/opencode_jaeger_hook.py" } }
+    gamora eve -- <args>    # Eve runs, one eve.run span per delegation
+    gamora kilo -- <args>   # Kilo runs, one kilo.run span per delegation
+    gamora inject "prompt"  # header + span, pipe into any CLI
 
-Or call `gamora inject` / `jaeger_inject.py` by hand.
+Or pipe by hand: `echo "prompt" | python opencode_jaeger_hook.py | kilo run`
+(the hook is a stdin/stdout filter, exit always 0). Every delegation
+through these doors carries a Jaeger span in the tree's own ledger.

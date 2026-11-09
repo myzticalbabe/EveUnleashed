@@ -157,6 +157,16 @@ def cmd_eve(args) -> int:
         print("eve: unavailable (%s)" % e)
         return 1
     eve_args = list(args.eve_args or [])
+    try:
+        import jaeger_inject
+        out = jaeger_inject.inject(" ".join(eve_args), capability="eve.run",
+                                   arm_id="jaeger-316t", max_push=False)
+        print("<jaeger-316t trace_id=%s span_id=%s capability=eve.run "
+              "recorded=%s>" % (out["trace_id"], out["span_id"],
+                                  "yes" if out["recorded"] else "header-only"),
+              file=sys.stderr)
+    except Exception as e:
+        print("eve: untraced (%s) -- running anyway." % e, file=sys.stderr)
     if eve_args[:1] == ["--"]:  # argparse REMAINDER keeps the separator; eve chokes on it
         eve_args = eve_args[1:]
     sys.argv = ["eve"] + eve_args
