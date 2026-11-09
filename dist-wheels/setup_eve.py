@@ -31,6 +31,6 @@ setup(
     # _replay_kernel); declared so bare interpreters get it via pip.
     # numpy ships cp310+ wheels, so the 3.10 floor holds.
     install_requires=["numpy"],
-    python_requires=">=3.10",
+    python_requires=">=3.9",
     entry_points={"console_scripts": ["eve-unleashed=eve_unleashed.cli:main"]},
 )

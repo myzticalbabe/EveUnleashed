@@ -4,6 +4,8 @@ Eve Unleashed — Model Architectures
 Custom PyTorch model definitions for Eve Unleashed.
 """
 
+from __future__ import annotations
+
 from .qwen35_ssm import (
     Qwen35ForCausalLM,
     Qwen35SSMConfig,

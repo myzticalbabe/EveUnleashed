@@ -4,6 +4,8 @@ Eve Unleashed Utilities
 Tensor preparation, output postprocessing, and shape validation.
 """
 
+from __future__ import annotations
+
 from typing import Any, List
 
 import numpy as np

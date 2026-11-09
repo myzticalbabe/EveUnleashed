@@ -31,6 +31,8 @@ Key specs:
   - max_position_embeddings: 262144
 """
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 # from typing import Optional, Tuple  # removed — all names have native equivalents

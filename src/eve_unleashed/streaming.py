@@ -10,6 +10,8 @@ Supports:
 - Torch/sklearn/ONNX: yield full result as single chunk (no native streaming)
 """
 
+from __future__ import annotations
+
 import time
 from typing import AsyncGenerator, List
 

@@ -19,6 +19,8 @@ Examples:
          -d '{"model":"/models/resnet.pt","input":[1.0,2.0,3.0]}'
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import sys

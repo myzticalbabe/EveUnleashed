@@ -10,6 +10,8 @@ and LRU+TTL inference caching.
 Async mode uses a thread pool for non-blocking batch processing.
 """
 
+from __future__ import annotations
+
 import asyncio
 import concurrent.futures
 import functools

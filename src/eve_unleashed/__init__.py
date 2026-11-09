@@ -5,6 +5,8 @@ High-performance inference engine for ML model deployment.
 Provides model loading, batch inference, result caching, and streaming.
 """
 
+from __future__ import annotations
+
 from .engine import InferenceEngine
 from .core import ModelLoader, InferenceResult
 from .config import EveConfig

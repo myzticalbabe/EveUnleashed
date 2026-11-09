@@ -4,6 +4,8 @@ Eve Unleashed Core
 Model loading, inference result types, and framework detection.
 """
 
+from __future__ import annotations
+
 import os
 import subprocess
 import sys

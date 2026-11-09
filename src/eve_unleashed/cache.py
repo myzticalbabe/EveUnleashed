@@ -8,6 +8,8 @@ Evicts least-recently-used entries when size exceeds cache_size_mb.
 Expires entries older than cache_ttl_seconds.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import sys
