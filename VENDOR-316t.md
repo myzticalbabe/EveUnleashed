@@ -24,3 +24,17 @@ Generated 2026-11-09. Everything below was MEASURED on this box, not assumed.
 - codegraph: 97532 nodes @ ecf93a4bf64d177ffa7fd45952286dde6783a26e == HEAD
 - barta registry on 316t: 13 robust sources; native urllib fallback verified 577 bytes/HTTP 200
 
+## Nuitka 3.16 port (venv site-packages patch, measured 2026-11-09)
+- exe: dist/win10/EveUnleashed-win10.exe (onefile, LINK EXIT=0, --help EXIT=0)
+- ROOT CAUSE of the early-AV saga: Nuitka_PyObject_GC_Link wrote through
+  _Py_AS_GC(op), but on 316t sizeof(PyGC_Head) != 16 (alignment attribute)
+  so it missed the type pre-header and zeroed heap metadata instead.
+  Fix: 0x400 Link arm is a pure no-op (caller already clears pre-header;
+  tracked state is the ob_gc_bits bit, accounting is CPython's).
+  Proof: hello316 + numpy-only probe pass WITHOUT faulthandler after the fix.
+- numpy 2.5.4 EXONERATED: imports, zeros, GIL-disabled all OK in the exe env.
+- exe-entry fixes: cli.py now all-absolute imports (64 converted); trainer.py
+  read_default has an ImportError->fallback guard (azazael repo not bundled).
+- gamora.py doctor: _args typo fixed; cradle path updated to native
+  src/eve_unleashed/cradle.py. langs arch: gamora/lucy/jaeger-316t all OK.
+

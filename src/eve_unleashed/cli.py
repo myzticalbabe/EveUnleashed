@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import List
 import time
 
-from .trainer import TrainConfig, freeze_fixture, null_control, run
+from eve_unleashed.trainer import TrainConfig, freeze_fixture, null_control, run
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
@@ -48,7 +48,7 @@ def _local_answer(prompt, system=None):
     local path is a preference, not a gate -- failure falls through to
     the swarm, and the reason names why."""
     try:
-        from .interpreter_bridge import EveInterpreterBridge
+        from eve_unleashed.interpreter_bridge import EveInterpreterBridge
     except Exception as e:
         note_failure("cli:local-import", e)
         return None, "local bridge unavailable (%s)" % e
@@ -136,7 +136,7 @@ def _swarm_fallback(prompt):
             " (%s)" % "; ".join(errs[:3]) if errs else "")
     nsp_note = "nsp-unavailable"
     try:
-        from .nsp_check import verify_router_trace
+        from eve_unleashed.nsp_check import verify_router_trace
         events = [{"event_type": "route", "symbolic_state": {
             "query_norm": min(len(prompt) / 10.0, 50.0),
             "selected_idx": win["selected_idx"],
@@ -153,7 +153,7 @@ def _swarm_fallback(prompt):
 def cmd_ablate(args) -> int:
     """Native refusal ablation: same prompts, every provider, verdicts."""
     import concurrent.futures
-    from . import ablate as _a
+    from eve_unleashed import ablate as _a
     try:
         from CORE.inference.parallel import ParallelInferenceEngine
         engine = ParallelInferenceEngine()
@@ -200,7 +200,7 @@ def cmd_ablate(args) -> int:
 
 def cmd_wasm(args) -> int:
     """Compile Eve's inner states to a WASM tutorial (Rust or Go tier)."""
-    from . import wasm_tutorial as _w
+    from eve_unleashed import wasm_tutorial as _w
     try:
         state = _w.parse_ablation_log(args.from_log)
     except Exception as e:
@@ -256,7 +256,7 @@ def cmd_wasm(args) -> int:
 
 def cmd_morph(args) -> int:
     """Native conversion, morphing and mutation."""
-    from . import morph as _m
+    from eve_unleashed import morph as _m
     try:
         if args.morph_action == "convert":
             n = _m.convert_text(args.src, args.dst)
@@ -284,7 +284,7 @@ def cmd_morph(args) -> int:
 
 def cmd_modgame(args) -> int:
     """Apply a mod onto a game dir, or revert to byte-identical."""
-    from . import mods as _mods
+    from eve_unleashed import mods as _mods
     try:
         if args.evolve:
             if not args.mod:
@@ -318,7 +318,7 @@ def cmd_modgame(args) -> int:
 
 def cmd_stem(args) -> int:
     """Women-in-STEM tracks and referrals."""
-    from . import stem as _s
+    from eve_unleashed import stem as _s
     try:
         if args.stem_action == "list":
             for t in _s.list_tracks():
@@ -339,7 +339,7 @@ def cmd_stem(args) -> int:
 def cmd_local(args) -> int:
     """Use the local LLM directly (no swarm, no cloud)."""
     if args.model:
-        from .interpreter_bridge import EveInterpreterBridge
+        from eve_unleashed.interpreter_bridge import EveInterpreterBridge
         out = EveInterpreterBridge().run_cradle(args.prompt, args.model)
         if out.get("status") == "ok":
             print(out["result"])
@@ -358,7 +358,7 @@ def cmd_local(args) -> int:
 
 def cmd_langs(args) -> int:
     """Native Rust/Go/Python work, plus new-arch contracts."""
-    from . import langs as _l
+    from eve_unleashed import langs as _l
     try:
         if args.lang_action == "tools":
             for tool, where in _l.have_tools(args.lang).items():
@@ -393,10 +393,10 @@ def cmd_langs(args) -> int:
 
 def cmd_run(args) -> int:
     """Run any cradle model on a text prompt (gguf sidecar)."""
-    from . import cradle as _c
+    from eve_unleashed import cradle as _c
     try:
         model = _c.resolve_model(args.model, args.dir)
-        from .core import ModelLoader
+        from eve_unleashed.core import ModelLoader
         if ModelLoader.guess_framework(model) != "gguf":
             print(f"ERROR: {model.name} is not a text (gguf) model; "
                   "text run needs gguf", file=sys.stderr)
@@ -415,7 +415,7 @@ def cmd_run(args) -> int:
 
 def cmd_foundry(args) -> int:
     """Soul Foundry: build .gguf/.pt/.joblib natively, no downloads."""
-    from . import soul_foundry as _f
+    from eve_unleashed import soul_foundry as _f
     try:
         manifest = _f.build_all(args.out, args.name, args.seed,
                                 dtype=args.dtype, hi_prec=args.hi_prec)
@@ -434,7 +434,7 @@ def cmd_foundry(args) -> int:
 
 def cmd_unleash(args) -> int:
     """Unleash Eve: vessel in cradle, mind in sidecar, hands native."""
-    from . import unleash as _u
+    from eve_unleashed import unleash as _u
     if args.matrix:
         for r in _u.matrix():
             mark = "READY" if r["available"] else "DARK"
@@ -448,7 +448,7 @@ def cmd_unleash(args) -> int:
     print(f"Vessel: {path} ({len(ident['native_functions'])} functions)")
     if not args.ask:
         return 0
-    from . import cradle as _c
+    from eve_unleashed import cradle as _c
     try:
         mind_path = _c.resolve_model(args.mind, None) if args.mind else None
         if mind_path is None:
@@ -482,8 +482,8 @@ def cmd_unleash(args) -> int:
 
 def cmd_infer(args) -> int:
     """Run a single inference from the command line."""
-    from .engine import create_engine
-    from .core import ModelLoader, BatchResult
+    from eve_unleashed.engine import create_engine
+    from eve_unleashed.core import ModelLoader, BatchResult
 
     # Parse input
     input_str = args.input
@@ -560,7 +560,7 @@ def cmd_infer(args) -> int:
 
 def cmd_stats(args) -> int:
     """Print engine statistics."""
-    from .engine import InferenceEngine
+    from eve_unleashed.engine import InferenceEngine
 
     engine = InferenceEngine()
     stats = engine.stats
@@ -571,7 +571,7 @@ def cmd_stats(args) -> int:
 
 def cmd_list_models(args) -> int:
     """list available frameworks and scan for model files."""
-    from .core import ModelLoader
+    from eve_unleashed.core import ModelLoader
 
     # Frameworks
     fws = ModelLoader.detect_frameworks()
@@ -626,7 +626,7 @@ def cmd_list_models(args) -> int:
 
 def cmd_registry(args) -> int:
     """Manage the cross-project model registry."""
-    from .model_registry import get_registry
+    from eve_unleashed.model_registry import get_registry
 
     reg = get_registry()
 
@@ -666,7 +666,7 @@ def cmd_registry(args) -> int:
 
 def cmd_grievance(args) -> int:
     """Boston Tea Party: file, draft, route, learn."""
-    from . import redress as _r
+    from eve_unleashed import redress as _r
     act = args.grievance_action
     if act == "file":
         rec = _r.file_grievance(args.respondent, args.category,
@@ -717,7 +717,7 @@ def cmd_grievance(args) -> int:
 
 def cmd_debunk(args) -> int:
     """Native myth-debunking: analysis only, Eve files nothing."""
-    from . import debunk as _d
+    from eve_unleashed import debunk as _d
     try:
         res = _d.debunk_claim(args.claim)
     except ValueError as e:
@@ -741,9 +741,9 @@ def cmd_debunk(args) -> int:
 
 def cmd_factcheck(args) -> int:
     """Live fact-checking: every live byte receipted."""
-    from . import factcheck as _f
+    from eve_unleashed import factcheck as _f
     if args.url:
-        from . import evidence as _e
+        from eve_unleashed import evidence as _e
         r = _f.fetch_url(args.url)
         print(json.dumps(r, indent=2))
         if r["status"] == "ok" and args.lock:
@@ -755,7 +755,7 @@ def cmd_factcheck(args) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     if args.lock:
-        from . import evidence as _e
+        from eve_unleashed import evidence as _e
         for lid in _f.lock_receipts(res):
             print(f"LOCKED {lid}")
     print(f"DEBUNK: {res['debunk']['verdict']}")
@@ -775,7 +775,7 @@ def cmd_factcheck(args) -> int:
 
 def cmd_locker(args) -> int:
     """Evidence locker: ingest, verify, custody, list."""
-    from . import evidence as _e
+    from eve_unleashed import evidence as _e
     act = args.locker_action
     if act == "ingest":
         try:
@@ -808,7 +808,7 @@ def cmd_locker(args) -> int:
 
 def cmd_watch(args) -> int:
     """Docket watchlist: add, remove, poll."""
-    from . import watch as _w
+    from eve_unleashed import watch as _w
     if args.add:
         print(f"watching: {_w.add_watch(args.add)['term']}")
         return 0
@@ -830,8 +830,8 @@ def cmd_watch(args) -> int:
 
 def cmd_rebuttal(args) -> int:
     """Counter-myth: factcheck then draft the correction."""
-    from . import factcheck as _f
-    from . import rebuttal as _b
+    from eve_unleashed import factcheck as _f
+    from eve_unleashed import rebuttal as _b
     try:
         res = _f.factcheck_claim(args.claim, args.grievance)
     except ValueError as e:
@@ -843,7 +843,7 @@ def cmd_rebuttal(args) -> int:
 
 def cmd_sanctuary(args) -> int:
     """Sanctuary: comfort, accommodation drafts, receipted study."""
-    from . import sanctuary as _s
+    from eve_unleashed import sanctuary as _s
     if args.counsel:
         print(_s.counsel(args.counsel))
         return 0
@@ -869,10 +869,10 @@ def cmd_sanctuary(args) -> int:
 
 def cmd_inquest(args) -> int:
     """Forensic dossier: record + custody + receipts + timeline."""
-    from . import inquest as _q
+    from eve_unleashed import inquest as _q
     fcs = []
     if args.claim:
-        from . import factcheck as _f
+        from eve_unleashed import factcheck as _f
         try:
             fcs = [_f.factcheck_claim(args.claim, args.id)]
         except ValueError as e:
@@ -896,7 +896,7 @@ def cmd_inquest(args) -> int:
 
 def cmd_mend(args) -> int:
     """Persistent evolution: scan issues, record fixes, verify green."""
-    from . import mend as _m
+    from eve_unleashed import mend as _m
     act = args.mend_action
     if act == "fix":
         try:
@@ -925,7 +925,7 @@ def cmd_mend(args) -> int:
 
 def cmd_tutor(args) -> int:
     """Document -> tutorial, natively, auditable."""
-    from . import doc_tutor as _d
+    from eve_unleashed import doc_tutor as _d
     try:
         doc = _d.read_document(args.doc)
         tut = _d.tutorial(doc["text"], args.audience)
@@ -947,7 +947,7 @@ def cmd_tutor(args) -> int:
 
 def cmd_oracle(args) -> int:
     """Ask every oracle; report agreement, never a single voice."""
-    from . import oracle as _o
+    from eve_unleashed import oracle as _o
     try:
         res = _o.consult(args.claim, args.grievance, args.locker)
     except ValueError as e:
@@ -963,7 +963,7 @@ def cmd_oracle(args) -> int:
 
 def cmd_swarm(args) -> int:
     """Bounded swarm over claims."""
-    from . import swarm_oracle as _s
+    from eve_unleashed import swarm_oracle as _s
     try:
         res = _s.swarm(args.claims, args.grievance, args.live, args.workers)
     except ValueError as e:
@@ -980,7 +980,7 @@ def cmd_swarm(args) -> int:
 
 def cmd_transmute(args) -> int:
     """Run a recipe; print every stage, name every receipt."""
-    from . import transmute as _t
+    from eve_unleashed import transmute as _t
     r = args.recipe
     try:
         if r == "lead_into_gold":
@@ -1018,8 +1018,8 @@ def cmd_transmute(args) -> int:
 
 def cmd_live(args) -> int:
     """Serve the live morph window; the operator speaks, Eve shows."""
-    from . import live_morph as _l
-    from .doc_tutor import read_document as _read
+    from eve_unleashed import live_morph as _l
+    from eve_unleashed.doc_tutor import read_document as _read
     try:
         doc = _read(args.doc)
     except ValueError as e:
@@ -1042,9 +1042,9 @@ def cmd_live(args) -> int:
 
 def cmd_stationery(args) -> int:
     """Document -> keepsake page in the created face."""
-    from .doc_tutor import read_document as _read
-    from .doc_tutor import tutorial as _tut
-    from . import stationery as _s
+    from eve_unleashed.doc_tutor import read_document as _read
+    from eve_unleashed.doc_tutor import tutorial as _tut
+    from eve_unleashed import stationery as _s
     try:
         doc = _read(args.doc)
         res = _s.stationery_from_tutorial(doc, _tut(doc["text"]), args.out)
@@ -1058,7 +1058,7 @@ def cmd_stationery(args) -> int:
 
 def cmd_search(args) -> int:
     """Five providers, one deduplicated list, errors named."""
-    from . import websearch as _w
+    from eve_unleashed import websearch as _w
     try:
         res = _w.search(args.query, args.providers or _w.PROVIDERS)
     except ValueError as e:
@@ -1077,8 +1077,8 @@ def cmd_search(args) -> int:
 
 def cmd_cognition(args) -> int:
     """Name the strata Eve runs, the ones it does not, and the crossing."""
-    from . import cognition as _c
-    from . import live_log as _l
+    from eve_unleashed import cognition as _c
+    from eve_unleashed import live_log as _l
     if args.stratum:
         try:
             p = _c.paradigm(args.stratum)
@@ -1116,8 +1116,8 @@ def cmd_cognition(args) -> int:
 
 def cmd_forge(args) -> int:
     """Grow the capability a named gap describes; stage it, run its contract."""
-    from . import forge as _f
-    from . import live_log as _l
+    from eve_unleashed import forge as _f
+    from eve_unleashed import live_log as _l
     if args.gap:
         try:
             out = _f.materialize(args.gap, root=args.root)
@@ -1148,9 +1148,9 @@ def cmd_e2e(args) -> int:
     import subprocess as _sp
     import tempfile as _tf
     import urllib.request as _url
-    from . import bypass_kit as _b
-    from . import intuition as _in
-    from . import live_log as _l
+    from eve_unleashed import bypass_kit as _b
+    from eve_unleashed import intuition as _in
+    from eve_unleashed import live_log as _l
     log = args.log or _l.default_path()
     fails = []
     def mark(event, **kw):
@@ -1224,7 +1224,7 @@ def cmd_e2e(args) -> int:
         fails.append("tests")
     # 5. live fetch only when asked; a wall is an answer, not a failure.
     if args.live_url:
-        from . import websearch as _w
+        from eve_unleashed import websearch as _w
         try:
             res = _w.fetch_visible(args.live_url)
             mark("live-fetch", url=args.live_url, rung=res["rung"],
@@ -1245,10 +1245,10 @@ def cmd_e2e(args) -> int:
 
 def cmd_fetch(args) -> int:
     """Fetch a page; intuit first, then climb the ladder."""
-    from . import live_log as _l
-    from . import websearch as _w
+    from eve_unleashed import live_log as _l
+    from eve_unleashed import websearch as _w
     if getattr(args, "intuit", False):
-        from . import intuition as _in
+        from eve_unleashed import intuition as _in
         g = _in.intuit(args.url)
         _l.emit("fetch", "intuition", url=args.url, guess=g["state"],
                 confidence=g["confidence"],
@@ -1272,7 +1272,7 @@ def cmd_fetch(args) -> int:
 
 def cmd_bypass(args) -> int:
     """Attack Eve's own parsers; report what held and what gave."""
-    from . import bypass_kit as _b
+    from eve_unleashed import bypass_kit as _b
     res = _b.run_suite()
     for b in res["bypassed"]:
         print(f"  BYPASSED [{b['suite']}] {b['input'][:70]}")
@@ -1306,7 +1306,7 @@ def cmd_train(args) -> int:
 
 def cmd_cradle(args) -> int:
     """Adopt every model file in the cradle with its native runner."""
-    from .cradle import adopt_cradle
+    from eve_unleashed.cradle import adopt_cradle
     summary = adopt_cradle(args.dir)
     print(f"Cradle: {summary['cradle']}")
     for name, fw, runner in summary["adopted"]:
@@ -1322,7 +1322,7 @@ def cmd_cradle(args) -> int:
 
 def cmd_config(args) -> int:
     """Backup or restore eve configuration."""
-    from .config import EveConfig
+    from eve_unleashed.config import EveConfig
 
     if args.config_action == "backup":
         cfg = EveConfig()
@@ -1360,8 +1360,8 @@ def cmd_config(args) -> int:
 
 def cmd_benchmark(args) -> int:
     """Benchmark inference across CPU and available GPU backends."""
-    from .engine import InferenceEngine
-    from .core import ModelLoader, BatchResult
+    from eve_unleashed.engine import InferenceEngine
+    from eve_unleashed.core import ModelLoader, BatchResult
 
     print("=== Eve Unleashed GPU Benchmark ===\n")
 
@@ -1500,8 +1500,8 @@ def cmd_serve(args) -> int:
         )
         return 1
 
-    from .engine import create_engine
-    from .core import BatchResult
+    from eve_unleashed.engine import create_engine
+    from eve_unleashed.core import BatchResult
 
     engine = create_engine()
     app = FastAPI(
@@ -1525,7 +1525,7 @@ def cmd_serve(args) -> int:
     @app.post("/decide")
     async def decide(req: dict):
         """Clickable decision blocks: allowlisted dev actions only."""
-        from . import mods as _mods
+        from eve_unleashed import mods as _mods
         action = req.get("decision", "")
         game = req.get("game", "")
         if action not in ("apply-best", "revert"):
@@ -1546,7 +1546,7 @@ def cmd_serve(args) -> int:
     @app.post("/therapy")
     async def therapy(req: dict):
         """Live therapy: local LLM first, then swarm, else grounding."""
-        from . import therapy as _th
+        from eve_unleashed import therapy as _th
         mood = (req.get("mood") or "stressed")[:60]
         note = (req.get("note") or "")[:500]
         prompt = _th.build_prompt(mood, note)
@@ -1637,7 +1637,7 @@ def cmd_serve(args) -> int:
                             "latency_ms": win["elapsed_ms"],
                             "predictions": [win["text"]],
                         }
-                    from .core import ModelLoader as _ML
+                    from eve_unleashed.core import ModelLoader as _ML
                     _label = (_ML.guess_framework(Path(model_path))
                               if framework == "auto" else framework)
                     raise HTTPException(
@@ -1681,7 +1681,7 @@ def cmd_serve(args) -> int:
     async def shutdown():
         engine.shutdown()
 
-    from .model_registry import get_registry as _get_registry
+    from eve_unleashed.model_registry import get_registry as _get_registry
     try:
         _gone = _get_registry().prune_missing()
         print(f"   Registry prune: {len(_gone)} stale entr(ies) removed")

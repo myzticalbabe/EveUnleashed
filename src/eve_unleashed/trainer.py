@@ -41,7 +41,11 @@ from .self_modifying_worms import (
     WormDNA,
     WormFitness,
 )
-from azazael.tools.defaults_profile import read_default
+try:
+    from azazael.tools.defaults_profile import read_default
+except ImportError:  # standalone exe: azazael repo not bundled; fallbacks rule
+    def read_default(dotted, fallback=None):
+        return fallback
 
 DEFAULT_URLS = [
     "https://example.com",

@@ -97,17 +97,24 @@ def cmd_doctor(_args) -> int:
     finally:
         sys.path[:] = saved
 
-    cradle = REPO / "Project_CRADLE" / "cradle.py"
+    cradle = REPO / "src" / "eve_unleashed" / "cradle.py"
     lucy = REPO / "Project_LUCY" / "lucy.py"
-    for label, path in (("cradle file", cradle), ("lucy file", lucy)):
+    for label, path, mod in (("cradle file", cradle, "eve_unleashed.cradle"),
+                             ("lucy file", lucy, "lucy")):
         if path.is_file():
             print("%-16s : ok (%s)" % (label, path.name))
-        else:
+            continue
+        # Frozen exe has the modules compiled in but no repo checkout on
+        # disk: importability is the real requirement, not the file.
+        try:
+            __import__(mod, fromlist=["*"])
+            print("%-16s : ok (%s, frozen in)" % (label, mod))
+        except Exception:
             print("%-16s : MISSING (%s)" % (label, path))
             ok = False
 
     print("doctor: %s" % ("READY" if ok else "NOT READY"))
-    if getattr(args, "json", False):
+    if getattr(_args, "json", False):
         print("---")
         print(json.dumps({"ready": bool(ok), "gil": gil,
                           "python": sys.version.split()[0]}, indent=2))
