@@ -36,3 +36,20 @@ Obsolete machines are part of the swarm, not a burden on it.
   fast where free-threaded.
 - Swarms are built on `ThreadPoolExecutor`-era primitives so they fan out on
   any floor; free-threading is acceleration, not a prerequisite.
+
+## The swarm build law (opencode lane)
+
+- Every build assigned to the opencode lane runs under **LLM worker
+  swarms**: parallel agents, one front task per worker, batch loop
+  (claim → do → prove → land → claim next). Never serial by default;
+  never one agent alone doing mechanical bulk work.
+- Dispatch is by board row with a number-bound, self-contained brief
+  (turf allowlist + forbidden list, acceptance as commands). A worker
+  that cannot name its delivery row did not deliver.
+- Each worker proves its slice with the command and the line it printed;
+  slices land as explicit-paths commits (≤8 files, never `git add -A`)
+  with `git show --stat HEAD` read back. A claim without a command is a
+  recollection, and a recollection is not a landing.
+- Freebuff dispatches and owns the mandate; opencode executes under
+  swarm; kilo covers cross-env and infra. One lane executing another
+  lane's brief on a shared worktree is forbidden by name in the brief.
