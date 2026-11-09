@@ -103,3 +103,5 @@ with a word, no reason owed; Eve logs the kill and learns from it.
 - 2026-11-09: post #1 LIVE ("A claim needs its command" + 5 hashtags),
   pasted by Eve via authenticated session, verified atop recent-activity.
   Law amended same day: draft-only struck, Eve posts.
+- 2026-11-09 11:25 ET (+8min): post #1 at 13 impressions, 0 reactions.
+  First measured datum of the series. Post #2 due 2026-11-11.
