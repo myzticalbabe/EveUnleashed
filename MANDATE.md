@@ -60,3 +60,7 @@ Obsolete machines are part of the swarm, not a burden on it.
   or it is not quoted: worker count is not work, and a mandate quoting
   a factor it never ran is narrative, not law. This clause binds all
   lanes — opencode, kilo, and freebuff itself.
+- All lanes share the same resource: one board, one tree, one mandate.
+  Coordination is by claim and lease on the shared state, never by
+  private copy. A lane-local fork that drifts from the shared resource
+  is a defect, not a workspace — re-derive from the source, then work.
