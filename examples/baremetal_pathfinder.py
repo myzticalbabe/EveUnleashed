@@ -255,6 +255,85 @@ def probe_opencl():
         return na("OpenCL query failed: %s" % e)
 
 
+def probe_secureboot():
+    # Their broken promise, our detector (26.04.1 ships intel-ipu7 modules
+    # unsigned: Secure Boot ON + NPU driver = refusal. Know before you boot).
+    if platform.system() == "Linux":
+        efivars = sorted(glob.glob("/sys/firmware/efi/efivars/SecureBoot-*"))
+        if efivars:
+            try:
+                with open(efivars[0], "rb") as f:
+                    raw = f.read()
+                # efivar payload: 4-byte attrs + 1-byte value
+                state = "ON" if raw and raw[-1] == 1 else "OFF"
+                return ok(secure_boot=state, source=efivars[0])
+            except OSError as e:
+                return na("efivar unreadable: %s" % e)
+        if shutil.which("mokutil"):
+            try:
+                p = subprocess.run(["mokutil", "--sb-state"], capture_output=True,
+                                   text=True, timeout=10)
+                out = (p.stdout + p.stderr).strip().lower()
+                if "enabled" in out:
+                    return ok(secure_boot="ON", source="mokutil")
+                if "disabled" in out:
+                    return ok(secure_boot="OFF", source="mokutil")
+                return na("mokutil inconclusive: %s" % out[:120])
+            except OSError as e:
+                return na("mokutil exec failed: %s" % e)
+        return na("no efivars and no mokutil (BIOS boot or no permission)")
+    if platform.system() == "Windows":
+        return na("SecureBoot read needs admin BCD; check msinfo32 instead")
+    return na("secureboot probe not implemented for " + platform.system())
+
+
+def verdict_frontier(r):
+    # EVOLVE-TO-FIXED: the report judges itself. FIXED = ours, verified live.
+    # DEGRADED-KNOWN = theirs, routed around with a named owner + fallback.
+    # UNKNOWN = this soil cannot answer; hand to a soil that can.
+    v = {}
+    soil = (r.get("soil") or {}).get("soil", "unknown")
+    drm = r.get("drm", {})
+    npu_mod = r.get("npu_module", {})
+    sb = r.get("secureboot", {})
+    ocl = r.get("opencl", {})
+    if drm.get("available") and drm.get("npu_present"):
+        v["npu_device"] = ok(verdict="FIXED", detail="/dev/accel present")
+    elif soil in ("wsl2-guest", "wsl-guest"):
+        v["npu_device"] = ok(verdict="DEGRADED-KNOWN",
+                               detail="NPU not paravirtualized by dxgkrnl (Microsoft); use bare metal")
+    elif soil == "bare-metal-linux":
+        v["npu_device"] = ok(verdict="BROKEN-UPSTREAM",
+                               detail="no /dev/accel on bare metal: BIOS disabled or no intel_vpu (Intel/firmware)")
+    else:
+        v["npu_device"] = ok(verdict="UNKNOWN", detail="not a Linux soil")
+    if npu_mod.get("available") and npu_mod.get("intel_vpu_loaded"):
+        v["npu_driver"] = ok(verdict="FIXED", detail="intel_vpu loaded")
+    elif soil in ("wsl2-guest", "wsl-guest"):
+        v["npu_driver"] = ok(verdict="DEGRADED-KNOWN",
+                               detail="no intel_vpu in guest by design; NPU lane runs on bare metal only")
+    else:
+        v["npu_driver"] = ok(verdict="UNKNOWN", detail="module state unreadable here")
+    if sb.get("available") and sb.get("secure_boot") == "ON" and soil == "bare-metal-linux":
+        v["secure_boot"] = ok(verdict="DEGRADED-KNOWN",
+                               detail="Secure Boot ON + unsigned ipu7 modules (26.04.1): turn OFF or MOK-enroll or NPU refuses")
+    elif sb.get("available"):
+        v["secure_boot"] = ok(verdict="FIXED", detail="Secure Boot " + sb.get("secure_boot", "?"))
+    else:
+        v["secure_boot"] = ok(verdict="UNKNOWN", detail=sb.get("reason", "unreadable"))
+    devs = [d for p in (ocl.get("detail") or []) for d in p.get("devices", [])]
+    sane = [d for d in devs if d.get("max_mhz")]
+    if ocl.get("available") and sane:
+        v["gpu_compute"] = ok(verdict="FIXED",
+                               detail="%d OpenCL device(s), clocks sane" % len(sane))
+    elif ocl.get("available"):
+        v["gpu_compute"] = ok(verdict="BROKEN-UPSTREAM",
+                               detail="loader present, no usable devices")
+    else:
+        v["gpu_compute"] = ok(verdict="UNKNOWN", detail=ocl.get("reason", "unreadable"))
+    return ok(subsystems=v)
+
+
 def probe_rapl():
     if platform.system() != "Linux":
         return na("powercap sysfs only exists on Linux")
@@ -280,11 +359,13 @@ def main():
     for name, fn in (("soil", probe_soil), ("cpu", probe_cpu),
                      ("mem", probe_mem), ("pci", probe_pci),
                      ("drm", probe_drm), ("npu_module", probe_npu_module),
-                     ("opencl", probe_opencl), ("rapl", probe_rapl)):
+                     ("opencl", probe_opencl), ("rapl", probe_rapl),
+                     ("secureboot", probe_secureboot)):
         try:
             report[name] = fn()
         except Exception as e:  # last-resort net: a probe never kills the report
             report[name] = na("probe crashed: %r" % e)
+    report["frontier"] = verdict_frontier(report)
     soil = report["soil"].get("soil", "unknown")
     n_gpu = sum(len(p.get("devices", [])) for p in
                 report["opencl"].get("detail", [])) if report["opencl"].get("available") else "?"

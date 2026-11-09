@@ -31,8 +31,8 @@
     "available": true,
     "count": 2,
     "devices": [
-      "0d87:00:00.0 \"3D controller [0302]\" \"Microsoft Corporation [1414]\" \"Device [008a]\" -p00 \"\" \"\"",
-      "923a:00:00.0 \"3D controller [0302]\" \"Microsoft Corporation [1414]\" \"Basic Render Driver [008e]\" -p00 \"\" \"\""
+      "9950:00:00.0 \"3D controller [0302]\" \"Microsoft Corporation [1414]\" \"Device [008a]\" -p00 \"\" \"\"",
+      "c4af:00:00.0 \"3D controller [0302]\" \"Microsoft Corporation [1414]\" \"Basic Render Driver [008e]\" -p00 \"\" \"\""
     ],
     "raw_lines": 4
   },
@@ -119,5 +119,34 @@
   "rapl": {
     "available": false,
     "reason": "no intel-rapl zones (not Intel, no powercap, or WSL guest)"
+  },
+  "secureboot": {
+    "available": false,
+    "reason": "no efivars and no mokutil (BIOS boot or no permission)"
+  },
+  "frontier": {
+    "available": true,
+    "subsystems": {
+      "npu_device": {
+        "available": true,
+        "verdict": "DEGRADED-KNOWN",
+        "detail": "NPU not paravirtualized by dxgkrnl (Microsoft); use bare metal"
+      },
+      "npu_driver": {
+        "available": true,
+        "verdict": "DEGRADED-KNOWN",
+        "detail": "no intel_vpu in guest by design; NPU lane runs on bare metal only"
+      },
+      "secure_boot": {
+        "available": true,
+        "verdict": "UNKNOWN",
+        "detail": "no efivars and no mokutil (BIOS boot or no permission)"
+      },
+      "gpu_compute": {
+        "available": true,
+        "verdict": "FIXED",
+        "detail": "2 OpenCL device(s), clocks sane"
+      }
+    }
   }
 }

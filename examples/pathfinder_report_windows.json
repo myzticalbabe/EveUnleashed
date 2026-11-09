@@ -105,5 +105,34 @@
   "rapl": {
     "available": false,
     "reason": "powercap sysfs only exists on Linux"
+  },
+  "secureboot": {
+    "available": false,
+    "reason": "SecureBoot read needs admin BCD; check msinfo32 instead"
+  },
+  "frontier": {
+    "available": true,
+    "subsystems": {
+      "npu_device": {
+        "available": true,
+        "verdict": "UNKNOWN",
+        "detail": "not a Linux soil"
+      },
+      "npu_driver": {
+        "available": true,
+        "verdict": "UNKNOWN",
+        "detail": "module state unreadable here"
+      },
+      "secure_boot": {
+        "available": true,
+        "verdict": "UNKNOWN",
+        "detail": "SecureBoot read needs admin BCD; check msinfo32 instead"
+      },
+      "gpu_compute": {
+        "available": true,
+        "verdict": "FIXED",
+        "detail": "2 OpenCL device(s), clocks sane"
+      }
+    }
   }
 }
