@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eve-linkedin-lane"
+version = "0.1.0"
+description = "Quarantined LinkedIn paste lane for EveUnleashed: publish via saved browser session (stdlib only). Dry-run by default; --live posts."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+eve-linkedin-paste = "eve_linkedin:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
