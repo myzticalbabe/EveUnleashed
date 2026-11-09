@@ -34,7 +34,14 @@ permanent, not per-task.
 
 ## Dashboard (the operator watches)
 
-6. Receipts ARE the dashboard. OpenCode tails the live log while the
-pool runs -- `eve e2e --log PATH` for the live-logged run, one receipt
-per delegation, one span per handoff. The operator watches the
-Colosseum work, learner by learner, worker by worker.
+6. Receipts ride the built dashboard. OpenCode keeps
+`python tools/lane_watch.py [seconds]` (azazael checkout) open while
+the pool runs -- `eve e2e --log PATH` for the live-logged run, one
+receipt per delegation, one span per handoff. The operator watches
+the Colosseum work, learner by learner, worker by worker.
+
+## Record (fastest build, 2026-11-09 -- posterity)
+
+- Berzerker suite green frozen-exe-adjacent; 80/80 tests green on 316t.
+- Full build record lives in OPENCODE_LANE_ORDERS.md under ## Record.
+  Landed b3a4958.

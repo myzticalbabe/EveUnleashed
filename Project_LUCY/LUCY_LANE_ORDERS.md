@@ -33,7 +33,15 @@ permanent, not per-task.
 
 ## Dashboard (the operator watches)
 
-6. Every judged reply is observed. OpenCode opens the watch surface
-with the run: the five-gate verdict (one line per throw, fixed order)
-plus `eve e2e --log PATH` for the live-logged run the operator tails.
-A judgement with no open log is an unobserved judgement.
+6. Every judged reply is observed. OpenCode opens the built swarm
+dashboard with the run -- `python tools/lane_watch.py [seconds]` in
+the azazael checkout (board tail, claims, processes, HEAD, watchdog)
+-- beside the five-gate verdict (one line per throw, fixed order) and
+`eve e2e --log PATH` for the live-logged run the operator tails.
+A judgement with no open dashboard is an unobserved judgement.
+
+## Record (fastest build, 2026-11-09 -- posterity)
+
+- lucy OK frozen (grounding present); 80/80 tests green on 316t.
+- Full build record lives in Project_GAMORA/OPENCODE_LANE_ORDERS.md
+  under ## Record. Landed b3a4958.

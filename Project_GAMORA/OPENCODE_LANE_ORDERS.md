@@ -62,8 +62,27 @@ which road each answer took.
 ## Dashboard (the operator watches)
 
 10. Every swarm run is observed. OpenCode launches the watch surface
-with the swarm, not after it: `eve swarm --claims ... --workers N`
+with the swarm, not after it: `python tools/lane_watch.py [seconds]`
+in the azazael checkout -- the built swarm dashboard, one terminal:
+board tail, claims held, agent processes, fresh files, HEAD, watchdog
+verdict, read-only. Beside it: `eve swarm --claims ... --workers N`
 prints one verdict line per worker plus the tally line, and
 `eve e2e --log PATH` writes the live-logged run the operator tails.
-A swarm with no open log is an unobserved swarm -- open the surface
-first, fan second.
+A swarm with no open dashboard is an unobserved swarm -- open the
+surface first, fan second.
+
+## Record (fastest build, 2026-11-09 -- posterity, do not prune)
+
+- 316t free-threaded (3.16.0a1t, gil-disabled), venv py316t.
+- Nuitka 3.16 port novel upstream (3.16 "known not to work at all"):
+  5 venv files patched. Root cause measured: Nuitka_PyObject_GC_Link
+  wrote through _Py_AS_GC, but on 316t sizeof(PyGC_Head) != 16, so it
+  missed the type pre-header and zeroed heap metadata. Fix: the 0x400
+  Link arm is a pure no-op (pre-header clear + accounting are CPython's).
+  numpy 2.5.4 exonerated in the exe env.
+- Deliverable: dist/win10/EveUnleashed-win10.exe (onefile, 41MB),
+  LINK EXIT=0, --help EXIT=0. Frozen gates: langs arch gamora OK
+  (doctor rc=0), lucy OK (grounding present), jaeger-316t OK (trace
+  recorded); langs tools OK. 80/80 tests green on 316t.
+- Landed b3a4958. exe entry fixes: cli.py all-absolute imports,
+  trainer ImportError fallback, gamora doctor frozen import fallback.

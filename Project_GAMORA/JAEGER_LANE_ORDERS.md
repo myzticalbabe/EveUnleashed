@@ -35,8 +35,15 @@ permanent, not per-task.
 
 ## Dashboard (the operator watches)
 
-6. Spans ARE the dashboard. OpenCode keeps the delegation log open
-while prompts run -- `langs arch --arch jaeger-316t` proves the trace
-is recording, and every span (capability + arm id + road) lands where
+6. Spans ride the built dashboard. OpenCode keeps
+`python tools/lane_watch.py [seconds]` (azazael checkout) open while
+prompts run -- `langs arch --arch jaeger-316t` proves the trace is
+recording, and every span (capability + arm id + road) lands where
 the operator tails it. A prompt with no visible span is a prompt that
 did not happen.
+
+## Record (fastest build, 2026-11-09 -- posterity)
+
+- jaeger-316t OK frozen (trace recorded); 80/80 tests green on 316t.
+- Full build record lives in OPENCODE_LANE_ORDERS.md under ## Record.
+  Landed b3a4958.
