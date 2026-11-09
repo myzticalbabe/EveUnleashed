@@ -1,0 +1,26 @@
+# esp_recovery_grub.template -- shape of the ESP-level recovery menu.
+# @PARTUUID@ = GPT unique_partition_guid of disk-0 partition 8 (Ubuntu root),
+# filled by elevated_recover.ps1 from (Get-Partition).Guid. No other UUIDs:
+# every entry locates its target with `search --file`, so nothing rots.
+# Written to S:\EFI\ubuntu\grub.cfg (ESP partition 1); original kept as
+# grub.cfg.bak-<timestamp> beside it.
+set timeout=10
+set default=0
+insmod part_gpt
+insmod ext2
+insmod gzio
+
+menuentry 'Ubuntu 26.04 bare metal (recovered)' {
+    search --no-floppy --file /boot/vmlinuz --set=root
+    linux /boot/vmlinuz root=PARTUUID=@PARTUUID@ ro quiet splash mem_sleep_default=deep
+    initrd /boot/initrd.img
+}
+menuentry 'Ubuntu 26.04 fallback (device path)' {
+    search --no-floppy --file /boot/vmlinuz --set=root
+    linux /boot/vmlinuz root=/dev/nvme0n1p8 ro nomodeset i915.force_probe=!7d51 xe.force_probe=7d51
+    initrd /boot/initrd.img
+}
+menuentry 'Windows 11' {
+    search --no-floppy --file /EFI/Microsoft/Boot/bootmgfw.efi --set=root
+    chainloader /EFI/Microsoft/Boot/bootmgfw.efi
+}
