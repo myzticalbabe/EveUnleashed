@@ -1,0 +1,9 @@
+[project]
+name = "eve-unleashed"
+version = "3.16.0"
+description = "Eve Unleashed + Gamora cliT + Lucy + Berzerker coach + five books. Stdlib only."
+requires-python = ">=3.16"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["Project_GAMORA/tests", "tests"]
