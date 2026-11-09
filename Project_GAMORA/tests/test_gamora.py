@@ -75,6 +75,24 @@ def test_kilo_help_runs_through():
     assert gamora.main(["kilo", "--", "--help"]) == 0
 
 
+def test_opencode_absorbed_missing_binary_reports(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda *a, **k: None)
+    assert gamora.main(["opencode", "--", "run", "hi"]) == 1
+
+
+def test_opencode_help_runs_through():
+    assert gamora.main(["opencode", "--", "--help"]) == 0
+
+
+def test_freebuff_absorbed_missing_binary_reports(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda *a, **k: None)
+    assert gamora.main(["freebuff", "--", "--help"]) == 1
+
+
+def test_freebuff_help_runs_through():
+    assert gamora.main(["freebuff", "--", "--help"]) == 0
+
+
 def test_cradle_selector_empty_names_the_dir(monkeypatch, capsys):
     import eve_unleashed.cradle as c
     monkeypatch.setattr(c, "list_cradle_models", lambda *a, **k: [])

@@ -255,31 +255,51 @@ def cmd_kilo(args) -> int:
     Kilo's argv passes through untouched (its parser owns its flags); the
     span names the road so the ledger sees the delegation. Span note goes
     to stderr so `kilo run --format json` stdout stays parseable."""
+    return _absorb("kilo", "kilo.run", args.kilo_args)
+
+
+def _absorb(binary, capability, raw_args) -> int:
+    """Run a node agent CLI under one Jaeger span per delegation.
+
+    The agent's argv passes through untouched; the span note goes to
+    stderr so `--format json` stdout stays parseable. A missing binary is
+    a named message, never a traceback."""
     import shutil
     import subprocess
-    kilo = shutil.which("kilo")
-    if not kilo:
-        print("kilo: missing (not on PATH) -- nothing absorbed.")
+    exe = shutil.which(binary)
+    if not exe:
+        print("%s: missing (not on PATH) -- nothing absorbed." % binary)
         return 1
-    kilo_args = list(args.kilo_args or [])
-    if kilo_args[:1] == ["--"]:  # argparse REMAINDER keeps the separator
-        kilo_args = kilo_args[1:]
+    fwd = list(raw_args or [])
+    if fwd[:1] == ["--"]:  # argparse REMAINDER keeps the separator
+        fwd = fwd[1:]
     try:
         import jaeger_inject
-        out = jaeger_inject.inject(" ".join(kilo_args), capability="kilo.run",
+        out = jaeger_inject.inject(" ".join(fwd), capability=capability,
                                    arm_id="jaeger-316t", max_push=False)
-        print("<jaeger-316t trace_id=%s span_id=%s capability=kilo.run "
+        print("<jaeger-316t trace_id=%s span_id=%s capability=%s "
               "recorded=%s>" % (out["trace_id"], out["span_id"],
+                                  capability,
                                   "yes" if out["recorded"] else "header-only"),
               file=sys.stderr)
     except Exception as e:
-        print("kilo: untraced (%s) -- running anyway." % e, file=sys.stderr)
+        print("%s: untraced (%s) -- running anyway." % (binary, e),
+              file=sys.stderr)
     try:
-        rc = subprocess.run([kilo] + kilo_args).returncode
-        return int(rc or 0)
+        return int(subprocess.run([exe] + fwd).returncode or 0)
     except Exception as e:
-        print("kilo: failed (%s)" % e)
+        print("%s: failed (%s)" % (binary, e))
         return 1
+
+
+def cmd_opencode(args) -> int:
+    """Absorb OpenCode natively: one span per delegation, then opencode runs."""
+    return _absorb("opencode", "opencode.run", args.opencode_args)
+
+
+def cmd_freebuff(args) -> int:
+    """Absorb Freebuff natively: one span per delegation, then freebuff runs."""
+    return _absorb("freebuff", "freebuff.run", args.freebuff_args)
 
 
 def cmd_lucy(args) -> int:
@@ -442,6 +462,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("kilo", help="absorbed Kilo CLI, one span per run")
     p.add_argument("kilo_args", nargs=argparse.REMAINDER)
     p.set_defaults(fn=cmd_kilo)
+
+    p = sub.add_parser("opencode", help="absorbed OpenCode CLI, one span per run")
+    p.add_argument("opencode_args", nargs=argparse.REMAINDER)
+    p.set_defaults(fn=cmd_opencode)
+
+    p = sub.add_parser("freebuff", help="absorbed Freebuff CLI, one span per run")
+    p.add_argument("freebuff_args", nargs=argparse.REMAINDER)
+    p.set_defaults(fn=cmd_freebuff)
 
     p = sub.add_parser("lucy", help="Eliza + therapy, offline-first")
     p.add_argument("mood", help="how the user feels (one word)")
