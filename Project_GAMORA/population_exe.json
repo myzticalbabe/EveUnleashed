@@ -1,0 +1,155 @@
+{
+ "generation": 2,
+ "population": [
+  {
+   "tag": "g1m0",
+   "genome": {
+    "lto": "no",
+    "compress": "on",
+    "nofollow": "none"
+   },
+   "build_ok": true,
+   "build_s": 308.7,
+   "feasible": true,
+   "size_bytes": 39206912,
+   "cold_start_s": 2.59,
+   "fitness": 0.5,
+   "population_n": 3,
+   "feasible_n": 2
+  },
+  {
+   "tag": "g1m1",
+   "genome": {
+    "lto": "no",
+    "compress": "on",
+    "nofollow": "none"
+   },
+   "build_ok": true,
+   "build_s": 289.3,
+   "feasible": true,
+   "size_bytes": 39206912,
+   "cold_start_s": 0.75,
+   "fitness": 1.0,
+   "population_n": 3,
+   "feasible_n": 2
+  },
+  {
+   "tag": "g1m2",
+   "genome": {
+    "lto": "no",
+    "compress": "on",
+    "nofollow": "numpy"
+   },
+   "build_ok": true,
+   "build_s": 244.4,
+   "feasible": false,
+   "reason": "doctor rc=1 ready=False audit=True",
+   "size_bytes": 34422272,
+   "cold_start_s": 1.08,
+   "fitness": 0.0
+  }
+ ],
+ "history": [
+  {
+   "generation": 0,
+   "results": [
+    {
+     "tag": "g0m0",
+     "genome": {
+      "lto": "no",
+      "compress": "on",
+      "nofollow": "none"
+     },
+     "build_ok": true,
+     "build_s": 367.1,
+     "feasible": true,
+     "size_bytes": 39206912,
+     "cold_start_s": 1.51,
+     "fitness": 1.0,
+     "population_n": 3,
+     "feasible_n": 1
+    },
+    {
+     "tag": "g0m1",
+     "genome": {
+      "lto": "yes",
+      "compress": "on",
+      "nofollow": "none"
+     },
+     "build_ok": false,
+     "build_s": 710.6,
+     "feasible": false,
+     "reason": "build failed: t(\n  File \"C:\\Azazael\\.venvs\\py316t\\Lib\\site-packages\\nuitka\\build\\WindowsObjGenerator.py\", line 150:\n    shutil.copyfileobj(f_in, f_out)\n  File \"C:\\Users\\clint\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\shutil.py\", line 257:\n    fdst_write(buf)\nFATAL: Error, onefile bootstrap binary build failed.\n",
+     "fitness": 0.0
+    },
+    {
+     "tag": "g0m2",
+     "genome": {
+      "lto": "no",
+      "compress": "on",
+      "nofollow": "both"
+     },
+     "build_ok": true,
+     "build_s": 363.1,
+     "feasible": false,
+     "reason": "doctor rc=1 ready=False audit=True",
+     "size_bytes": 34422272,
+     "cold_start_s": 1.41,
+     "fitness": 0.0
+    }
+   ]
+  },
+  {
+   "generation": 1,
+   "results": [
+    {
+     "tag": "g1m0",
+     "genome": {
+      "lto": "no",
+      "compress": "on",
+      "nofollow": "none"
+     },
+     "build_ok": true,
+     "build_s": 308.7,
+     "feasible": true,
+     "size_bytes": 39206912,
+     "cold_start_s": 2.59,
+     "fitness": 0.5,
+     "population_n": 3,
+     "feasible_n": 2
+    },
+    {
+     "tag": "g1m1",
+     "genome": {
+      "lto": "no",
+      "compress": "on",
+      "nofollow": "none"
+     },
+     "build_ok": true,
+     "build_s": 289.3,
+     "feasible": true,
+     "size_bytes": 39206912,
+     "cold_start_s": 0.75,
+     "fitness": 1.0,
+     "population_n": 3,
+     "feasible_n": 2
+    },
+    {
+     "tag": "g1m2",
+     "genome": {
+      "lto": "no",
+      "compress": "on",
+      "nofollow": "numpy"
+     },
+     "build_ok": true,
+     "build_s": 244.4,
+     "feasible": false,
+     "reason": "doctor rc=1 ready=False audit=True",
+     "size_bytes": 34422272,
+     "cold_start_s": 1.08,
+     "fitness": 0.0
+    }
+   ]
+  }
+ ]
+}
