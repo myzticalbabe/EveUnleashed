@@ -8,7 +8,7 @@ CLI:  eve-linkedin-paste <markdown-file> [--state PATH] [--dry-run|--live]
 Default is --dry-run: builds the exact Voyager request, prints its SHAPE with
 secrets redacted, touches nothing. --live performs the POST.
 Exit 0 = pasted (live) or would-paste (dry-run). Exit 1 = blocked (no session,
-bad state, network/refusal). Exit 2 = --live refused without confirmation.
+bad state, network/refusal). Exit 2 = usage error.
 
 Secrets discipline: cookie VALUES never hit stdout, logs, or reports. Only
 names and lengths are ever printed.
@@ -20,6 +20,7 @@ import urllib.request
 import urllib.error
 
 VOYAGER_SHARES = "https://www.linkedin.com/voyager/api/contentcreation/normShares"
+VOYAGER_ME = "https://www.linkedin.com/voyager/api/me"
 
 
 def load_session(state_path):
@@ -33,27 +34,50 @@ def load_session(state_path):
     return jar, missing
 
 
-def build_request(text, jar):
-    """Shape the Voyager normShares POST. Returns (url, headers, payload).
+def csrf_token(jar):
+    raw = jar["JSESSIONID"].strip('"')
+    # Stored value is usually already "ajax:<id>"; prepend only if bare.
+    return raw if raw.startswith("ajax:") else "ajax:" + raw
 
-    header values are real (needed for --live); callers MUST redact on print.
-    """
-    csrf = "ajax:" + jar["JSESSIONID"].strip('"')
-    payload = {
-        "commentary": {"text": {"text": text}},
-        "lifecycleState": "PUBLISHED",
-        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
-    }
-    body = json.dumps(payload).encode("utf-8")
-    headers = {
-        "Content-Type": "application/json",
+
+def base_headers(jar):
+    return {
         "Accept": "application/json",
-        "csrf-token": csrf,
+        "csrf-token": csrf_token(jar),
         "X-RestLi-Protocol-Version": "2.0.0",
         "X-Li-Track": '{"clientVersion":"1.0"}',
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Cookie": "; ".join("%s=%s" % (k, v) for k, v in sorted(jar.items())),
     }
+
+
+def fetch_owner_urn(jar, timeout=30):
+    """Read-only GET /voyager/api/me; derive the shares owner URN. No writes."""
+    req = urllib.request.Request(VOYAGER_ME, headers=base_headers(jar), method="GET")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        me = json.loads(r.read().decode("utf-8", "replace"))
+    mp = me.get("miniProfile", {}) or {}
+    obj = mp.get("objectUrn", "")  # urn:li:member:<id>
+    mid = obj.rsplit(":", 1)[-1] if obj else str(me.get("plainId", ""))
+    if not mid:
+        raise ValueError("no member id in /me response keys=%s" % sorted(me.keys()))
+    return "urn:li:person:" + mid
+
+
+def build_request(text, jar, owner):
+    """Shape the Voyager normShares POST. Returns (url, headers, payload).
+
+    header values are real (needed for --live); callers MUST redact on print.
+    """
+    payload = {
+        "owner": owner,
+        "commentary": {"text": {"text": text}},
+        "lifecycleState": "PUBLISHED",
+        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+    }
+    body = json.dumps(payload).encode("utf-8")
+    headers = dict(base_headers(jar))
+    headers["Content-Type"] = "application/json"
     return VOYAGER_SHARES, headers, body
 
 
@@ -101,13 +125,17 @@ def main(argv=None):
         print("cannot read %s: %s" % (md_path, e))
         return 2
     jar, missing = load_session(state_path)
-    print("session: %d linkedin cookies (%s)" %
-          (len(jar), ",".join(sorted(jar.keys())[:8]) + ",..."))
+    print("session: %d linkedin cookies" % len(jar))
     if missing:
         print("BLOCKED: session missing %s; re-login and refresh %s" % (missing, state_path))
         return 1
-    url, headers, body = build_request(text, jar)
-    shape = {"url": url, "headers": redact(headers),
+    try:
+        owner = fetch_owner_urn(jar)
+    except Exception as e:
+        print("BLOCKED: owner lookup failed: %s" % str(e)[:200])
+        return 1
+    url, headers, body = build_request(text, jar, owner)
+    shape = {"url": url, "owner": owner, "headers": redact(headers),
              "payload_keys": sorted(json.loads(body.decode()).keys()),
              "text_chars": len(text)}
     print("request shape: %s" % json.dumps(shape))
