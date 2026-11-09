@@ -166,29 +166,72 @@ def cmd_eve(args) -> int:
         return int(s.code or 0)
 
 
-def _cradle_script():
-    """Locate cradle.py: tree first, then installed data (wheel/exe)."""
-    from pathlib import Path as _P
-    cands = [REPO / "Project_CRADLE" / "cradle.py",
-             _P(sys.prefix) / "gamora_data" / "cradle.py",
-             _P(__file__).resolve().parent / "gamora_data" / "cradle.py"]
-    for c in cands:
-        if c.is_file():
-            return c
-    return cands[0]
+def _cradle_selector() -> int:
+    """No-args cradle: numbered selector over cradle models, then adopt."""
+    repo_src = REPO / "src"
+    sys.path.insert(0, str(repo_src))
+    try:
+        from eve_unleashed.cradle import adopt_cradle, list_cradle_models
+    except Exception as e:
+        print("cradle: unavailable (%s)" % e)
+        return 1
+    try:
+        models = list_cradle_models() or []
+    except Exception as e:
+        print("cradle: cannot list (%s)" % e)
+        return 1
+    if not models:
+        print("cradle: empty -- drop a model file in ~/.azazael/cradle,")
+        print("cradle: then run `gamora cradle` again to choose.")
+        return 0
+    for i, m in enumerate(models, 1):
+        print("  [%d] %s [%s]" % (i, m.get("name"), m.get("framework")))
+    try:
+        raw = input("choose [1-%d] (0 adopts all): " % len(models)).strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\ncradle: cancelled -- nothing adopted.")
+        return 1
+    if raw in ("", "0"):
+        want = None
+    else:
+        try:
+            want = models[int(raw) - 1].get("name")
+        except (ValueError, IndexError):
+            print("cradle: choose 1-%d or 0 -- nothing adopted." % len(models))
+            return 1
+    try:
+        summary = adopt_cradle()
+    except Exception as e:
+        print("cradle: adopt failed (%s)" % e)
+        return 1
+    rows = ([("ADOPTED", n, "%s via %s" % (f, r)) for n, f, r in summary["adopted"]]
+            + [("FAILED", n, d) for n, d in summary["failed"]]
+            + [("SKIPPED", n, w) for n, w in summary["skipped"]])
+    shown = [row for row in rows if want is None or row[1] == want]
+    for state, name, detail in shown:
+        print("  %s %s (%s)" % (state, name, detail))
+    print("adopted=%d failed=%d skipped=%d" % (len(summary["adopted"]),
+          len(summary["failed"]), len(summary["skipped"])))
+    return 0 if not summary["failed"] else 1
 
 
 def cmd_cradle(args) -> int:
-    """Passthrough to Project_CRADLE/cradle.py (doctor/demo/grimoire/serve)."""
-    cradle = _cradle_script()
-    if not cradle.is_file():
-        print("cradle: missing (%s)" % cradle)
-        return 1
-    import runpy
-    sys.argv = ["cradle.py"] + list(args.cradle_args or [])
+    """Cradle models: selector with no args, else Eve's cradle command."""
+    repo_src = REPO / "src"
+    sys.path.insert(0, str(repo_src))
     try:
-        runpy.run_path(str(cradle), run_name="__main__")
-        return 0
+        from eve_unleashed.cli import main as eve_main
+    except Exception as e:
+        print("cradle: unavailable (%s)" % e)
+        return 1
+    cradle_args = list(args.cradle_args or [])
+    if cradle_args[:1] == ["--"]:  # argparse REMAINDER keeps the separator
+        cradle_args = cradle_args[1:]
+    if not cradle_args and sys.stdin.isatty():
+        return _cradle_selector()
+    sys.argv = ["eve", "cradle"] + cradle_args
+    try:
+        return int(eve_main() or 0)
     except SystemExit as s:
         return int(s.code or 0)
     except Exception as e:

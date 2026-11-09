@@ -38,12 +38,58 @@ def test_swarm_command_runs_offline():
     assert rc == 0
 
 
-def test_cradle_prefers_tree_then_installed_data(tmp_path, monkeypatch):
-    assert gamora._cradle_script() == gamora.REPO / "Project_CRADLE" / "cradle.py"
-    fake_prefix = tmp_path / "prefix"
-    (fake_prefix / "gamora_data").mkdir(parents=True)
-    shipped = fake_prefix / "gamora_data" / "cradle.py"
-    shipped.write_text("# shipped cradle\n")
-    monkeypatch.setattr(sys, "prefix", str(fake_prefix))
-    monkeypatch.setattr(gamora, "REPO", tmp_path / "empty-tree")
-    assert gamora._cradle_script() == shipped
+def test_cradle_delegates_to_eve_cradle():
+    # No tree script is consulted: eve owns cradle (adopt/list/run).
+    assert not hasattr(gamora, "_cradle_script")
+    rc = gamora.main(["cradle", "--", "--help"])
+    assert rc == 0
+
+
+class _TtyIn:
+    def isatty(self):
+        return True
+
+
+def test_cradle_selector_empty_cradle(monkeypatch, capsys):
+    import eve_unleashed.cradle as c
+    monkeypatch.setattr(c, "list_cradle_models", lambda *a, **k: [])
+    monkeypatch.setattr(sys, "stdin", _TtyIn())
+    assert gamora.main(["cradle"]) == 0
+    assert "empty" in capsys.readouterr().out
+
+
+def test_cradle_selector_chooses_one(monkeypatch, capsys):
+    import eve_unleashed.cradle as c
+    monkeypatch.setattr(c, "list_cradle_models",
+                        lambda *a, **k: [{"name": "m1", "framework": "gguf"}])
+    monkeypatch.setattr(c, "adopt_cradle",
+                        lambda *a, **k: {"adopted": [("m1", "gguf", "r")],
+                                         "failed": [], "skipped": []})
+    monkeypatch.setattr(sys, "stdin", _TtyIn())
+    monkeypatch.setattr("builtins.input", lambda *a, **k: "1")
+    assert gamora.main(["cradle"]) == 0
+    out = capsys.readouterr().out
+    assert "ADOPTED m1" in out
+
+
+def test_cradle_selector_empty_names_the_dir(monkeypatch, capsys):
+    import eve_unleashed.cradle as c
+    monkeypatch.setattr(c, "list_cradle_models", lambda *a, **k: [])
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    assert gamora._cradle_selector() == 0
+    assert ".azazael/cradle" in capsys.readouterr().out
+
+
+def test_cradle_selector_chooses_one(monkeypatch, capsys):
+    import eve_unleashed.cradle as c
+    fake = [{"name": "a.gguf", "framework": "gguf"},
+            {"name": "b.pt", "framework": "torch"}]
+    monkeypatch.setattr(c, "list_cradle_models", lambda *a, **k: fake)
+    monkeypatch.setattr(c, "adopt_cradle", lambda *a, **k: {
+        "adopted": [("b.pt", "torch", "direct:torch")],
+        "failed": [], "skipped": [("a.gguf", "not chosen")]})
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda *a, **k: "2")
+    assert gamora._cradle_selector() == 0
+    out = capsys.readouterr().out
+    assert "[1] a.gguf" in out and "ADOPTED b.pt" in out
