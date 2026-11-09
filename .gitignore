@@ -5,3 +5,10 @@ dist/
 build/
 *.egg-info/
 .berzerker_ledger/
+graphify-out/cache/
+graphify-out/.graphify_ast.json
+graphify-out/.graphify_extract.json
+graphify-out/.graphify_semantic.json
+graphify-out/.graphify_analysis.json
+graphify-out/.graphify_detect.json
+graphify-out/.graphify_chunk_*.json

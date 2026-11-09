@@ -40,6 +40,20 @@ the pool runs -- `eve e2e --log PATH` for the live-logged run, one
 receipt per delegation, one span per handoff. The operator watches
 the Colosseum work, learner by learner, worker by worker.
 
+## Graphs (re-graph after restart)
+
+7. Stale graph: `graphify extract C:/Azazael/EveUnleashed
+--backend <keyed>`, then `graphify export html` + `graphify tree`.
+Provider-agnostic (gemini|kimi|claude|openai|deepseek|ollama) -- use
+whichever key is set. Full orders in OPENCODE_LANE_ORDERS.md.
+
+## Providers (one orchestration, any provider native)
+
+8. The coach advises on any provider: toolchain probes and receipts are
+provider-blind; the swarm behind a drill is whichever backend the
+environment names. No key means offline scaffolds, never silence.
+Full provider orders in OPENCODE_LANE_ORDERS.md under ## Providers.
+
 ## Record (fastest build, 2026-11-09 -- posterity)
 
 - Berzerker suite green frozen-exe-adjacent; 80/80 tests green on 316t.

@@ -42,6 +42,19 @@ recording, and every span (capability + arm id + road) lands where
 the operator tails it. A prompt with no visible span is a prompt that
 did not happen.
 
+## Graphs (re-graph after restart)
+
+7. Stale graph: `graphify extract C:/Azazael/EveUnleashed
+--backend <keyed>`, then `graphify export html` + `graphify tree`.
+Provider-agnostic (gemini|kimi|claude|openai|deepseek|ollama) -- use
+whichever key is set. Full orders in OPENCODE_LANE_ORDERS.md.
+
+## Providers (one orchestration, any provider native)
+
+8. The trace header rides every provider: max or swarm, the capability +
+arm id + span are identical. Backend by environment, never hardcoded.
+Full provider orders in OPENCODE_LANE_ORDERS.md under ## Providers.
+
 ## Record (fastest build, 2026-11-09 -- posterity)
 
 - jaeger-316t OK frozen (trace recorded); 80/80 tests green on 316t.

@@ -71,6 +71,30 @@ prints one verdict line per worker plus the tally line, and
 A swarm with no open dashboard is an unobserved swarm -- open the
 surface first, fan second.
 
+## Graphs (the lanes re-graph after restart)
+
+11. Refresh graphs/maps/index on session start when stale:
+`graphify extract C:/Azazael/EveUnleashed --backend <keyed>` builds
+this repo's graphify-out (graph.json + GRAPH_REPORT.md); then
+`graphify export html` and `graphify tree` for the maps. Parent
+index: `graphify update C:/Azazael/azazael/src` (code-only, no LLM
+needed). Provider-agnostic: gemini|kimi|claude|openai|deepseek|ollama
+-- use whichever key is set, never prompt for one.
+
+## Providers (one orchestration: CLI + TTY + GUI, any provider native)
+
+12. The lanes handle ANY provider the operator wants, natively, as one
+orchestration across three surfaces: CLI (`graphify extract --backend`,
+`eve swarm`, `langs`), TTY (`lane_watch.py`, live-log tails), GUI
+(monitor html, `eve live` morph window). The backend is chosen by
+environment, never hardcoded: whichever key is set wins
+(GEMINI/GOOGLE, ANTHROPIC + ANTHROPIC_BASE_URL for LiteLLM/gateways,
+OPENAI + OPENAI_BASE_URL for self-hosted llama.cpp/vLLM/LM Studio,
+DEEPSEEK, KIMI, ollama local). No key on file means no model call --
+the lane degrades to offline answers (grounding script, named message),
+never a prompt for a key, never a traceback. A new provider is added by
+naming its env vars here, not by editing lane code.
+
 ## Record (fastest build, 2026-11-09 -- posterity, do not prune)
 
 - 316t free-threaded (3.16.0a1t, gil-disabled), venv py316t.

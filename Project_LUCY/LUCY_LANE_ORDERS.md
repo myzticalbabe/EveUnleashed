@@ -40,6 +40,20 @@ the azazael checkout (board tail, claims, processes, HEAD, watchdog)
 `eve e2e --log PATH` for the live-logged run the operator tails.
 A judgement with no open dashboard is an unobserved judgement.
 
+## Graphs (re-graph after restart)
+
+7. Stale graph: `graphify extract C:/Azazael/EveUnleashed
+--backend <keyed>`, then `graphify export html` + `graphify tree`.
+Provider-agnostic (gemini|kimi|claude|openai|deepseek|ollama) -- use
+whichever key is set. Full orders in OPENCODE_LANE_ORDERS.md.
+
+## Providers (one orchestration, any provider native)
+
+8. Lucy answers offline first; a caller WITH any keyed provider may ask
+the swarm through `therapy_prompt`. Backend by environment, never
+hardcoded, never prompted. Full provider orders in
+OPENCODE_LANE_ORDERS.md under ## Providers.
+
 ## Record (fastest build, 2026-11-09 -- posterity)
 
 - lucy OK frozen (grounding present); 80/80 tests green on 316t.
