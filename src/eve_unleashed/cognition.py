@@ -103,6 +103,21 @@ def _src_root():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _present(root, locus):
+    """A locus counts as present if its file is on disk -- or, in a frozen
+    exe where sources are compiled in, if its module imports."""
+    if os.path.exists(os.path.join(root, locus)):
+        return True
+    if locus.endswith(".py"):
+        mod = locus[:-3].replace("/", ".")
+        try:
+            __import__(mod)
+            return True
+        except Exception:
+            return False
+    return False
+
+
 def _exercised(events):
     seen = set()
     for r in events:
@@ -117,7 +132,7 @@ def audit(log_path=None):
     root = _src_root()
     rows = []
     for name, stratum, what, locus, evidence in PROCESSES:
-        present = os.path.exists(os.path.join(root, locus))
+        present = _present(root, locus)
         fired = bool(evidence) and any(e in seen for e in evidence)
         if not present:
             state = "absent"
