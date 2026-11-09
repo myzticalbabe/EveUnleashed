@@ -27,6 +27,22 @@ def test_inject_carries_trace_and_drive():
     assert out["capability"] == "t.cap" and out["arm_id"] == "t.arm"
 
 
+def test_inject_recorded_flag_is_honest():
+    # Regression: _record_span once returned True while the ledger got
+    # nothing (in-tree CORE mirror shadowed the span writer). True must
+    # mean the span row exists.
+    out = jaeger_inject.inject("honesty probe", capability="t.honest",
+                               arm_id="t.arm", max_push=False)
+    assert out["recorded"] is True
+    import sqlite3
+    from pathlib import Path
+    db = Path.home() / ".azazael" / "telemetry_store.db"
+    rows = sqlite3.connect(str(db)).execute(
+        "SELECT span_id FROM otel_spans WHERE trace_id=?",
+        (out["trace_id"],)).fetchall()
+    assert [r[0] for r in rows] == [out["span_id"]]
+
+
 def test_inject_no_drive_is_header_only():
     out = jaeger_inject.inject("hi", max_push=False)
     assert "<jaeger-316t" in out["injected"]

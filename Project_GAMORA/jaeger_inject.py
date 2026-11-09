@@ -71,10 +71,13 @@ def _record_span(prompt, *, capability, arm_id, trace_id, span_id):
                 "prompt_chars": len(prompt or ""),
                 "injector": "jaeger-316t"}
         duration_ms = (time.perf_counter() - t0) * 1000.0
-        emit_delegation(flat, capability=capability, arm_id=arm_id,
-                        trace_id=trace_id, span_id=span_id,
-                        duration_ms=duration_ms)
-        return True
+        got = emit_delegation(flat, capability=capability, arm_id=arm_id,
+                              trace_id=trace_id, span_id=span_id,
+                              duration_ms=duration_ms)
+        # Honest flag: emit returns None when nothing was written (tracing off,
+        # writer unimportable, write failed). A True here once masked a dead
+        # ledger for a whole session -- never again.
+        return bool(got)
     except Exception:
         try:
             from CORE.failure_ledger import note_failure  # noqa: E401
