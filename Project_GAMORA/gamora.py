@@ -1,4 +1,4 @@
-"""Gamora DOMellifluousML cliT -- agentic CLI harness on the 316t interpreter.
+"""Gamora DOMellifluousML Berzerker A-I-O cliT -- agentic CLI harness on the 316t interpreter.
 
 WHAT GAMORA IS
 --------------
@@ -318,7 +318,7 @@ def cmd_inject(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="gamora",
-        description="Gamora DOMellifluousML cliT -- one command over "
+        description="Gamora DOMellifluousML Berzerker A-I-O cliT -- one command over "
                     "lilith swarm, eve, jaeger 3:16T, cradle, berzerker.")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

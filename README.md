@@ -5,7 +5,7 @@ three children, five books. Stdlib only, offline-first, receipted.
 
 | Tree | What it is | Run it |
 | --- | --- | --- |
-| `Project_GAMORA/` | Gamora DOMellifluousML cliT — one command over lilith, eve, jaeger, cradle, lucy, berzerker | `python Project_GAMORA/gamora.py doctor` |
+| `Project_GAMORA/` | Gamora DOMellifluousML Berzerker A-I-O cliT — one command over lilith, eve, jaeger, cradle, lucy, berzerker | `python Project_GAMORA/gamora.py doctor` |
 | `Project_LUCY/` | Lucy — Eliza + live therapy, natively combined, plus the colosseum arena | `python Project_GAMORA/gamora.py lucy hopeful "first build"` |
 | `src/eve_unleashed/` | Eve Unleashed — inference engine, langs (rust/go/python), wasm tiers, swarm, debunk, cognition, MellifluousML | `python Project_GAMORA/gamora.py eve -- --help` |
 | `docs/bible/` | The five books — canon, star-trek, star-wars, emotional, female | `python tools/bible_check.py --check` |

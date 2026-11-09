@@ -1,4 +1,4 @@
-# PROJECT GAMORA -- Gamora DOMellifluousML cliT
+# PROJECT GAMORA -- Gamora DOMellifluousML Berzerker A-I-O cliT
 
 One command over parts that existed and did not know about each other.
 
