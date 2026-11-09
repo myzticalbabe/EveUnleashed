@@ -40,6 +40,18 @@ except ImportError:                               # never break the host
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 # from typing import Optional  # removed — all names have native equivalents
 
+async def _to_thread(func, *args, **kwargs):
+    """asyncio.to_thread backport for 3.8 (to_thread landed in 3.9)."""
+    import asyncio as _aio_mod
+    import functools
+    to_thread = getattr(_aio_mod, "to_thread", None)
+    if to_thread is not None:
+        return await to_thread(func, *args, **kwargs)
+    loop = _aio_mod.get_running_loop()
+    return await loop.run_in_executor(
+        None, functools.partial(func, *args, **kwargs))
+
+
 SWARM_TIMEOUT_S = 180
 
 
@@ -1555,7 +1567,7 @@ def cmd_serve(args) -> int:
         import asyncio as _aio
         try:
             local_text, local_tag = await _aio.wait_for(
-                _aio.to_thread(_local_answer, prompt), timeout=200)
+                _to_thread(_local_answer, prompt), timeout=200)
         except Exception as e:
             note_failure("cli:therapy-local", e)
             local_text, local_tag = None, "local error"
@@ -1565,7 +1577,7 @@ def cmd_serve(args) -> int:
                     "live": True}
         try:
             win, _reason = await _aio.wait_for(
-                _aio.to_thread(_swarm_fallback, prompt),
+                _to_thread(_swarm_fallback, prompt),
                 timeout=SWARM_TIMEOUT_S + 30)
         except Exception as e:
             note_failure("cli:therapy-swarm", e)
@@ -1622,7 +1634,7 @@ def cmd_serve(args) -> int:
                     import asyncio as _aio
                     try:
                         win, reason = await _aio.wait_for(
-                            _aio.to_thread(_swarm_fallback, inputs),
+                            _to_thread(_swarm_fallback, inputs),
                             timeout=SWARM_TIMEOUT_S + 30)
                     except Exception as te:
                         note_failure("cli:swarm-serve", te)

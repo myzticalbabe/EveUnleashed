@@ -206,8 +206,11 @@ class GeneticAlgorithm:
             fit = dict(self.fitness)
 
         # Score each genome; missing fitness = baseline 0.3.
-        scored = [(d, f.score() if (f := fit.get(d.worm_id)) is not None else 0.3)
-                  for d in pop]
+        # Plain loop (no walrus): keeps this module importable on 3.7.
+        scored = []
+        for d in pop:
+            f = fit.get(d.worm_id)
+            scored.append((d, f.score() if f is not None else 0.3))
         scored.sort(key=lambda x: x[1], reverse=True)
 
         elites = [d for d, _ in scored[: self.elite_keep]]
@@ -246,9 +249,10 @@ class GeneticAlgorithm:
     def _best_unlocked(self) -> Optional[WormDNA]:
         if not self.population:
             return None
-        scored = [(d, f.score() if (f := self.fitness.get(d.worm_id)) is not None
-                   else 0.3)
-                  for d in self.population]
+        scored = []
+        for d in self.population:
+            f = self.fitness.get(d.worm_id)
+            scored.append((d, f.score() if f is not None else 0.3))
         return max(scored, key=lambda x: x[1])[0]
 
     def snapshot(self) -> Dict[str, Any]:
