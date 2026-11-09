@@ -1,0 +1,22 @@
+#!/bin/sh
+exec tail -n +3 $0
+# Managed by EveUnleashed/baremetal/apply.sh — re-running apply.sh rewrites
+# everything below. Hardware: Core Ultra 9 285H, Arc 140T 0x7D51, AI Boost NPU.
+# Kernel symlinks track updates; no version pins.
+
+menuentry 'Ubuntu 26.04 bare metal' --class ubuntu {
+    search --no-floppy --fs-uuid --set=root @ROOT_UUID@
+    linux /boot/vmlinuz root=UUID=@ROOT_UUID@ ro quiet splash mem_sleep_default=deep
+    initrd /boot/initrd.img
+}
+
+menuentry 'Ubuntu 26.04 fallback (i915-grab recovery)' --class ubuntu {
+    search --no-floppy --fs-uuid --set=root @ROOT_UUID@
+    linux /boot/vmlinuz root=UUID=@ROOT_UUID@ ro nomodeset i915.force_probe=!7d51 xe.force_probe=7d51
+    initrd /boot/initrd.img
+}
+
+menuentry 'Windows 11' --class windows {
+    search --fs-uuid --no-floppy --set=root @ESP_UUID@
+    chainloader (${root})/EFI/Microsoft/Boot/bootmgfw.efi
+}

@@ -1,0 +1,10 @@
+# Enforced by EveUnleashed/baremetal/apply.sh into /etc/default/grub.
+# No i915/xe force_probe on kernel 7.0: the Arc 140T (0x7D51) binds xe natively.
+# The i915-grab fallback lives in 40_custom, not here.
+GRUB_DEFAULT=saved
+GRUB_SAVEDEFAULT=true
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TIMEOUT=10
+GRUB_DISTRIBUTOR=Ubuntu 26.04 bare metal
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash mem_sleep_default=deep"
+GRUB_CMDLINE_LINUX=""
