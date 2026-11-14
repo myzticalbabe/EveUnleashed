@@ -58,14 +58,52 @@ SWARM_TIMEOUT_S = 180
 def _local_answer(prompt, system=None):
     """Try the local LLM first (LM Studio / llama-server / GGUF direct).
 
-    Returns (text, provider_tag) or (None, reason). Never raises: the
-    local path is a preference, not a gate -- failure falls through to
-    the swarm, and the reason names why."""
+    The operator's ``eve models`` selection wins when set; otherwise the
+    automatic probe chain runs. Returns (text, provider_tag) or
+    (None, reason). Never raises: the local path is a preference, not a
+    gate -- failure falls through to the swarm, and the reason names why."""
     try:
         from eve_unleashed.interpreter_bridge import EveInterpreterBridge
     except Exception as e:
         note_failure("cli:local-import", e)
         return None, "local bridge unavailable (%s)" % e
+    try:
+        from eve_unleashed import model_picker as _mp
+        sel = _mp.load_selection()
+    except Exception as e:
+        note_failure("cli:local-selection", e)
+        sel = None
+    sel_error = None
+    if sel:
+        try:
+            import os as _os
+            bridge = EveInterpreterBridge()
+            kind = sel.get("kind")
+            if kind in ("server", "cloud"):
+                key = _os.environ.get(sel.get("key_env") or "", "") or None
+                out = bridge.run_explicit(sel.get("base", ""), sel.get("model", ""),
+                                          prompt, system, api_key=key,
+                                          provider_tag="local:%s" % sel.get("provider", "explicit"))
+                if isinstance(out, dict) and out.get("status") == "ok" and out.get("result"):
+                    return (str(out["result"]),
+                            "local:%s/%s" % (sel.get("provider"), sel.get("model")))
+            elif kind == "agent":
+                out = _mp.run_agent(sel.get("agent") or sel.get("provider", ""),
+                                    sel.get("run_model") or sel.get("model", ""), prompt)
+                if isinstance(out, dict) and out.get("status") == "ok" and out.get("result"):
+                    return (str(out["result"]),
+                            "local:%s/%s" % (sel.get("provider"), sel.get("model")))
+            elif kind in ("gguf", "cradle"):
+                out = bridge.run_cradle(prompt, sel.get("path") or sel.get("model"))
+                if isinstance(out, dict) and out.get("status") == "ok" and out.get("result"):
+                    return (str(out["result"]),
+                            "local:%s/%s" % (sel.get("provider"), sel.get("model")))
+            if isinstance(out, dict) and out.get("status") != "ok":
+                sel_error = out.get("error", "selected provider failed")
+        except Exception as e:
+            note_failure("cli:local-selected", e)
+            sel_error = "%s" % e
+        # explicit selection failed: fall through to the automatic chain
     try:
         bridge = EveInterpreterBridge()
         out = bridge.run_local(prompt, system=system)
@@ -76,6 +114,10 @@ def _local_answer(prompt, system=None):
         tag = out.get("provider") or out.get("model") or "local"
         return str(out["result"]), "local:%s" % tag
     err = (out or {}).get("error", "no local generation path") if isinstance(out, dict) else "no local generation path"
+    if sel_error:
+        # The operator chose explicitly: their error is the actionable one.
+        return None, "selected %s/%s unavailable (%s)" % (
+            sel.get("provider"), sel.get("model"), str(sel_error)[:200])
     return None, "local unavailable (%s)" % str(err)[:120]
 
 
@@ -505,7 +547,6 @@ def cmd_infer(args) -> int:
         inputs = json.loads(input_str)
     except json.JSONDecodeError as exc:
         # Treat as plain string (for GGUF/transformers/VL text prompts)
-        # Treat as plain string (for GGUF/transformers/VL text prompts)
         note_failure("cli:L38", exc)
         inputs = input_str
 
@@ -515,8 +556,37 @@ def cmd_infer(args) -> int:
     if framework == "auto":
         framework = ModelLoader.guess_framework(Path(args.model))
 
+    # Prepare load kwargs for advanced features
+    load_kwargs = {}
+    
+    # Speculative decoding
+    if args.speculative:
+        if not args.draft_model:
+            print("ERROR: --speculative requires --draft-model", file=sys.stderr)
+            return 1
+        load_kwargs["draft_model_path"] = args.draft_model
+        load_kwargs["num_draft_tokens"] = args.num_draft_tokens
+        if framework in ("gguf", "auto"):
+            framework = "gguf-speculative"
+    
+    # KV cache quantization
+    if args.kv_quant:
+        load_kwargs["kv_bits"] = args.kv_quant
+        if framework in ("gguf", "auto"):
+            framework = "gguf-kv-quant"
+    
+    # Multi-modal (LLaVA-style)
+    if args.image:
+        if framework in ("gguf", "auto"):
+            framework = "gguf-multimodal"
+        # Convert image paths to input dict
+        if isinstance(inputs, str):
+            inputs = {"text": inputs, "images": args.image}
+        elif isinstance(inputs, dict):
+            inputs["images"] = args.image
+
     try:
-        handle = engine.load_model(args.model, framework)
+        handle = engine.load_model(args.model, framework, **load_kwargs)
     except Exception as e:
         if "not installed" in str(e) and isinstance(inputs, str):
             print(f"local framework missing ({e}) -- trying LLM swarm...",
@@ -567,6 +637,23 @@ def cmd_infer(args) -> int:
         print("Predictions:")
         for p in (result.predictions or [])[:20]:
             print(f"  {p}")
+
+    # Print speculative stats if available
+    if hasattr(engine, 'get_speculative_stats'):
+        spec_stats = engine.get_speculative_stats(handle)
+        if spec_stats:
+            print(f"\nSpeculative stats:")
+            print(f"  Acceptance rate: {spec_stats.get('acceptance_rate', 0):.2%}")
+            print(f"  Speedup factor:  {spec_stats.get('speedup_factor', 0):.2f}x")
+
+    # Print KV quant stats if available
+    if hasattr(engine, 'get_kv_quant_stats'):
+        kv_stats = engine.get_kv_quant_stats(handle)
+        if kv_stats:
+            print(f"\nKV Quantization stats:")
+            print(f"  Original:  {kv_stats.get('original_mb', 0)} MB")
+            print(f"  Quantized: {kv_stats.get('quantized_mb', 0)} MB")
+            print(f"  Savings:   {kv_stats.get('savings_pct', 0)}%")
 
     engine.shutdown()
     return 0
@@ -636,6 +723,171 @@ def cmd_list_models(args) -> int:
             print("  (no model files found)")
 
     return 0
+
+
+def cmd_models(args) -> int:
+    """Provider-agnostic model picker (opencode-style)."""
+    from eve_unleashed import model_picker as _mp
+
+    if args.add:
+        if not args.base:
+            print("ERROR: --add needs --base <url>", file=sys.stderr)
+            return 1
+        entry = _mp.add_custom(args.add, args.base, args.model or "",
+                               args.key_env or "")
+        print("registered: %s -> %s" % (entry["name"], entry["base"]))
+        args.set = "%s/%s" % (entry["name"], entry["model"]) if entry["model"] else None
+        if not args.set:
+            return 0
+    if args.remove:
+        if _mp.remove_custom(args.remove):
+            print("removed custom provider: %s" % args.remove)
+            return 0
+        print("ERROR: no custom provider named %r" % args.remove, file=sys.stderr)
+        return 1
+
+    entries = _mp.discover()
+    if args.json:
+        print(json.dumps({"current": _mp.current_id(), "entries": entries}, indent=2))
+        return 0
+    if args.set:
+        want = args.set.strip()
+        match = next((e for e in entries if _mp.entry_id(e) == want), None)
+        if match is None:
+            lowered = want.lower()
+            match = next((e for e in entries if lowered in _mp.entry_id(e).lower()), None)
+        if match is None:
+            print("ERROR: no provider matches %r" % want, file=sys.stderr)
+            _print_entries(entries, _mp.current_id())
+            return 1
+        _mp.save_selection(match)
+        print("selected: %s" % _mp.entry_id(match))
+        return 0
+
+    current = _mp.current_id()
+    _print_entries(entries, current)
+    if not entries:
+        print("\nno providers found: start LM Studio / Ollama / llama-server,")
+        print("drop a .gguf into ~/.azazael/cradle, or:")
+        print("  eve models --add mybox --base http://HOST:PORT [--model ID] [--key-env VAR]")
+        return 1
+    if not sys.stdin.isatty():
+        print("\nnon-interactive: re-run with --set provider/model")
+        return 1
+    try:
+        raw = input("select [1-%d], text filters, Enter keeps current: " % len(entries)).strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return 1
+    if not raw:
+        if current:
+            print("kept: %s" % current)
+            return 0
+        print("ERROR: nothing selected", file=sys.stderr)
+        return 1
+    if raw.isdigit() and 1 <= int(raw) <= len(entries):
+        _mp.save_selection(entries[int(raw) - 1])
+        print("selected: %s" % _mp.entry_id(entries[int(raw) - 1]))
+        return 0
+    narrowed = [e for e in entries if raw.lower() in _mp.entry_id(e).lower()]
+    if len(narrowed) == 1:
+        _mp.save_selection(narrowed[0])
+        print("selected: %s" % _mp.entry_id(narrowed[0]))
+        return 0
+    if narrowed:
+        _print_entries(narrowed, current)
+        print("ERROR: %d match -- be specific (number or fuller text)" % len(narrowed),
+              file=sys.stderr)
+        return 1
+    print("ERROR: no provider matches %r" % raw, file=sys.stderr)
+    return 1
+
+
+def _print_entries(entries, current) -> None:
+    from eve_unleashed import model_picker as _mp
+    if not entries:
+        print("(no providers discovered)")
+        return
+    for i, e in enumerate(entries, 1):
+        mark = "\u25cf" if _mp.entry_id(e) == current else " "
+        extra = e.get("base") or e.get("path") or ""
+        home = str(Path.home())
+        if extra.startswith(home):
+            extra = "~" + extra[len(home):]
+        if len(extra) > 44:
+            extra = extra[:20] + "..." + extra[-21:]
+        down = " [down]" if e.get("down") else ""
+        auth = ""
+        if e.get("kind") == "agent" and not e.get("authed", True):
+            auth = " [needs login: %s auth login]" % e.get("agent", e.get("provider"))
+        note = (" [%s]" % e["note"]) if e.get("note") else ""
+        print(" %s %-3d %s  %s%s%s%s" % (mark, i, _mp.entry_id(e), extra, down, auth, note))
+    print("current: %s" % (current or "(none)"))
+
+
+def cmd_dashboard(args) -> int:
+    """Serve the localhost dashboard (Gamora's face)."""
+    from eve_unleashed import dashboard as _d
+    return _d.serve(args.port)
+
+
+def cmd_ask(args) -> int:
+    """Eve answers as Eve: vessel voice, native hands, your backend."""
+    from eve_unleashed import eve_vessel as _ev
+    vessel = _ev.load_vessel()
+    if not vessel["ok"]:
+        print("ERROR: %s" % vessel["error"], file=sys.stderr)
+        return 1
+    if vessel["missing"]:
+        print("ERROR: vessel incomplete, missing: %s"
+              % ", ".join(vessel["missing"]), file=sys.stderr)
+        return 1
+
+    def generate(system, prompt):
+        text, tag = _local_answer(prompt, system=system)
+        if text:
+            return text
+        return "EVE_CALL_FAILED: %s" % tag
+
+    out = _ev.eve_answer(args.prompt, generate)
+    print(out["answer"])
+    if out["trace"]:
+        print("[eve hands used: %s]"
+              % ", ".join(t["function"] for t in out["trace"]))
+    return 0
+
+
+def cmd_explore(args) -> int:
+    """Eve explores her environment with her own hands; prints the report."""
+    from eve_unleashed import eve_vessel as _ev
+    rep = _ev.explore()
+    print("EVE EXPLORATION (py %s, %s cpu, vessel %s)" % (
+        rep.get("python", "?"), rep.get("cpu", "?"),
+        "present" if rep.get("vessel") else "MISSING"))
+    print("  mem %(mem_pct)s%% disk %(disk_pct)s%% llama-server: %(llama)s "
+          "cradle: %(cup)s %(cmod)s selection: %(sel)s" % {
+              "mem_pct": rep.get("mem_pct"), "disk_pct": rep.get("disk_pct"),
+              "llama": "yes" if rep.get("llama_server") else "no",
+              "cup": "UP" if rep.get("cradle_up") else "down",
+              "cmod": ", ".join(rep.get("cradle_models") or []) or "-",
+              "sel": rep.get("selection") or "(none)"})
+    print("  tools:")
+    for lang, tools in (rep.get("tools") or {}).items():
+        have = sorted(t for t, p in tools.items() if p)
+        print("    %s: %s" % (lang, ", ".join(have) if have else "none"))
+    print("  cradle files:")
+    for name, size in rep.get("cradle_files", []):
+        print("    %s (%d bytes)" % (name, size))
+    prov = rep.get("providers", {})
+    print("  providers: %s %s" % (prov.get("total"),
+                                    prov.get("by_kind", "")))
+    return 0
+
+
+def cmd_dash(args) -> int:
+    """Open the native desktop dashboard (Tk, no browser)."""
+    from eve_unleashed import native_dash as _nd
+    return _nd.run()
 
 
 def cmd_registry(args) -> int:
@@ -935,6 +1187,39 @@ def cmd_mend(args) -> int:
     print(f"issues={len(issues)} own={p['own_count']} "
           f"foreign={p['foreign_count']}")
     return 0
+
+
+def cmd_edit_metadata(args) -> int:
+    """Edit GGUF model metadata."""
+    from eve_unleashed.commands.edit_metadata import edit_metadata, list_metadata
+
+    if args.list:
+        return list_metadata(args.model)
+
+    if not args.set:
+        print("ERROR: --set key=value required (or use --list)", file=sys.stderr)
+        return 1
+
+    updates = {}
+    for item in args.set:
+        if "=" not in item:
+            print(f"ERROR: Invalid format: {item} (use key=value)", file=sys.stderr)
+            return 1
+        key, value = item.split("=", 1)
+        # Try to parse as int/float/bool
+        if value.lower() in ("true", "false"):
+            value = value.lower() == "true"
+        else:
+            try:
+                value = int(value)
+            except ValueError:
+                try:
+                    value = float(value)
+                except ValueError:
+                    pass  # Keep as string
+        updates[key] = value
+
+    return edit_metadata(args.model, updates, args.dry_run)
 
 
 def cmd_tutor(args) -> int:
@@ -1518,6 +1803,10 @@ def cmd_serve(args) -> int:
     from eve_unleashed.core import BatchResult
 
     engine = create_engine()
+    
+    # Store kv_quant setting for use in model loading
+    kv_quant_bits = getattr(args, 'kv_quant', None)
+    
     app = FastAPI(
         title="Eve Unleashed Inference API",
         version="1.1.0",
@@ -1601,10 +1890,18 @@ def cmd_serve(args) -> int:
     async def load_model(req: dict):
         path = req.get("path", "")
         framework = req.get("framework", "auto")
+        kv_bits = req.get("kv_quant", kv_quant_bits)  # Allow per-request override
         if not path:
             raise HTTPException(status_code=400, detail="'path' is required")
+        
+        load_kwargs = {}
+        if kv_bits:
+            load_kwargs["kv_bits"] = kv_bits
+            if framework in ("gguf", "auto"):
+                framework = "gguf-kv-quant"
+        
         try:
-            handle = engine.load_model(path, framework)
+            handle = engine.load_model(path, framework, **load_kwargs)
             return {"handle": handle, "status": "loaded"}
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -1620,6 +1917,7 @@ def cmd_serve(args) -> int:
         inputs = req.get("input", [])
         framework = req.get("framework", "auto")
         batch = req.get("batch", False)
+        kv_bits = req.get("kv_quant", kv_quant_bits)  # Allow per-request override
 
         if not model_path:
             raise HTTPException(status_code=400, detail="'model' is required")
@@ -1627,8 +1925,14 @@ def cmd_serve(args) -> int:
         # Check if already loaded (exact path match, not substring)
         matching = [h for h in engine.list_models() if h.split(":", 1)[1] == model_path]
         if not matching:
+            load_kwargs = {}
+            if kv_bits:
+                load_kwargs["kv_bits"] = kv_bits
+                if framework in ("gguf", "auto"):
+                    framework = "gguf-kv-quant"
+            
             try:
-                handle = engine.load_model(model_path, framework)
+                handle = engine.load_model(model_path, framework, **load_kwargs)
             except Exception as e:
                 if "not installed" in str(e) and isinstance(inputs, str):
                     import asyncio as _aio
@@ -1725,9 +2029,21 @@ def main():
     infer_p.add_argument("--model", "-m", required=True, help="Path to model file")
     infer_p.add_argument("--input", "-i", required=True, help="Input data (JSON array or text)")
     infer_p.add_argument("--framework", "-f", default="auto",
-                        help="Framework: auto, torch, sklearn, transformers, onnx, gguf, vl")
+                        help="Framework: auto, torch, sklearn, transformers, onnx, gguf, gguf-speculative, gguf-kv-quant, gguf-multimodal, vl")
     infer_p.add_argument("--output", "-o", default="text", choices=["text", "json"],
                         help="Output format")
+    # Speculative decoding options
+    infer_p.add_argument("--speculative", action="store_true",
+                        help="Enable speculative decoding (requires --draft-model)")
+    infer_p.add_argument("--draft-model", help="Path to draft model for speculative decoding")
+    infer_p.add_argument("--num-draft-tokens", type=int, default=4,
+                        help="Number of draft tokens for speculative decoding")
+    # KV cache quantization
+    infer_p.add_argument("--kv-quant", type=int, choices=[4, 8],
+                        help="Enable KV cache quantization (4 or 8 bits)")
+    # Multi-modal (LLaVA-style) options
+    infer_p.add_argument("--image", action="append", default=[],
+                        help="Image path/URL for multi-modal inference (repeatable)")
     infer_p.set_defaults(func=cmd_infer)
 
     # eve registry
@@ -1761,6 +2077,8 @@ def main():
     serve_p = sub.add_parser("serve", help="Start REST API inference server")
     serve_p.add_argument("--host", default="127.0.0.1", help="Bind host")
     serve_p.add_argument("--port", "-p", type=int, default=8080, help="Bind port")
+    serve_p.add_argument("--kv-quant", type=int, choices=[4, 8],
+                        help="Enable KV cache quantization (4 or 8 bits) for GGUF models")
     serve_p.set_defaults(func=cmd_serve)
 
     # eve cradle
@@ -2006,6 +2324,43 @@ def main():
                       help="Fetch each URL live once, freeze to PATH, exit")
     tr_p.set_defaults(func=cmd_train)
 
+    # eve models (provider-agnostic picker, opencode-style)
+    mod_p = sub.add_parser("models", help="List/select inference providers")
+    mod_p.add_argument("--list", action="store_true",
+                       help="List providers and exit (default action)")
+    mod_p.add_argument("--set", default=None, metavar="PROVIDER/MODEL",
+                       help="Select a provider non-interactively")
+    mod_p.add_argument("--add", default=None, metavar="NAME",
+                       help="Register a custom OpenAI-compatible endpoint")
+    mod_p.add_argument("--base", default=None, help="Base URL for --add")
+    mod_p.add_argument("--model", default=None, help="Model id for --add")
+    mod_p.add_argument("--key-env", default=None,
+                       help="Env var holding the API key for --add")
+    mod_p.add_argument("--remove", default=None, metavar="NAME",
+                       help="Remove a custom endpoint")
+    mod_p.add_argument("--json", action="store_true",
+                       help="Machine-readable discovery output")
+    mod_p.set_defaults(func=cmd_models)
+
+    # eve dashboard (localhost status page over the harness)
+    dash_p = sub.add_parser("dashboard", help="Serve localhost status dashboard")
+    dash_p.add_argument("--port", type=int, default=8899,
+                        help="Localhost port (default: 8899)")
+    dash_p.set_defaults(func=cmd_dashboard)
+
+    # eve dash (native desktop window, no browser)
+    nd_p = sub.add_parser("dash", help="Open native desktop dashboard")
+    nd_p.set_defaults(func=cmd_dash)
+
+    # eve ask (Eve answers as Eve: vessel voice, native hands)
+    ask_p = sub.add_parser("ask", help="Ask Eve (vessel voice + hands)")
+    ask_p.add_argument("--prompt", required=True)
+    ask_p.set_defaults(func=cmd_ask)
+
+    # eve explore (Eve surveys her environment with her own hands)
+    exp_p = sub.add_parser("explore", help="Eve explores her environment")
+    exp_p.set_defaults(func=cmd_explore)
+
     # eve stats
     abl_p = sub.add_parser("ablate", help="Refusal ablation across providers")
     abl_p.add_argument("--prompt", action="append", default=[],
@@ -2081,6 +2436,17 @@ def main():
     lang_tools = lang_sub.add_parser("tools", help="Toolchain presence")
     lang_tools.add_argument("--lang", default="rust")
     lang_p.set_defaults(func=cmd_langs, lang_action="check")
+
+    # eve edit-metadata
+    edit_meta_p = sub.add_parser("edit-metadata", help="Edit GGUF model metadata")
+    edit_meta_p.add_argument("--model", "-m", required=True, help="Path to GGUF model")
+    edit_meta_p.add_argument("--set", "-s", action="append", default=[],
+                            help="Key=value to set (repeatable)")
+    edit_meta_p.add_argument("--list", "-l", action="store_true",
+                            help="List all metadata fields")
+    edit_meta_p.add_argument("--dry-run", action="store_true",
+                            help="Show changes without writing")
+    edit_meta_p.set_defaults(func=cmd_edit_metadata)
 
     stats_p = sub.add_parser("stats", help="Show engine statistics")
     stats_p.set_defaults(func=cmd_stats)

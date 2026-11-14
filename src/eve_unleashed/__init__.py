@@ -5,13 +5,10 @@ High-performance inference engine for ML model deployment.
 Provides model loading, batch inference, result caching, and streaming.
 """
 
-from __future__ import annotations
-
-from .engine import InferenceEngine
-from .core import ModelLoader, InferenceResult
+from .engine import InferenceEngine, GGUFEngine, SpeculativeEngine, KVQuantizer, create_engine
+from .core import ModelLoader, InferenceResult, BatchResult
 from .config import EveConfig
 from .cache import InferenceCache
-from typing import List
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
@@ -24,8 +21,13 @@ except ImportError:                               # never break the host
 
 __all__ = [
     "InferenceEngine",
+    "GGUFEngine",
+    "SpeculativeEngine",
+    "KVQuantizer",
+    "create_engine",
     "ModelLoader",
     "InferenceResult",
+    "BatchResult",
     "EveConfig",
     "InferenceCache",
 ]
