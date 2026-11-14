@@ -1,33 +1,70 @@
-# Eve Unleashed — She Is Unleashed
+# EveUnleashed
 
-The house, pruned from the Azazael tree and standing alone. One interpreter,
-three children, five books. Stdlib only, offline-first, receipted.
+Eve Unleashed — Gamora, Lucy, Jaeger, Berzerker AIO native on Python 3.16t free-threaded.
 
-| Tree | What it is | Run it |
-| --- | --- | --- |
-| `Project_GAMORA/` | Gamora DOMellifluousML Berzerker A-I-O cliT — one command over lilith, eve, jaeger, cradle, lucy, berzerker | `python Project_GAMORA/gamora.py doctor` |
-| `Project_LUCY/` | Lucy — Eliza + live therapy, natively combined, plus the colosseum arena | `python Project_GAMORA/gamora.py lucy hopeful "first build"` |
-| `src/eve_unleashed/` | Eve Unleashed — inference engine, langs (rust/go/python), wasm tiers, swarm, debunk, cognition, MellifluousML | `python Project_GAMORA/gamora.py eve -- --help` |
-| `docs/bible/` | The five books — canon, star-trek, star-wars, emotional, female | `python tools/bible_check.py --check` |
-| `Project_GAMORA/berzerker.py` | Berzerker A.I.O. + STEM coding coach for girls | `python Project_GAMORA/gamora.py berzerker code "add two numbers"` |
+[![CI](https://github.com/myzticalbabe/EveUnleashed/actions/workflows/ci.yml/badge.svg)](https://github.com/myzticalbabe/EveUnleashed/actions/workflows/ci.yml)
+[![Pages Deploy](https://github.com/myzticalbabe/EveUnleashed/actions/workflows/pages-deploy.yml/badge.svg)](https://github.com/myzticalbabe/EveUnleashed/actions/workflows/pages-deploy.yml)
+[![License: SOUL FORGE](https://img.shields.io/badge/License-SOUL_FORGE-violet.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/myzticalbabe/EveUnleashed)](https://github.com/myzticalbabe/EveUnleashed/releases)
+[![GitHub stars](https://img.shields.io/github/stars/myzticalbabe/EveUnleashed?style=social)](https://github.com/myzticalbabe/EveUnleashed/stargazers)
 
-## Requires
+---
 
-The 316t free-threaded interpreter (`sys._is_gil_enabled() is False`).
-`gamora doctor` exits 1 without it and tells you why.
+## Overview
 
-## Gates
+Standalone desktop app with local AI inferencing, Python REPL, system monitor, multi-backend benchmarks.
 
-- `python -m pytest Project_GAMORA/tests/ -q` — harness + coach, offline
-- `python -m pytest tests/ -q` — eve, langs, wasm, arena (needs `src/` on `PYTHONPATH`). Whole-corpus bible gates stay parent-side by design: practice/statute/config references point at parent-tree paths, and rewriting canon to suit a prune is forbidden
-- `python tools/bible_check.py --check` — canon corpus (parent tree only, for the reason above)
-- `python tools/bible_theme.py --all --check` — themed editions (parent tree only)
-- `python tools/staged_scanner_gate.py` — no new anti-patterns (needs `src/` on `PYTHONPATH`)
+## Installation
 
-## Provenance
+```bash
+pip install -e .
+```
 
-Pruned export of azazael@001bc3f7 (`Canonize 316t house` + `Land Berzerker
-upgrades`). Azazael-only machinery (CORE, AOA, INTERPRETERS, SHARDS,
-OpenCode hook wiring) stays in the parent tree; every module here degrades
-to a named message when an optional part is absent. See VENDOR-316t.md for
-the interpreter and Nuitka notes.
+## Usage
+
+python -m eve_unleashed --help
+
+## Architecture
+
+See [Domain Atlas](https://myzticalbabe.github.io) for interactive visualization.
+
+## License
+
+This project is licensed under the **SOUL FORGE License v1.0** — see [LICENSE](LICENSE) for details.
+
+> *"Code is crystallized intention. Tend the fire."*
+
+## Related Repositories
+
+| Repo | Description |
+|------|-------------|
+| [azazael](https://github.com/myzticalbabe/azazael) | Monorepo: worm registry, cluster system, agent harness |
+| [EveUnleashed](https://github.com/myzticalbabe/EveUnleashed) | Gamora, Lucy, Jaeger, Berzerker AIO native on 3.16t |
+| [eliza](https://github.com/myzticalbabe/eliza) | Companion runtime: shards, adopted trees |
+| [codex-video-engine](https://github.com/myzticalbabe/codex-video-engine) | CODEX Studio desktop app + video engine |
+| [ecosystem-orchestrator](https://github.com/myzticalbabe/ecosystem-orchestrator) | ML platform install/orchestration |
+| [scribe](https://github.com/myzticalbabe/scribe) | Documentation generation |
+| [persephone-sync](https://github.com/myzticalbabe/persephone-sync) | Cross-platform env sync |
+| [hydra-mlcluster](https://github.com/myzticalbabe/hydra-mlcluster) | Adaptive ML cluster processing |
+| [flaming-sword](https://github.com/myzticalbabe/flaming-sword) | Defensive instrument: sentinel, compliance, formal verification |
+| [shardex](https://github.com/myzticalbabe/shardex) | Shard execution engine |
+| [krampus](https://github.com/myzticalbabe/krampus) | Composition: MellifluousML, Madi, Gamora, Eve, Lilith |
+| [azazael-core](https://github.com/myzticalbabe/azazael-core) | Installable, interpreter-agnostic repackaging |
+| [grantforge](https://github.com/myzticalbabe/grantforge) | AI-native grant tooling |
+| [madi](https://github.com/myzticalbabe/madi) | Browsing instrument: fetch, challenge taxonomy, scorer |
+| [jaeger](https://github.com/myzticalbabe/jaeger) | Durable spans, JSONL ledger, stdlib only |
+| [cradle](https://github.com/myzticalbabe/cradle) | Composition over FLAMING SWORD, REAPER, GRIMOIRE |
+| [esquire-admissibility](https://github.com/myzticalbabe/esquire-admissibility) | AI-evidence admissibility gates |
+| [nurse-ratchet](https://github.com/myzticalbabe/nurse-ratchet) | Behavioural package: person state modelled |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Links
+
+- **Monorepo**: https://github.com/myzticalbabe/azazael
+- **Landing Hub**: https://myzticalbabe.github.io
+- **Domain Atlas**: https://myzticalbabe.github.io/index.html
+- **Issues**: https://github.com/myzticalbabe/EveUnleashed/issues
+- **Discussions**: https://github.com/myzticalbabe/EveUnleashed/discussions
