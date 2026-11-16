@@ -109,12 +109,21 @@ def check_doc_shards() -> dict:
     missing: list = []
     try:
         repo = Path(__file__).resolve().parents[2]
-        candidates = [repo / ".agents" / "skills",
-                      repo.parent / ".agents" / "skills",
-                      repo / "docs",
-                      Path(__file__).resolve().parents[1]]
+        skill_roots = [repo / ".agents" / "skills",
+                       repo.parent / ".agents" / "skills"]
+        candidates = skill_roots + [repo / "docs",
+                                    Path(__file__).resolve().parents[1]]
     except Exception:
         return {"ok": False, "checked": 0, "missing": ["repo-unresolvable"]}
+    # Every doc shard is a list of SKILL NAMES, and the corpus they name is
+    # INSTALLED rather than committed: `.agents/skills` arrives with the skills
+    # CLI and is absent from a fresh clone and from CI. With no corpus there is
+    # nothing to resolve against, so calling the shard "missing" would blame the
+    # repository for a checkout that never carried it. Say that instead.
+    if not any(root.is_dir() for root in skill_roots):
+        return {"ok": True, "checked": 0, "missing": [],
+                "note": "skill corpus absent (.agents/skills is installed by "
+                        "the skills CLI, not committed): doc shards not verified"}
     for name in SHARDS:
         # `SHARDS` is already imported from SHARDS.registry at module level;
         # the per-iteration re-import here was the same dict every time, and
