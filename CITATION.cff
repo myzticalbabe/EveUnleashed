@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Azazael"
+    given-names: "Contributors"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+title: "Eve Unleashed: Standalone Desktop AI App"
+version: 0.1.0
+doi: "10.5281/zenodo.XXXXXXX"
+date-released: 2026-11-18
+url: "https://github.com/myzticalbabe/EveUnleashed"
+preferred-citation:
+  type: "software"
+  authors:
+    - family-names: "Azazael"
+      given-names: "Contributors"
+  title: "Eve Unleashed: Standalone Desktop AI App"
+  year: 2026
+  version: "0.1.0"
+  doi: "10.5281/zenodo.XXXXXXX"
+  url: "https://github.com/myzticalbabe/EveUnleashed"
+keywords:
+  - "desktop"
+  - "ai"
+  - "inference"
+  - "repl"
+  - "benchmark"
+license: "CDDL-1.1"
+repository: "https://github.com/myzticalbabe/EveUnleashed"
+repository-code: "https://github.com/myzticalbabe/EveUnleashed"
+repository-artifact: "https://pypi.org/project/eve-unleashed/"
