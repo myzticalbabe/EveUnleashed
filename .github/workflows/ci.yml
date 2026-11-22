@@ -4,9 +4,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # master is the default branch: CI must watch it, otherwise the gate
+    # never runs on the branch every PR targets.
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
