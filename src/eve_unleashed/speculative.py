@@ -9,7 +9,12 @@ from __future__ import annotations
 import time
 from typing import Any, List, Optional
 
-from llama_cpp import Llama
+try:
+    from llama_cpp import Llama
+    _LLAMA_AVAILABLE = True
+except ImportError:  # optional accel dep: module must import without it;
+    Llama = Any  # factories raise a clear error if actually called
+    _LLAMA_AVAILABLE = False
 
 
 class SpeculativeEngine:
@@ -210,6 +215,11 @@ def create_speculative_engine(
     **kwargs
 ) -> SpeculativeEngine:
     """Factory function to create a speculative engine from model paths."""
+    if not _LLAMA_AVAILABLE:
+        raise ImportError(
+            "llama-cpp-python is required to build a SpeculativeEngine "
+            "(pip install llama-cpp-python)"
+        )
     draft = Llama(model_path=draft_model_path, n_ctx=n_ctx, verbose=False)
     target = Llama(model_path=target_model_path, n_ctx=n_ctx, verbose=False)
     return SpeculativeEngine(draft, target, num_draft_tokens, **kwargs)

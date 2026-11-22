@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def test_speculative_engine_creation():
     """Test that SpeculativeEngine can be imported and instantiated."""
     try:
-        from eve_unleashed.engine.speculative import SpeculativeEngine, create_speculative_engine
+        from eve_unleashed.speculative import SpeculativeEngine, create_speculative_engine
         print("SpeculativeEngine import successful")
     except ImportError as e:
         print(f"SpeculativeEngine import failed: {e}")
@@ -23,7 +23,7 @@ def test_speculative_engine_creation():
 def test_kv_quantizer_creation():
     """Test that KVQuantizer can be imported and instantiated."""
     try:
-        from eve_unleashed.engine.kv_quant import KVQuantizer, create_quantized_llama
+        from eve_unleashed.kv_quant import KVQuantizer, create_quantized_llama
         print("KVQuantizer import successful")
     except ImportError as e:
         print(f"KVQuantizer import failed: {e}")
