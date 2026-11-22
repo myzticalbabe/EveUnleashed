@@ -1,9 +1,16 @@
 [project]
 name = "eve-unleashed"
 version = "3.16.0"
-description = "Eve Unleashed + Gamora cliT + Lucy + Berzerker coach + five books. Stdlib only."
+description = "Eve Unleashed + Gamora cliT + Lucy + Berzerker coach + five books. Runs on Python 3.16t free-threaded."
 requires-python = ">=3.16"
-dependencies = []
+dependencies = [
+    # Imported unconditionally by cache.py, engine.py, resilience.py, utils.py
+    # and _replay_kernel.py. The description used to claim "Stdlib only", so
+    # nothing installed numpy and importing the package raised
+    # ModuleNotFoundError before a single test ran. Optional accelerators
+    # (openvino, PIL) stay guarded at their import sites and undeclared here.
+    "numpy>=1.26",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

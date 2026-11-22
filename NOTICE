@@ -1,0 +1,48 @@
+# NOTICE
+
+Eve Unleashed — Standalone Desktop AI App
+Copyright 2026 Azazael Contributors
+
+This product includes software developed by the Azazael project (https://github.com/myzticalbabe/azazael).
+
+## Third-Party Licenses
+
+This software may include or depend on the following third-party components:
+
+### Python Standard Library
+- Licensed under the Python Software Foundation License Version 2
+- https://docs.python.org/3/license.html
+
+### PyYAML
+- Licensed under the MIT License
+- https://github.com/yaml/pyyaml/blob/master/LICENSE
+
+### pytest
+- Licensed under the MIT License
+- https://github.com/pytest-dev/pytest/blob/main/LICENSE
+
+### GitPython
+- Licensed under the BSD 3-Clause License
+- https://github.com/gitpython-developers/GitPython/blob/main/LICENSE
+
+### Click
+- Licensed under the BSD 3-Clause License
+- https://github.com/pallets/click/blob/main/LICENSE
+
+### llama-cpp-python
+- Licensed under the MIT License
+- https://github.com/abetlen/llama-cpp-python/blob/main/LICENSE
+
+### psutil
+- Licensed under the BSD 3-Clause License
+- https://github.com/giampaolo/psutil/blob/master/LICENSE
+
+## Attribution
+
+Portions of this software are derived from the AZAZAEL project, which is licensed under the Common Development and Distribution License (CDDL) Version 1.1.
+
+The CDDL license text is included in the LICENSE file in this distribution.
+
+## Trademarks
+
+"Eve Unleashed" and the Eve logo are trademarks of the Azazael Contributors. All other trademarks are the property of their respective owners.

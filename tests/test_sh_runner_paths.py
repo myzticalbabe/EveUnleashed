@@ -7,12 +7,23 @@ These tests lock the flavored mapping: MSYS by default, WSL when the
 binary or the distro marker says so, both drive-prefix forms handled.
 """
 
+import os
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from INTERPRETERS.sh_runner import _bash_flavor, _to_bash_path
+
+# `_to_bash_path` translates a DRIVE LETTER, so off Windows it returns its input
+# unchanged by design: there is no `C:` to rewrite. The flavor tests that do not
+# depend on a drive letter still run everywhere; only the two that assert a
+# translation are pinned to Windows.
+windows_only = pytest.mark.skipif(
+    os.name != "nt",
+    reason="_to_bash_path is a no-op off Windows: no drive prefix to map")
 
 
 def _win(p):
@@ -31,11 +42,13 @@ def test_wsl_detected_by_binary_or_marker(monkeypatch):
     assert _bash_flavor("/usr/bin/bash") == "wsl"
 
 
+@windows_only
 def test_both_prefix_forms_map_to_msys():
     assert _to_bash_path(_win("Azazael/t.sh"), "bash") == "/c/Azazael/t.sh"
     assert _to_bash_path("C:/Azazael/t.sh", "bash") == "/c/Azazael/t.sh"
 
 
+@windows_only
 def test_wsl_flavor_maps_to_mnt():
     wsl = r"C:\Windows\System32\wsl.exe"
     assert _to_bash_path(_win("Azazael/t.sh"), wsl) == "/mnt/c/Azazael/t.sh"
