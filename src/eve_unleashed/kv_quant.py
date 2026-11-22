@@ -12,7 +12,7 @@ from typing import Any
 class KVQuantizer:
     """
     8-bit KV cache quantizer for GGUF models.
-    
+
     Quantizes the key-value cache to 8-bit integers to reduce memory
     usage and potentially improve inference speed on supported hardware.
     """
@@ -90,7 +90,9 @@ class KVQuantizer:
             else:
                 quantized_bytes += quantized.size * 2  # int16 = 2 bytes (packed 4-bit)
 
-        savings_pct = (1 - quantized_bytes / original_bytes) * 100 if original_bytes > 0 else 0
+        savings_pct = (
+            (1 - quantized_bytes / original_bytes) * 100 if original_bytes > 0 else 0
+        )
 
         return {
             "original_mb": round(original_bytes / (1024 * 1024), 2),
@@ -109,7 +111,7 @@ class KVQuantizer:
 def apply_kv_quantization(model: Any, bits: int = 8) -> KVQuantizer:
     """
     Apply KV cache quantization to a llama-cpp-python model.
-    
+
     This wraps the model's forward pass to quantize/dequantize KV cache.
     Note: llama-cpp-python manages KV cache internally, so this provides
     a framework for external cache management.
@@ -121,20 +123,17 @@ def apply_kv_quantization(model: Any, bits: int = 8) -> KVQuantizer:
 
 
 def create_quantized_llama(
-    model_path: str,
-    n_ctx: int = 2048,
-    kv_bits: int = 8,
-    **kwargs
+    model_path: str, n_ctx: int = 2048, kv_bits: int = 8, **kwargs
 ) -> Any:
     """
     Create a llama-cpp-python model with KV cache quantization enabled.
-    
+
     Args:
         model_path: Path to GGUF model
         n_ctx: Context window size
         kv_bits: Quantization bits (4 or 8)
         **kwargs: Additional Llama constructor arguments
-    
+
     Returns:
         Llama model with KV quantizer attached
     """

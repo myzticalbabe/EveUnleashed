@@ -11,6 +11,7 @@ from typing import Any
 
 try:
     from llama_cpp import Llama
+
     _LLAMA_AVAILABLE = True
 except ImportError:  # optional accel dep: module must import without it;
     Llama = Any  # factories raise a clear error if actually called
@@ -20,7 +21,7 @@ except ImportError:  # optional accel dep: module must import without it;
 class SpeculativeEngine:
     """
     Speculative decoding engine using a draft model and target model.
-    
+
     The draft model generates multiple tokens speculatively, which are then
     verified by the target model in parallel. Accepted tokens are kept,
     rejected tokens trigger re-generation.
@@ -49,7 +50,9 @@ class SpeculativeEngine:
         self.draft_time_ms = 0.0
         self.verify_time_ms = 0.0
 
-    def _sample_token(self, logits: list[float], temperature: float, top_p: float) -> int:
+    def _sample_token(
+        self, logits: list[float], temperature: float, top_p: float
+    ) -> int:
         """Sample a token from logits with temperature and top-p."""
         import numpy as np
 
@@ -68,7 +71,7 @@ class SpeculativeEngine:
             cutoff = cumsum >= top_p
             if np.any(cutoff):
                 first_true = np.argmax(cutoff)
-                sorted_probs[first_true + 1:] = 0
+                sorted_probs[first_true + 1 :] = 0
                 sorted_probs = sorted_probs / np.sum(sorted_probs)
             probs[sorted_indices] = sorted_probs
 
@@ -178,7 +181,8 @@ class SpeculativeEngine:
         """Get engine statistics."""
         acceptance_rate = (
             self.total_accepted / self.total_generated
-            if self.total_generated > 0 else 0
+            if self.total_generated > 0
+            else 0
         )
         return {
             "total_generated": self.total_generated,
@@ -187,9 +191,15 @@ class SpeculativeEngine:
             "acceptance_rate": acceptance_rate,
             "draft_time_ms": round(self.draft_time_ms, 2),
             "verify_time_ms": round(self.verify_time_ms, 2),
-            "speedup_factor": round(
-                (self.draft_time_ms + self.verify_time_ms) / max(self.verify_time_ms, 1), 2
-            ) if self.verify_time_ms > 0 else 0,
+            "speedup_factor": (
+                round(
+                    (self.draft_time_ms + self.verify_time_ms)
+                    / max(self.verify_time_ms, 1),
+                    2,
+                )
+                if self.verify_time_ms > 0
+                else 0
+            ),
         }
 
     def reset_stats(self):
@@ -206,7 +216,7 @@ def create_speculative_engine(
     target_model_path: str,
     num_draft_tokens: int = 4,
     n_ctx: int = 2048,
-    **kwargs
+    **kwargs,
 ) -> SpeculativeEngine:
     """Factory function to create a speculative engine from model paths."""
     if not _LLAMA_AVAILABLE:

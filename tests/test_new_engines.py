@@ -87,7 +87,9 @@ def test_kv_quantizer_rejects_bad_bits():
 
 def test_create_quantized_llama_missing_file():
     """Factory surfaces loader errors instead of returning a broken model."""
-    with pytest.raises((FileNotFoundError, RuntimeError, ImportError, OSError, ValueError)):
+    with pytest.raises(
+        (FileNotFoundError, RuntimeError, ImportError, OSError, ValueError)
+    ):
         create_quantized_llama("does-not-exist.gguf")
 
 
