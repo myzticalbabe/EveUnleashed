@@ -306,11 +306,10 @@ class PromptGuard:
         # Basic schema validation
         valid = True
         try:
-            if isinstance(response, str):
-                # Try to parse as JSON if schema expects object
-                if schema.get("type") == "object":
-                    parsed = json.loads(response)
-                    # Could use jsonschema.validate here for strict validation
+            # Try to parse as JSON if schema expects object
+            if isinstance(response, str) and schema.get("type") == "object":
+                json.loads(response)  # validates JSON; result unused
+                # Could use jsonschema.validate here for strict validation
         except json.JSONDecodeError:
             if schema.get("type") == "object":
                 valid = False

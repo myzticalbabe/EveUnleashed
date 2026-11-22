@@ -14,6 +14,7 @@ conclusion -- a pin without a residual map is a lie shaped like a pin.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import shutil
 from datetime import UTC, datetime
@@ -84,7 +85,7 @@ def residual_report(log_paths: list[str]) -> dict[str, dict]:
                     seqs.setdefault(e["url"], []).append(str(e.get("state")))
     report = {}
     for url, seq in seqs.items():
-        flips = sum(1 for a, b in zip(seq, seq[1:]) if a != b)
+        flips = sum(1 for a, b in itertools.pairwise(seq) if a != b)
         report[url] = {
             "n": len(seq),
             "outcomes": sorted(set(seq)),

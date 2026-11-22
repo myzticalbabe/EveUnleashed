@@ -92,11 +92,7 @@ def regime_histogram(graph: ShapeGraph) -> dict[str, int]:
     for e in graph.edges:
         s = e["solid"]
         if s == "complete-20":
-            role = (
-                "funnel"
-                if in_deg[e["dst"]] >= 2
-                else "fan" if out_deg[e["src"]] >= 2 else "fan"
-            )
+            role = "funnel" if in_deg[e["dst"]] >= 2 else "fan"
         elif s == "cycle-20":
             role = "ring"
         elif s == "hypercube-32":

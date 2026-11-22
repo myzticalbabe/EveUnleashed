@@ -132,7 +132,7 @@ def _host(url):
 
 def _matches(host, table):
     for entry in table:
-        if host == entry or host.endswith("." + entry) or host.endswith(entry):
+        if host == entry or host.endswith((entry, "." + entry)):
             return entry
     return None
 

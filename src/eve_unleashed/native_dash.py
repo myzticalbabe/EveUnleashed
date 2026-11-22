@@ -219,6 +219,4 @@ def run() -> int:
 
 
 def cmd_dash(args) -> int:
-    from eve_unleashed import native_dash as _nd
-
-    return _nd.run()
+    return run()

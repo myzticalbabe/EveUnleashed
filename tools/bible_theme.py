@@ -438,11 +438,12 @@ def _verse_problems(
                     _text_problems(annotation.get("note"), f"{note_where} note")
                 )
                 source = annotation.get("source")
-                if source is not None:
-                    if not isinstance(source, str) or not (repo / source).is_file():
-                        problems.append(
-                            f"{note_where} source {source!r} does not exist in this repository"
-                        )
+                if source is not None and (
+                    not isinstance(source, str) or not (repo / source).is_file()
+                ):
+                    problems.append(
+                        f"{note_where} source {source!r} does not exist in this repository"
+                    )
     return problems
 
 

@@ -160,12 +160,12 @@ class Sequential:
         blocks = list(blocks)
         if not blocks:
             raise ValueError("sequential needs >= 1 block")
-        for a, b in zip(
+        for a, b_in in zip(
             [d for b in blocks if isinstance(b, Dense) for d in [b.out_dim]][:-1],
             [b.in_dim for b in blocks if isinstance(b, Dense)][1:],
         ):
-            if a != b:
-                raise ValueError(f"dim mismatch at assembly: {a:d} != {b:d}")
+            if a != b_in:
+                raise ValueError(f"dim mismatch at assembly: {a:d} != {b_in:d}")
         self.blocks = blocks
         self.in_dim = next(b.in_dim for b in blocks if isinstance(b, Dense))
         self.out_dim = next(b.out_dim for b in reversed(blocks) if isinstance(b, Dense))

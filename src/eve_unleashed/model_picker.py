@@ -21,6 +21,14 @@ import os
 import urllib.request
 from pathlib import Path
 
+try:
+    from CORE.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- model_picker: no ledger, broad
+
+    def note_failure(where, exc=None):
+        pass
+
+
 STORE_DIR = Path.home() / ".azazael"
 SELECTION_FILE = STORE_DIR / "eve_model.json"
 PROVIDERS_FILE = STORE_DIR / "eve_providers.json"
@@ -95,7 +103,8 @@ def _fetch_ids(base: str, api_key: str | None = None, timeout: float = 2.0):
             req = urllib.request.Request(base.rstrip("/") + suffix, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 payload = json.loads(resp.read().decode("utf-8", "replace") or "{}")
-        except Exception:  # noqa: BLE001 -- _fetch_ids: best-effort continue
+        except Exception as e:  # noqa: BLE001 -- model_picker: logged, broad
+            note_failure("model_picker:_fetch_ids", e)
             continue
         ids = []
         for item in payload.get("data") or payload.get("models") or []:
@@ -198,7 +207,8 @@ def discover(timeout: float = 2.0) -> list:
                         "note": "" if gguf_runner else "needs llama-server",
                     }
                 )
-        except Exception:  # noqa: BLE001 -- discover: best-effort continue
+        except Exception as e:  # noqa: BLE001 -- model_picker: logged, broad
+            note_failure("model_picker:discover", e)
             continue
 
     # cradle registry
@@ -354,7 +364,8 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
             continue
         try:
             obj = json.loads(line)
-        except Exception:  # noqa: BLE001 -- run_agent: best-effort continue
+        except Exception as e:  # noqa: BLE001 -- model_picker: logged, broad
+            note_failure("model_picker:run_agent", e)
             continue
         if obj.get("type") == "error":
             err = obj.get("error") or {}

@@ -61,7 +61,8 @@ FALLBACK_DEV = {
 def vtable(iface: str) -> dict[str, int]:
     """Resolve method name -> vtable slot by parsing the SDK header itself."""
     try:
-        text = open(SDK_HDR, encoding="utf-8", errors="replace").read()
+        with open(SDK_HDR, encoding="utf-8", errors="replace") as f:
+            text = f.read()
         body = text[text.index(f"typedef struct {iface}Vtbl") :]
         body = body[: body.index(f"}} {iface}Vtbl;")]
     except (OSError, ValueError):
@@ -228,14 +229,6 @@ def main() -> int:
         DEV,
         "CreateTexture2D",
         ctypes.POINTER(D3D11_TEXTURE2D_DESC),
-        ctypes.POINTER(D3D11_SUBRESOURCE_DATA),
-        ctypes.POINTER(ctypes.c_void_p),
-    )
-    create_buffer = method(
-        device.value,
-        DEV,
-        "CreateBuffer",
-        ctypes.POINTER(D3D11_BUFFER_DESC),
         ctypes.POINTER(D3D11_SUBRESOURCE_DATA),
         ctypes.POINTER(ctypes.c_void_p),
     )

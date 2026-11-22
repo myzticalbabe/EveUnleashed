@@ -215,7 +215,7 @@ class TerenceV2:
     def reject(self, index: int) -> bool:
         """Reject a queued high-risk fix."""
         if 0 <= index < len(self._review_queue):
-            prop = self._review_queue.pop(index)
+            self._review_queue.pop(index)
             self.stats.fixes_rejected += 1
             return True
         return False

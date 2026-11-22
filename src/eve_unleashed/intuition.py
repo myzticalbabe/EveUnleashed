@@ -84,7 +84,7 @@ def intuit(url, log_path=None):
         counts = {}
         for r in ok:
             counts[r.get("rung")] = counts.get(r.get("rung"), 0) + 1
-        modal = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+        modal = min(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0]
     return {
         "state": "guess" if rate >= 0.5 else "blocked",
         "confidence": round(min(0.75, rate), 3),

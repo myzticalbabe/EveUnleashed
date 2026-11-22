@@ -1979,7 +1979,7 @@ def cmd_benchmark(args) -> int:
     times = []
     for _ in range(iterations):
         t0 = time.perf_counter()
-        c = a @ b
+        _c = a @ b  # timed bench; result discarded
         torch.cuda.synchronize() if torch.cuda.is_available() else None
         times.append((time.perf_counter() - t0) * 1000)
     avg = sum(times) / len(times)
@@ -1995,7 +1995,7 @@ def cmd_benchmark(args) -> int:
         times = []
         for _ in range(iterations):
             t0 = time.perf_counter()
-            c = a_cuda @ b_cuda
+            _c = a_cuda @ b_cuda  # timed bench; result discarded
             torch.cuda.synchronize()
             times.append((time.perf_counter() - t0) * 1000)
         avg = sum(times) / len(times)
@@ -2012,7 +2012,7 @@ def cmd_benchmark(args) -> int:
             times = []
             for _ in range(iterations):
                 t0 = time.perf_counter()
-                c = a_xpu @ b_xpu
+                _c = a_xpu @ b_xpu  # timed bench; result discarded
                 torch.xpu.synchronize()
                 times.append((time.perf_counter() - t0) * 1000)
             avg = sum(times) / len(times)
@@ -2030,7 +2030,7 @@ def cmd_benchmark(args) -> int:
         times = []
         for _ in range(iterations):
             t0 = time.perf_counter()
-            c = a_mps @ b_mps
+            _c = a_mps @ b_mps  # warmup; result intentionally discarded
             torch.mps.synchronize()
             times.append((time.perf_counter() - t0) * 1000)
         avg = sum(times) / len(times)

@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 try:
     from CORE.failure_ledger import note_failure
@@ -42,7 +42,7 @@ class PamSEvolution:
     """PAMS memory evolution layer over PamsRecorder + DistillZ."""
 
     #: Severity -> base importance weight.
-    SEVERITY_WEIGHT = {
+    SEVERITY_WEIGHT: ClassVar[dict] = {
         "critical": 1.0,
         "error": 0.8,
         "warning": 0.6,
@@ -51,7 +51,7 @@ class PamSEvolution:
     }
 
     #: Event types that are always high-signal.
-    SIGNAL_EVENT_TYPES = {
+    SIGNAL_EVENT_TYPES: ClassVar[set] = {
         "anomaly_detected",
         "worm_execution",
         "morph_event",

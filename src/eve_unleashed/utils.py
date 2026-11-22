@@ -59,11 +59,9 @@ def validate_input_shape(
     allow_batch: bool = True,
 ) -> bool:
     """Validate that input matches the expected shape."""
-    if inputs.shape == expected_shape:
-        return True
-    if allow_batch and inputs.shape[1:] == expected_shape:
-        return True
-    return False
+    return inputs.shape == expected_shape or (
+        allow_batch and inputs.shape[1:] == expected_shape
+    )
 
 
 def softmax(x: np.ndarray, axis: int = -1) -> np.ndarray:

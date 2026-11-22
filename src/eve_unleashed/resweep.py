@@ -27,7 +27,8 @@ INT_FIELDS = ("n", "degree", "edges", "diameter")
 def sweep(manifest_path: str = "state/honey/honey.json") -> dict:
     chains: dict[str, dict] = {}
     try:
-        man = json.load(open(manifest_path, encoding="utf-8"))
+        with open(manifest_path, encoding="utf-8") as f:
+            man = json.load(f)
     except (OSError, ValueError) as e:
         bad = {"pass": False, "detail": f"UNREADABLE {e}"}
         chains = {

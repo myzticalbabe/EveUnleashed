@@ -168,9 +168,9 @@ class RustRunner:
         errors: list[dict] = []
         for line in stderr.split("\n"):
             line = line.strip()
-            if not line or line.startswith("  =") or line.startswith("  |"):
+            if not line or line.startswith(("  =", "  |")):
                 continue
-            if line.startswith("error") or line.startswith("warning"):
+            if line.startswith(("error", "warning")):
                 parts = line.split(":", 3)
                 if len(parts) >= 4:
                     errors.append(

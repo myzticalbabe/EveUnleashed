@@ -21,6 +21,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import ClassVar
 
 try:
     from CORE.failure_ledger import note_failure
@@ -221,7 +222,7 @@ class PwshRunner:
             timeout=30,
         )
 
-    _module_cache: dict = {}  # P2: process-level probe cache (pwsh spawn ~200ms)
+    _module_cache: ClassVar[dict] = {}  # P2: process-level probe cache
 
     def _module_present(self, name: str) -> bool:
         """True when a PowerShell module is importable (fast probe).

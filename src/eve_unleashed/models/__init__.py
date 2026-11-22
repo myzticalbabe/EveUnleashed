@@ -6,8 +6,6 @@ Custom PyTorch model definitions for Eve Unleashed.
 
 from __future__ import annotations
 
-from typing import List
-
 from .qwen35_ssm import (
     Qwen35ForCausalLM,
     Qwen35SSMConfig,

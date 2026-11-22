@@ -21,14 +21,10 @@ OpenMono Integration:
 
 import argparse
 import io
-import os
 import subprocess
 import sys
 from collections.abc import Callable
-
-# from typing import List  # removed — all names have native equivalents
 from dataclasses import dataclass
-from typing import List
 
 from INTERPRETERS.node_runner import NodeRunner
 from INTERPRETERS.pwsh_runner import PwshRunner
@@ -277,7 +273,7 @@ def run_code(language: str, code: str, args: list[str] | None = None) -> RunResu
 
 def supported_languages() -> list[str]:
     """Return list of supported languages."""
-    return sorted(set(k for k in LANGUAGE_RUNNERS if len(k) > 2))  # Skip short aliases
+    return sorted({k for k in LANGUAGE_RUNNERS if len(k) > 2})  # Skip short aliases
 
 
 # --- CLI ---------------------------------------------------------------------

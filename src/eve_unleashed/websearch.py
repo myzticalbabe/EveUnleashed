@@ -485,7 +485,7 @@ def fetch_visible(url):
         raise ValueError("nothing to fetch: empty url")
     url = str(url).strip()
     ladder = [("plain", _UA), ("browser-headers", _BROWSER_HEADERS)]
-    last_err, last_kind = "no attempt made", None
+    last_kind = None
     for rung, headers in ladder:
         try:
             req = _request.Request(url, headers=headers)
@@ -503,7 +503,6 @@ def fetch_visible(url):
                     continue
                 return {"state": "ok", "rung": rung, "kind": None, "text": body[:20000]}
         except Exception as e:  # noqa: BLE001 -- logged below, guard broad
-            last_err = str(e)[:160]
             note_failure(f"websearch:fetch:{rung}", e)
     try:
         text, profile, cerr = _curl_cffi_fetch(url)

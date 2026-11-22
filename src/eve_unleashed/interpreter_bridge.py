@@ -27,6 +27,7 @@ BUG FIX (2026-10-18, eve-verify-land lane):
 from __future__ import annotations
 
 import glob
+import importlib.util
 import json
 import urllib.error
 import urllib.request
@@ -101,12 +102,10 @@ class EveInterpreterBridge:
         # we disable it here so the direct-chat path is always used, keeping
         # behaviour consistent with production and avoiding the interpreter
         # consuming server responses before the direct-chat fallback runs.
-        try:
-            import interpreter as interpreter_pkg  # scanner:ignore (optional legacy pkg)
-
+        if importlib.util.find_spec("interpreter") is None:
+            note_failure("eve_interpreter:init", ImportError("no interpreter pkg"))
+        else:
             note_failure("eve_interpreter:init", None)
-        except ImportError as exc:
-            note_failure("eve_interpreter:init", exc)
         self._interpreter = None
         self._available = False
 

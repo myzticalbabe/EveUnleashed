@@ -180,7 +180,9 @@ class LlamaServerManager:
                     headers={"Content-Type": "application/json"},
                 )
                 with urllib.request.urlopen(req, timeout=self.health_timeout) as resp:
-                    body = json.loads(resp.read().decode("utf-8", "replace"))
+                    json.loads(
+                        resp.read().decode("utf-8", "replace")
+                    )  # body must be JSON; content unused
                 ms = (time.perf_counter() - t0) * 1000
                 self.record_latency(ms)
                 times.append(ms)

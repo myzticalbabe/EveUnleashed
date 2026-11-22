@@ -128,8 +128,8 @@ def test_full_loop_sine_learn_digest_verify_ship(tmp_path):
     ship(m, loss, p)
     assert digest(load_ship(p)) == digest(m)  # shipped == trained
     assert aether_verify(mcml_proof(m, loss, 0.05))["verdict"] == "PASS"
-    raw = open(p, encoding="utf-8").read().replace("0.5", "0.6", 1)
-    open(p, "w", encoding="utf-8").write(raw)
+    raw = Path(p).read_text(encoding="utf-8").replace("0.5", "0.6", 1)
+    Path(p).write_text(raw, encoding="utf-8")
     refused = False
     try:
         load_ship(p)

@@ -87,7 +87,7 @@ def _scan_raw():
         lane = _bake_lane()
         for line in lane.read_text(encoding="utf-8").splitlines():
             try:
-                row = json.loads(line)
+                json.loads(line)  # validates JSONL shape; corrupt lines skip via except
             except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("mend:lane-parse", exc)
                 continue

@@ -71,7 +71,7 @@ def open_inquest(grievance_id, locker_ids=None, factcheck_results=None):
             timeline.append(
                 (r["fetched_utc"], "live receipt: {}".format(r.get("url", "?")[:80]))
             )
-    stamped = sorted([t for t in timeline if not t[0] == "manifest"])
+    stamped = sorted([t for t in timeline if t[0] != "manifest"])
     undated = [t for t in timeline if t[0] == "manifest"]
     checks = bundle.get("checks", [])
     passed = sum(1 for c in checks if c.get("passed"))

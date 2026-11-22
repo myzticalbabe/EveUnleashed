@@ -29,7 +29,7 @@ def edit_metadata(
         print(f"ERROR: Model not found: {model_path}", file=sys.stderr)
         return 1
 
-    if not path.suffix.lower() == ".gguf":
+    if path.suffix.lower() != ".gguf":
         print(f"ERROR: Not a GGUF file: {model_path}", file=sys.stderr)
         return 1
 

@@ -107,26 +107,25 @@ def file_lock(lock_path: Path | str, where: str):
     thread_lock = _thread_lock_for(str(lock.resolve()))
     thread_lock.acquire()
     try:
-        fh = open(str(lock), "ab")
-        lock_kind = "none"
-        try:
-            if fcntl is not None:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
-                lock_kind = "flock"
-            elif msvcrt is not None:
-                try:
-                    fh.seek(0)
-                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
-                    lock_kind = "msvcrt"
-                except OSError as e:
-                    note_failure(where + ":msvcrt-lock", e)
-                    lock_kind = "none"
-            else:
-                note_failure(where + ":no-lock-primitive", None)
-                lock_kind = "none"
-            yield lock
-        finally:
+        with open(str(lock), "ab") as fh:
+            lock_kind = "none"
             try:
+                if fcntl is not None:
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+                    lock_kind = "flock"
+                elif msvcrt is not None:
+                    try:
+                        fh.seek(0)
+                        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                        lock_kind = "msvcrt"
+                    except OSError as e:
+                        note_failure(where + ":msvcrt-lock", e)
+                        lock_kind = "none"
+                else:
+                    note_failure(where + ":no-lock-primitive", None)
+                    lock_kind = "none"
+                yield lock
+            finally:
                 kind = lock_kind
                 if kind == "flock" and fcntl is not None:
                     fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
@@ -136,7 +135,5 @@ def file_lock(lock_path: Path | str, where: str):
                         msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
                     except OSError as e:
                         note_failure(where + ":unlock", e)
-            finally:
-                fh.close()
     finally:
         thread_lock.release()

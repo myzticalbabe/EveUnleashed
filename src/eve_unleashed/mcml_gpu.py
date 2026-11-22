@@ -150,9 +150,7 @@ def available() -> bool:
     try:
         cl = _CL()
         n = ctypes.c_uint32()
-        if cl.get_platform_ids(0, None, ctypes.byref(n)) != 0 or n.value == 0:
-            return False
-        return True
+        return not (cl.get_platform_ids(0, None, ctypes.byref(n)) != 0 or n.value == 0)
     except Exception:  # noqa: BLE001 -- logged below, guard broad
         return False
 
@@ -673,7 +671,7 @@ def main() -> int:
     d.gb = [0.0] * OUT
     gY = [row[:] for row in Y]
     mse_g = [[2.0 * (yv - tv) / OUT for yv, tv in zip(yr, tr)] for yr, tr in zip(gY, T)]
-    dX, bwd_kt = g.backward_batch(X, mse_g)
+    _dX, bwd_kt = g.backward_batch(X, mse_g)
     for x, my in zip(X, mse_g):
         y = a.forward(d.forward(x))
         dy = [m * _d for m, _d in zip(my, [1.0 - v * v for v in y])]
@@ -698,7 +696,7 @@ def main() -> int:
         a.forward(d.forward(x))
     cpu_ms = (time.perf_counter() - t0) * 1e3
     t0 = time.perf_counter()
-    Y2, _ = g.forward_batch(X)
+    _Y2, _ = g.forward_batch(X)
     gpu_ms = (time.perf_counter() - t0) * 1e3
 
     print(f"shape: batch={B:d} in={IN:d} out={OUT:d}  params={g._nw + g._nb:d}")

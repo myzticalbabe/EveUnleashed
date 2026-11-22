@@ -147,24 +147,25 @@ def cradle_start() -> dict:
         return {"ok": False, "error": "no llama-server on PATH (build llama.cpp)"}
     gguf = ggufs[0]
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    log = open(LOG_FILE, "a")
-    proc = subprocess.Popen(
-        [
-            exe,
-            "-m",
-            str(gguf),
-            "--port",
-            str(CRADLE_PORT),
-            "--ctx-size",
-            "2048",
-            "--alias",
-            "cradle-" + gguf.stem,
-        ],
-        stdout=log,
-        stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+    with open(LOG_FILE, "a") as log:
+        # Parent's copy closes at block exit; the child's dup'd fd keeps logging.
+        proc = subprocess.Popen(
+            [
+                exe,
+                "-m",
+                str(gguf),
+                "--port",
+                str(CRADLE_PORT),
+                "--ctx-size",
+                "2048",
+                "--alias",
+                "cradle-" + gguf.stem,
+            ],
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
     PID_FILE.write_text(str(proc.pid))
     for _ in range(60):
         if _http_json(CRADLE_BASE + "/health", timeout=2.0) == {"status": "ok"}:

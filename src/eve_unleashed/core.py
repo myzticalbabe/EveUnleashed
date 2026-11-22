@@ -6,6 +6,7 @@ Model loading, inference result types, and framework detection.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -30,6 +31,35 @@ _COMPAT_FRAMEWORKS = _compat_frameworks()
 
 # Cached XPU availability check (subprocess-based to survive segfaults)
 _XPU_AVAILABLE: bool | None = None
+
+
+def _check_xpu_available(timeout: float = 30) -> bool:
+    """Crash-safe Intel XPU probe.
+
+    Direct ``torch.xpu`` init can segfault headless systems (Level Zero /
+    SYCL), so the probe runs in a child interpreter; a dead child reads as
+    unavailable instead of killing the host. Result is cached: hardware does
+    not appear mid-process.
+    """
+    global _XPU_AVAILABLE
+    if _XPU_AVAILABLE is not None:
+        return _XPU_AVAILABLE
+    try:
+        probe = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import torch; print(bool(torch.xpu.is_available()))",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        _XPU_AVAILABLE = probe.returncode == 0 and "True" in probe.stdout
+    except (OSError, subprocess.SubprocessError):
+        _XPU_AVAILABLE = False
+    return _XPU_AVAILABLE
 
 
 # PIL / image support detection
@@ -74,7 +104,9 @@ class BatchResult:
 
 
 try:
-    from shared.models import BatchResult, InferenceResult
+    # Rebinds the InferenceResult fallback above to the canonical shared model.
+    # (BatchResult has no shared counterpart; its local fallback always stands.)
+    from shared.models import InferenceResult
 except ImportError as exc:
     # Fallback: local dataclasses above stand (shared module not available)
     note_failure("core:L112", exc)

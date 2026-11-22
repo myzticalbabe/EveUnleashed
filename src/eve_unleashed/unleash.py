@@ -94,7 +94,9 @@ def matrix():
     rows = []
     for f in FUNCTIONS:
         try:
-            mod = __import__("eve_unleashed.{}".format(f["module"]), fromlist=["x"])
+            __import__(
+                "eve_unleashed.{}".format(f["module"]), fromlist=["x"]
+            )  # importability probe; module unused
             ok, detail = True, "import ok"
             for need in f["needs"]:
                 if need == "z3":

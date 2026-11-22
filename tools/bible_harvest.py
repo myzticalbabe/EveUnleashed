@@ -208,8 +208,7 @@ def _first_paragraph(body: list[str]) -> str:
                 break
             continue
         if (
-            stripped.startswith("#")
-            or stripped.startswith("|")
+            stripped.startswith(("#", "|"))
             or FENCE.match(stripped)
             or BULLET.match(stripped)
         ):

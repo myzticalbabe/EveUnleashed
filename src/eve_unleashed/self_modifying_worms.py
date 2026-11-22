@@ -234,9 +234,6 @@ class GeneticAlgorithm:
         scored.sort(key=lambda x: x[1], reverse=True)
 
         elites = [d for d, _ in scored[: self.elite_keep]]
-        cull_threshold = (
-            scored[self.elite_keep][1] if len(scored) > self.elite_keep else 0.0
-        )
 
         new_pop: list[WormDNA] = list(elites)
         while len(new_pop) < self.population_size:

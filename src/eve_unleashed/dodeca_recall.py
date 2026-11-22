@@ -219,7 +219,7 @@ class ShapeStore:
         return home
 
     def _distances(
-        self, home: int, weights: dict[frozenset, float] = None
+        self, home: int, weights: dict[frozenset, float] | None = None
     ) -> dict[int, float]:
         """Shortest costs from home: BFS unweighted, Dijkstra weighted."""
         if not weights:
@@ -241,7 +241,10 @@ class ShapeStore:
         return dist
 
     def recall(
-        self, key: str, radius: int = None, weights: dict[frozenset, float] = None
+        self,
+        key: str,
+        radius: int | None = None,
+        weights: dict[frozenset, float] | None = None,
     ) -> dict[str, Any]:
         """Walk outward from key's home vertex; collect nearest-first.
 
@@ -324,8 +327,8 @@ def transmogrify(
     name: str,
     n: int,
     nbr: Callable[[int], list[int]],
-    max_diameter: int = None,
-    min_girth: int = None,
+    max_diameter: int | None = None,
+    min_girth: int | None = None,
 ) -> str:
     """Register ANY neighbor-function as a new solid. Validated, or refused.
 
@@ -402,7 +405,7 @@ def mutate_shape(
 
 
 def transsubstantiate(
-    store: ShapeStore, key_fn: Callable[[str, Any], str], shape: str = None
+    store: ShapeStore, key_fn: Callable[[str, Any], str], shape: str | None = None
 ) -> ShapeStore:
     """Change what the vertices HOLD: re-home every entry under new keys.
 
@@ -445,7 +448,10 @@ class SwarmStore:
         return s, self.stores[s].put(key, value)
 
     def recall(
-        self, key: str, radius: int = None, weights: dict[frozenset, float] = None
+        self,
+        key: str,
+        radius: int | None = None,
+        weights: dict[frozenset, float] | None = None,
     ) -> dict[str, Any]:
         """Fan out to every shard; merge. Exact stays exact."""
         exact: list[tuple[int, str, Any]] = []
@@ -503,7 +509,7 @@ class SwarmStore:
 
 
 def cast_projection(
-    store: ShapeStore, genome: dict[str, Any], provenance: dict[str, Any] = None
+    store: ShapeStore, genome: dict[str, Any], provenance: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """PROJECTION: cast the finished stone -- in ALL forms, not one.
 
@@ -591,7 +597,7 @@ def write_projection(
     store: ShapeStore,
     genome: dict[str, Any],
     base_path: str,
-    provenance: dict[str, Any] = None,
+    provenance: dict[str, Any] | None = None,
 ) -> list[str]:
     """Write all three forms to <base>.json / <base>.py / <base>.md."""
     cast = cast_projection(store, genome, provenance)
@@ -619,7 +625,7 @@ BUILTIN_SHAPES = frozenset(
 )
 
 
-def conjoin(a: ShapeStore, b: ShapeStore, shape: str = None) -> ShapeStore:
+def conjoin(a: ShapeStore, b: ShapeStore, shape: str | None = None) -> ShapeStore:
     """CONJOIN: marry two stores onto one solid. Every entry survives.
 
     Defaults to the larger solid; same key in both yields both entries
@@ -635,7 +641,7 @@ def conjoin(a: ShapeStore, b: ShapeStore, shape: str = None) -> ShapeStore:
 
 
 def separate(
-    store: ShapeStore, pred: Callable[[str, Any], bool], shape: str = None
+    store: ShapeStore, pred: Callable[[str, Any], bool], shape: str | None = None
 ) -> tuple[ShapeStore, ShapeStore]:
     """SEPARATE: divide one store by predicate. (match, rest).
 

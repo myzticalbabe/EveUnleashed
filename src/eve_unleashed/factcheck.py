@@ -150,7 +150,7 @@ def lock_receipts(result):
 
     ids = []
     if not isinstance(result, dict):
-        raise ValueError("nothing to lock: not a factcheck result")
+        raise TypeError("nothing to lock: not a factcheck result")
     for r in result.get("receipts", []):
         if r.get("status") == "ok":
             ids.append(ingest_receipt(r)["id"])

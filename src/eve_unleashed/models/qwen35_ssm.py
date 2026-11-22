@@ -326,7 +326,7 @@ class Qwen35SSM(nn.Module):
         PyTorch operations (cumulative product + cumulative sum), giving
         O(log seq_len) parallel complexity instead of O(seq_len) serial.
         """
-        bsz, seq_len, inner = u.shape
+        _bsz, _seq_len, _inner = u.shape
 
         # Discretize A and B
         delta = F.softplus(delta)
@@ -358,7 +358,7 @@ class Qwen35SSM(nn.Module):
         return y
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        bsz, seq_len, _ = hidden_states.shape
+        _bsz, seq_len, _ = hidden_states.shape
 
         # Project input
         proj = self.in_proj(hidden_states)

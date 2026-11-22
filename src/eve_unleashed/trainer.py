@@ -287,8 +287,8 @@ def run_url(
     url: str,
     log_path: str,
     cap_s: float = DEFAULT_CAP_S,
-    calib: dict[str, float] = None,
-    fixture: dict[str, dict[str, Any]] = None,
+    calib: dict[str, float] | None = None,
+    fixture: dict[str, dict[str, Any]] | None = None,
 ):
     """One scored fetch: intuition guesses, policy decides live-vs-memory.
 
@@ -390,7 +390,7 @@ def load_or_seed(ga: GeneticAlgorithm, cfg: TrainConfig, rng: random.Random) -> 
 
 
 def score_genome(
-    dna: WormDNA, cfg: TrainConfig, calib: dict[str, float] = None
+    dna: WormDNA, cfg: TrainConfig, calib: dict[str, float] | None = None
 ) -> WormFitness:
     """Score one genome over every URL. No selection, no tuning, no breed.
 
