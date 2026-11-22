@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: Any = None) -> None:
@@ -72,7 +72,7 @@ class PamSEvolution:
         if self.recorder is not None:
             return self.recorder
         try:
-            from CORE.PamsRecorder import get_recorder
+            from core.PamsRecorder import get_recorder
 
             self.recorder = get_recorder()
             return self.recorder

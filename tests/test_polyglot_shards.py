@@ -12,14 +12,14 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from INTERPRETERS import (
+from interpreters import (
     node_runner,
     pwsh_runner,
     run_code,
     sh_runner,
     supported_languages,
 )
-from SHARDS import polyglot, registry
+from shards import polyglot, registry
 
 
 def test_runner_modules_expose_expected_api():
@@ -56,7 +56,7 @@ def test_run_code_javascript_inline():
 
 
 def test_route_lang_spends_budgets():
-    from SHARDS.registry import route_lang
+    from shards.registry import route_lang
 
     assert route_lang("gateway", "balanced") == "go"
     assert route_lang("gateway", "peak") == "rust"
@@ -79,7 +79,7 @@ def test_work_tier_sum_agreement_where_toolchains_exist():
     # (The bash golden once summed 1..20000 via seq while every other
     # language summed 0..19999 — nothing covered the work tier, so the
     # routing table silently ranked bash on a failing measurement.)
-    from SHARDS.polyglot import EXPECTED_SUM, WORK_SNIPPETS
+    from shards.polyglot import EXPECTED_SUM, WORK_SNIPPETS
 
     assert EXPECTED_SUM == 20000 * 19999 // 2 == 199990000
     assert set(WORK_SNIPPETS) == set(polyglot.supported_shard_langs())
@@ -95,7 +95,7 @@ def test_stale_sweep_falls_back_to_canonical_order():
     # Owner decision 2026-10-29: a stale table degrades to canonical
     # preference, never spends stale numbers. MAX_AGE=-1 makes every
     # table stale by age, deterministically, on any machine.
-    import SHARDS.registry as reg
+    import shards.registry as reg
 
     old = reg.SWEEP_MAX_AGE_HOURS
     reg.SWEEP_MAX_AGE_HOURS = -1

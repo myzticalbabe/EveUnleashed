@@ -18,7 +18,7 @@ analysis; only you file it, and only you judge the person.
 import re
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):

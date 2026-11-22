@@ -37,7 +37,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: BaseException | None = None) -> None:

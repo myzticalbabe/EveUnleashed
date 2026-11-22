@@ -9,7 +9,7 @@ to be replayed by hand everywhere. This module is the single source;
 the per-store functions remain thin wrappers that set timestamps and
 defaults.
 
-Stdlib-only like failure_ledger, so any layer (CORE or SHARDS) can
+Stdlib-only like failure_ledger, so any layer (core or shards) can
 import it without cycles.
 """
 
@@ -32,7 +32,7 @@ except ImportError:
     msvcrt = None  # type: ignore[assignment]
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: BaseException | None = None) -> None:

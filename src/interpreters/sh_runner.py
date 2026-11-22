@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: BaseException | None = None) -> None:
@@ -31,7 +31,7 @@ except ImportError:  # never break the host
 
 
 try:
-    from CORE.paths import get_project_root_safe as _get_project_root_safe
+    from core.paths import get_project_root_safe as _get_project_root_safe
 except ImportError as exc:  # never break the host
     note_failure("sh_runner:core-paths-import", exc)
     _get_project_root_safe = None

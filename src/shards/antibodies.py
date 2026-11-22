@@ -14,7 +14,7 @@ Lifecycle (closed loop, evidence-gated):
     exclusive lock (D2), same pattern as morphed_registry.
 
 Usage:
-    from SHARDS.antibodies import run_antibody, seek_all
+    from shards.antibodies import run_antibody, seek_all
     seek_all()   # run every probe, record generations, print JSON
 """
 
@@ -30,17 +30,17 @@ from pathlib import Path
 from typing import Any, NotRequired, TypedDict
 
 try:
-    from CORE.atomic_store import atomic_write_json, file_lock
-    from CORE.failure_ledger import note_failure
+    from core.atomic_store import atomic_write_json, file_lock
+    from core.failure_ledger import note_failure
 except ImportError:
-    # Script path (`python src/SHARDS/antibodies.py`): the checkout root
+    # Script path (`python src/shards/antibodies.py`): the checkout root
     # is cwd but src/ is not on sys.path. Bootstrap it once, guarded so
-    # an installed/importable CORE is never shadowed by the checkout.
+    # an installed/importable core is never shadowed by the checkout.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from CORE.atomic_store import atomic_write_json, file_lock
-    from CORE.failure_ledger import note_failure
-from SHARDS import registry as _registry
-from SHARDS.polyglot import EXPECTED_SUM, run_shard, supported_shard_langs
+    from core.atomic_store import atomic_write_json, file_lock
+    from core.failure_ledger import note_failure
+from shards import registry as _registry
+from shards.polyglot import EXPECTED_SUM, run_shard, supported_shard_langs
 
 # ── Type definitions ──────────────────────────────────────────────
 
@@ -136,13 +136,13 @@ def _load_store() -> dict[str, Any]:
 
 
 def _save_store(store: dict[str, Any]) -> None:
-    """Atomic write via CORE.atomic_store (D1) — single implementation."""
+    """Atomic write via core.atomic_store (D1) — single implementation."""
     store["updated_at"] = datetime.now(UTC).isoformat()
     atomic_write_json(_STORE_PATH, store, "antibodies")
 
 
 def _store_lock() -> Any:
-    """Exclusive lock for read-modify-write (D2) — via CORE.atomic_store."""
+    """Exclusive lock for read-modify-write (D2) — via core.atomic_store."""
     return file_lock(_STORE_PATH.with_suffix(".lock"), "antibodies")
 
 
@@ -377,7 +377,7 @@ def seek_all(record: bool = True) -> dict[str, Any]:
     return report
 
 
-_BOX_MARKER = os.path.join("src", "SHARDS", "antibodies.py")
+_BOX_MARKER = os.path.join("src", "shards", "antibodies.py")
 _BOX_SKIP_DIRS = {
     ".git",
     "__pycache__",
@@ -429,7 +429,7 @@ def discover_checkouts(
 ) -> list[str]:
     """Find Azazael checkouts under roots (marker-gated, bounded depth).
 
-        A checkout is a directory containing src/SHARDS/antibodies.py — the
+        A checkout is a directory containing src/shards/antibodies.py — the
         antibody module itself is the marker, so pre-antibody checkouts are
         invisible by construction (documented limitation: sync first, then
         they join the box). Matched checkouts are not descended into;
@@ -483,7 +483,7 @@ def _seek_checkout(root: str, timeout: int = _BOX_TIMEOUT_S) -> dict[str, Any]:
     its own interpreter and tree, so version drift between checkouts
     cannot contaminate this process. Anything unparseable is an
     `unreachable` outcome — never mistaken for clean."""
-    script = str(Path(root) / "src" / "SHARDS" / "antibodies.py")
+    script = str(Path(root) / "src" / "shards" / "antibodies.py")
     try:
         proc = subprocess.run(
             [sys.executable, script, "--seek", "--no-record"],

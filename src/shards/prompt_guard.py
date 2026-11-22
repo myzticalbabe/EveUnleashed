@@ -7,7 +7,7 @@ OWASP LLM Top 10 coverage:
 - LLM06: Sensitive Information Disclosure — PII/secret redaction
 
 Usage:
-    from SHARDS.prompt_guard import PromptGuard
+    from shards.prompt_guard import PromptGuard
     guard = PromptGuard()
     clean_prompt = guard.sanitize(user_prompt)
     validated_response = guard.validate(llm_response, expected_schema)

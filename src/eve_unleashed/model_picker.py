@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except Exception:  # noqa: BLE001 -- model_picker: no ledger, broad
 
     def note_failure(where, exc=None):

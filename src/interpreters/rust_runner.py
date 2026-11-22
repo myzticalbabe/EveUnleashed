@@ -26,7 +26,7 @@ from pathlib import Path
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: BaseException | None = None) -> None:
@@ -36,7 +36,7 @@ except ImportError:  # never break the host
 # --- Configuration -----------------------------------------------------------
 
 try:
-    from CORE.paths import get_project_root_safe as _get_project_root_safe
+    from core.paths import get_project_root_safe as _get_project_root_safe
 except ImportError as exc:  # never break the host
     note_failure("rust_runner:core-paths-import", exc)
     _get_project_root_safe = None
@@ -45,7 +45,7 @@ except ImportError as exc:  # never break the host
 #: `Path.home() / "azazael"` -- a DIFFERENT, stale checkout from this repo -- so with
 #: AZAZAEL_ROOT unset this runner resolved the WRONG tree and forwarded it to the child
 #: process it spawns. `parents[2]` (this file's own tree) answers only the case where
-#: CORE.paths is unimportable.
+#: core.paths is unimportable.
 _DEFAULT_ROOT = (
     str(_get_project_root_safe())
     if _get_project_root_safe is not None

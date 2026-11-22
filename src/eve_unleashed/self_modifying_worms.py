@@ -22,7 +22,7 @@ from typing import Any
 from .dodeca_recall import SHAPES  # recall never imports worms, so no cycle
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: Any = None) -> None:
@@ -330,7 +330,7 @@ class EvolutionaryWormManager:
         if self._recorder is not None:
             return self._recorder
         try:
-            from CORE.PamsRecorder import get_recorder
+            from core.PamsRecorder import get_recorder
 
             self._recorder = get_recorder()
             return self._recorder

@@ -33,7 +33,7 @@ from eve_unleashed.trainer import TrainConfig, freeze_fixture, null_control, run
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: BaseException | None = None) -> None:
@@ -187,7 +187,7 @@ def _swarm_fallback(prompt):
     import concurrent.futures
 
     try:
-        from CORE.inference.parallel import ParallelInferenceEngine
+        from core.inference.parallel import ParallelInferenceEngine
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:swarm-import", e)
         return None, "swarm unavailable (parallel engine would not import)"
@@ -268,7 +268,7 @@ def cmd_ablate(args) -> int:
     from eve_unleashed import ablate as _a
 
     try:
-        from CORE.inference.parallel import ParallelInferenceEngine
+        from core.inference.parallel import ParallelInferenceEngine
 
         engine = ParallelInferenceEngine()
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad

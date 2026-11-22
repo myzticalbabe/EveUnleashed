@@ -82,7 +82,7 @@ def _show(rev: str) -> str:
 
 
 def _counts(source: str, path: str, min_severity: str) -> Counter:
-    from CORE.compliance.scanner import FINDING_SEVERITIES, ASTAntiPatternScanner
+    from core.compliance.scanner import FINDING_SEVERITIES, ASTAntiPatternScanner
 
     result = ASTAntiPatternScanner().scan_source(path, source)
     floor = SEVERITY_ORDER[min_severity]
@@ -126,7 +126,7 @@ def main() -> int:
             return 2
 
     try:
-        from CORE.compliance.scanner import ASTAntiPatternScanner  # noqa: F401
+        from core.compliance.scanner import ASTAntiPatternScanner  # noqa: F401
     except Exception as exc:  # noqa: BLE001 - pass LOUD, never silently block
         print(f"[StagedScanner] scanner unavailable ({exc}) - passing loud")
         return 0

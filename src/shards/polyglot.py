@@ -2,7 +2,7 @@
 """Polyglot router + golden self-test (arena-64n shard_node shape).
 
 `run_shard(lang)` executes the golden snippet for one language through the
-INTERPRETERS dispatcher and returns a JSON-serializable result (no weights,
+interpreters dispatcher and returns a JSON-serializable result (no weights,
 no handles across the boundary). `self_test()` cold-recomputes every
 available toolchain and asserts stdout agreement on the golden token.
 A missing toolchain is a clean skip, never a failure.
@@ -20,10 +20,10 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from CORE.atomic_store import atomic_write_json
-from CORE.failure_ledger import note_failure
-from INTERPRETERS import run_code, supported_languages
-from SHARDS.registry import LANG_ORDER, SHARDS, _probe_toolchain_versions, route_lang
+from core.atomic_store import atomic_write_json
+from core.failure_ledger import note_failure
+from interpreters import run_code, supported_languages
+from shards.registry import LANG_ORDER, SHARDS, _probe_toolchain_versions, route_lang
 
 GOLDEN_TOKEN = "AZAZAEL-GOLDEN-OK"
 WORK_TOKEN = "AZAZAEL-WORK-OK"
@@ -148,7 +148,7 @@ def check_doc_shards() -> dict:
             "the skills CLI, not committed): doc shards not verified",
         }
     for name in SHARDS:
-        # `SHARDS` is already imported from SHARDS.registry at module level;
+        # `SHARDS` is already imported from shards.registry at module level;
         # the per-iteration re-import here was the same dict every time, and
         # its except-continue could hide a failure nothing else would show.
         entry = SHARDS.get(name, {})
@@ -258,7 +258,7 @@ def prune_build_dirs(max_age_days: int = 14) -> dict:
 
 
 def _atomic_write_json(path: Path, payload: dict) -> None:
-    """Atomic JSON write (D1) via CORE.atomic_store — single implementation."""
+    """Atomic JSON write (D1) via core.atomic_store — single implementation."""
     atomic_write_json(path, payload, "shards")
 
 

@@ -1,6 +1,6 @@
-# Vendored from azazael/src/CORE/cd3_exporter.py -- span writer for the
+# Vendored from azazael/src/core/cd3_exporter.py -- span writer for the
 # tree ledger (otel_spans). Byte-identical except this header. EveUnleashed
-# src/CORE is a standalone-safe mirror; the azazael tree remains canonical.
+# src/core is a standalone-safe mirror; the azazael tree remains canonical.
 # coding: utf-8
 """
 
@@ -20,7 +20,7 @@ Provides:
     BatchSpanProcessor + SQLiteSpanExporter.
 
 Usage:
-    from CORE.cd3_exporter import SQLiteSpanExporter, configure_otel_tracing
+    from core.cd3_exporter import SQLiteSpanExporter, configure_otel_tracing
 
     # Option 1: Manual setup
     exporter = SQLiteSpanExporter()
@@ -54,7 +54,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 #: This list used to sit INSIDE the module docstring above, i.e. inside a string
-#: literal, so it was never assigned: `from CORE.cd3_exporter import *` exported
+#: literal, so it was never assigned: `from core.cd3_exporter import *` exported
 #: every public name and __all__ itself did not exist.
 __all__ = [
     "DB_PATH",
@@ -73,7 +73,7 @@ __all__ = [
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: BaseException | None = None) -> None:
@@ -82,7 +82,7 @@ except ImportError:  # never break the host
 
 # -- OTel SDK, GUARDED (optional in fact, mandatory in the old code) ----
 # The SDK is optional in FACT but was mandatory in the CODE: the two module-level
-# imports that used to sit at the top made `import CORE.cd3_exporter` itself raise
+# imports that used to sit at the top made `import core.cd3_exporter` itself raise
 # wherever the SDK is absent. Measured 2026-10-10 on the production interpreter
 # (C:/Azazael/.venvs/py315t): only the bare `opentelemetry` namespace package is
 # installed, and `from opentelemetry.sdk.trace import ReadableSpan` raises
@@ -693,7 +693,7 @@ def purge_old_spans(older_than_days: int = 30, db_path: str | None = None) -> in
 # ====================================================================
 
 if __name__ == "__main__":
-    # Ensure src/ is on sys.path so CORE.* imports resolve
+    # Ensure src/ is on sys.path so core.* imports resolve
     _src_path = os.path.join(os.path.dirname(__file__), "..")
     if _src_path not in sys.path:
         sys.path.insert(0, _src_path)

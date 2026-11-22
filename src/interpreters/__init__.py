@@ -9,7 +9,7 @@ runner class with compile, run, test, and lint capabilities.
 Supported: Python, Rust, Go, Bash, JavaScript (Node), PowerShell (pwsh).
 
 Usage:
-    from INTERPRETERS import run_code
+    from interpreters import run_code
     result = run_code("rust", 'fn main() { println!("Hello"); }')
 
 OpenMono Integration:
@@ -26,15 +26,15 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from INTERPRETERS.node_runner import NodeRunner
-from INTERPRETERS.pwsh_runner import PwshRunner
-from INTERPRETERS.sh_runner import ShRunner
+from interpreters.node_runner import NodeRunner
+from interpreters.pwsh_runner import PwshRunner
+from interpreters.sh_runner import ShRunner
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: BaseException | None = None) -> None:
@@ -59,7 +59,12 @@ def run_python(code: str, args: list[str] | None = None) -> RunResult:
     """Run Python code via exec.
 
     D6 contract: args are literal strings exposed as sys.argv[1:] with NO
-    shell evaluation; args containing spaces/quotes arrive intact."""
+    shell evaluation; args containing spaces/quotes arrive intact.
+
+    Trust boundary: `code` runs with the caller's own privileges (same as
+    `python -c`), so only the invoking user can authorize it; argv is
+    sandboxed to ["<inline>", *args] and stdio is captured, never inherited.
+    """
     import time
     from contextlib import redirect_stderr, redirect_stdout
 
@@ -72,7 +77,9 @@ def run_python(code: str, args: list[str] | None = None) -> RunResult:
             _old_argv = sys.argv
             sys.argv = ["<inline>"] + list(args or [])
             try:
-                exec(code, {"__name__": "__main__"})
+                exec(  # noqa: S102 -- audited: caller-privileged runner, see docstring
+                    code, {"__name__": "__main__"}
+                )
             finally:
                 sys.argv = _old_argv
         success = True
@@ -98,7 +105,7 @@ def run_rust(code: str, args: list[str] | None = None) -> RunResult:
 
     D6 contract: args are literal strings forwarded as process argv with
     NO shell evaluation; args containing spaces/quotes arrive intact."""
-    from INTERPRETERS.rust_runner import RustRunner
+    from interpreters.rust_runner import RustRunner
 
     runner = RustRunner()
     result = runner.run_code(code, args or [])
@@ -119,7 +126,7 @@ def run_go(code: str, args: list[str] | None = None) -> RunResult:
 
     D6 contract: args are literal strings forwarded as process argv with
     NO shell evaluation; args containing spaces/quotes arrive intact."""
-    from INTERPRETERS.go_runner import GoRunner
+    from interpreters.go_runner import GoRunner
 
     runner = GoRunner()
     result = runner.run_code(code, args or [])

@@ -13,12 +13,12 @@ import sys
 import time
 from pathlib import Path
 
-from CORE.failure_ledger import note_failure
-from INTERPRETERS.go_runner import GoRunner
-from INTERPRETERS.node_runner import NodeRunner
-from INTERPRETERS.pwsh_runner import PwshRunner
-from INTERPRETERS.rust_runner import RustRunner
-from INTERPRETERS.sh_runner import ShRunner
+from core.failure_ledger import note_failure
+from interpreters.go_runner import GoRunner
+from interpreters.node_runner import NodeRunner
+from interpreters.pwsh_runner import PwshRunner
+from interpreters.rust_runner import RustRunner
+from interpreters.sh_runner import ShRunner
 
 
 def _probe_toolchain_versions() -> dict:
@@ -70,14 +70,14 @@ SHARDS: dict = {
         "two implementations. Template for all future dual-lang shards.",
     },
     "interpreters": {
-        "paths": ["src/INTERPRETERS/"],
+        "paths": ["src/interpreters/"],
         "langs": ["python", "go", "rust", "javascript", "powershell", "bash"],
         "canonical": "python",
         "notes": "Runner fleet. Python hosts; every other language executes "
         "through its dedicated runner module.",
     },
     "antibodies": {
-        "paths": ["src/SHARDS/antibodies.py"],
+        "paths": ["src/shards/antibodies.py"],
         "langs": ["python"],
         "canonical": "python",
         "notes": "Error-derived detectors. Each antibody is cloned from one "
@@ -193,7 +193,7 @@ def sweep_freshness() -> dict:
             reasons.append(f"age {age_h:.1f}h > {SWEEP_MAX_AGE_HOURS}h")
     except (ValueError, TypeError, OverflowError) as e:
         reasons.append(f"unparseable generated_at: {e}")
-    runners_dir = Path(__file__).parent.parent / "INTERPRETERS"
+    runners_dir = Path(__file__).parent.parent / "interpreters"
     try:
         sweep_mtime = sweep_path.stat().st_mtime
         for runner in sorted(runners_dir.glob("*_runner.py")):

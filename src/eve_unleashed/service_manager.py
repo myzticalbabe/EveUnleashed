@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:
 
     def note_failure(where, exc=None):
@@ -188,7 +188,7 @@ class LlamaServerManager:
                 times.append(ms)
             except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 try:
-                    from CORE.failure_ledger import note_failure
+                    from core.failure_ledger import note_failure
 
                     note_failure("service_manager:benchmark_inference", exc)
                 except Exception as exc:  # noqa: BLE001 -- logged below, guard broad

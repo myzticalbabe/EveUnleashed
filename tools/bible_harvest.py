@@ -100,7 +100,7 @@ def _clean(text: str, limit: int = MAX_FIELD) -> str:
     """One line, bold markers removed, bounded. Deterministic by construction.
 
     Only `**` is stripped. Stripping `__` as well turned every dunder module name
-    in the corpus into a wrong path (`CORE/paths/__init__.py` -> `init.py`), which
+    in the corpus into a wrong path (`core/paths/__init__.py` -> `init.py`), which
     is the kind of quiet corruption a provenance ledger must never introduce.
     """
     text = BULLET.sub("", text.strip())

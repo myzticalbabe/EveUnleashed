@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: Any = None) -> None:
@@ -172,7 +172,7 @@ class IntrospectionLoop:
         if self._recorder is not None:
             return self._recorder
         try:
-            from CORE.PamsRecorder import get_recorder
+            from core.PamsRecorder import get_recorder
 
             self._recorder = get_recorder()
             return self._recorder
@@ -325,7 +325,7 @@ class GoalSetting:
         if self._recorder is not None:
             return self._recorder
         try:
-            from CORE.PamsRecorder import get_recorder
+            from core.PamsRecorder import get_recorder
 
             self._recorder = get_recorder()
             return self._recorder
@@ -407,7 +407,7 @@ class Reflection:
         if self._recorder is not None:
             return self._recorder
         try:
-            from CORE.PamsRecorder import get_recorder
+            from core.PamsRecorder import get_recorder
 
             self._recorder = get_recorder()
             return self._recorder

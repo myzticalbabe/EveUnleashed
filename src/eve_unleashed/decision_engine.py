@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Any
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: Any = None) -> None:
@@ -25,13 +25,13 @@ except ImportError:  # never break the host
 
 
 try:
-    from CORE.WORMS.expansion.utility_guided_orchestration import (
+    from core.WORMS.expansion.utility_guided_orchestration import (
         OrchestrationAction as _OrchestrationAction,
     )
-    from CORE.WORMS.expansion.utility_guided_orchestration import (
+    from core.WORMS.expansion.utility_guided_orchestration import (
         OrchestrationContext as _OrchestrationContext,
     )
-    from CORE.WORMS.expansion.utility_guided_orchestration import (
+    from core.WORMS.expansion.utility_guided_orchestration import (
         UtilityEngine as _UtilityEngine,
     )
 except ImportError:  # never break the host
@@ -145,7 +145,7 @@ class AutonomousDecisionEngine:
         if self.recorder is not None:
             return self.recorder
         try:
-            from CORE.PamsRecorder import get_recorder
+            from core.PamsRecorder import get_recorder
 
             self.recorder = get_recorder()
             return self.recorder

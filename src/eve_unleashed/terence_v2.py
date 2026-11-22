@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: Any = None) -> None:

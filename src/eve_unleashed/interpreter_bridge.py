@@ -36,7 +36,7 @@ from typing import Any
 
 #: Swallows recorded when the failure ledger is unavailable
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:
 
     def note_failure(where: str, exc: Any = None) -> None:

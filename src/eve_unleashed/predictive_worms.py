@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:  # never break the host
 
     def note_failure(where: str, exc: Any = None) -> None:
@@ -143,7 +143,7 @@ class PredictiveWorm:
         rec = self.recorder
         if rec is None:
             try:
-                from CORE.PamsRecorder import get_recorder
+                from core.PamsRecorder import get_recorder
 
                 rec = get_recorder()
             except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
