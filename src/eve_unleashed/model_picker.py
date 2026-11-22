@@ -291,7 +291,11 @@ def discover_agents(timeout: float = 30.0) -> list:
         models: list = []
         try:
             proc = subprocess.run(
-                [exe, "models"], capture_output=True, text=True, timeout=timeout
+                [exe, "models"],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
             )
             for line in (proc.stdout or "").splitlines():
                 line = line.strip().strip("`")
@@ -337,7 +341,9 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
         argv += ["-m", model]
     argv += ["--format", "json", prompt]
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(
+            argv, capture_output=True, text=True, timeout=timeout, check=False
+        )
     except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         return {"status": "error", "error": f"{agent}: {exc}"}
     out = (proc.stdout or "").strip()

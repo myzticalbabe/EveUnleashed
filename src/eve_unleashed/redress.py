@@ -307,10 +307,16 @@ def tutorial():
         "STEP 2 -- PICK THE CATEGORY: {}.".format(", ".join(CATEGORIES)),
         "STEP 3 -- STATE REDRESS: what fixes it? (refund, repair, rule change...)",
         "STEP 4 -- GATHER EVIDENCE: file paths, dates, screenshots.",
-        "STEP 5 -- FILE: eve grievance file --respondent X --category Y "
-        "--narrative '...' --redress '...'",
-        "STEP 6 -- ROUTE: eve grievance draft (FOIA/public comment) + "
-        "eve grievance refer (free legal aid).",
-        "STEP 7 -- TRACK: eve grievance show. Nothing auto-files anywhere "
-        "without your key and your word.",
+        (
+            "STEP 5 -- FILE: eve grievance file --respondent X --category Y "
+            "--narrative '...' --redress '...'"
+        ),
+        (
+            "STEP 6 -- ROUTE: eve grievance draft (FOIA/public comment) + "
+            "eve grievance refer (free legal aid)."
+        ),
+        (
+            "STEP 7 -- TRACK: eve grievance show. Nothing auto-files anywhere "
+            "without your key and your word."
+        ),
     ]

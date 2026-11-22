@@ -159,6 +159,7 @@ def run_shell_untrusted(command: str) -> RunResult:
             shell=True,  # scanner:ignore -- run_shell_untrusted IS the designated shell path; input is user shell by contract
             capture_output=True,
             timeout=30,
+            check=False,
         )
         stdout = result.stdout.decode("utf-8", errors="replace")
         stderr = result.stderr.decode("utf-8", errors="replace")

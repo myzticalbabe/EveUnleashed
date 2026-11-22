@@ -48,8 +48,10 @@ def fallback_response(mood, note):
         "",
         f"Grounding (pick one step): {GROUNDING_STEPS[0]}",
         "",
-        "Tiny next action: drink water, unclench your jaw, "
-        "look 20 feet away for 20 seconds.",
+        (
+            "Tiny next action: drink water, unclench your jaw, "
+            "look 20 feet away for 20 seconds."
+        ),
         "",
         "I am here with you. What do you need next?",
     ]

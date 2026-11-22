@@ -122,6 +122,7 @@ class ShRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=15,
+                check=False,
             )
             self.version = out.stdout.split("\n")[0].strip() if out.stdout else ""
         except Exception as e:  # noqa: BLE001 -- logged below, guard broad
@@ -145,6 +146,7 @@ class ShRunner:
                 cwd=cwd,
                 capture_output=True,
                 timeout=timeout,
+                check=False,
             )
             stdout = (
                 result.stdout.decode("utf-8", errors="replace")

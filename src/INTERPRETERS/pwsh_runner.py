@@ -101,6 +101,7 @@ class PwshRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=20,
+                check=False,
             )
             self.version = out.stdout.strip()
         except Exception as e:  # noqa: BLE001 -- logged below, guard broad
@@ -136,6 +137,7 @@ class PwshRunner:
                 cwd=cwd,
                 capture_output=True,
                 timeout=timeout,
+                check=False,
             )
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
@@ -237,6 +239,7 @@ class PwshRunner:
                 ),
                 capture_output=True,
                 timeout=30,
+                check=False,
             )
             present = b"YES" in (probe.stdout or b"")
             PwshRunner._module_cache[name] = present

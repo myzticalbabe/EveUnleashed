@@ -87,6 +87,7 @@ class NodeRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=15,
+                check=False,
             )
             self.version = out.stdout.strip()
         except Exception as e:  # noqa: BLE001 -- logged below, guard broad
@@ -142,6 +143,7 @@ class NodeRunner:
                 cwd=cwd,
                 capture_output=True,
                 timeout=timeout,
+                check=False,
             )
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")

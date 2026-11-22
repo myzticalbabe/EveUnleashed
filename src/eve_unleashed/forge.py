@@ -42,25 +42,31 @@ SPECS = {
     "priming": (
         "prime",
         "prime(previous, next_request)",
-        "the previous task's host raises the next guess's confidence, and a "
-        "disjoint host does not",
+        (
+            "the previous task's host raises the next guess's confidence, and a "
+            "disjoint host does not"
+        ),
     ),
     "prospective-memory": (
         "intentions",
         "add_intention(text, trigger)",
-        "an intention added for a trigger fires once when the trigger is "
-        "seen, and never fires twice",
+        (
+            "an intention added for a trigger fires once when the trigger is "
+            "seen, and never fires twice"
+        ),
     ),
     "inhibition": (
         "inhibit",
         "suppress(host, rung, attempts)",
-        "three blocked attempts at a rung for a host suppress it for that " "host only",
+        "three blocked attempts at a rung for a host suppress it for that host only",
     ),
     "counterfactual-replay": (
         "counterfactual",
         "replay_choice(record, alternative)",
-        "replaying a past choice against the recorded outcome returns "
-        "better/same/worse with the delta",
+        (
+            "replaying a past choice against the recorded outcome returns "
+            "better/same/worse with the delta"
+        ),
     ),
     "salience": (
         "salience",
@@ -70,7 +76,7 @@ SPECS = {
     "affect": (
         "affect",
         "valence(outcomes)",
-        "a losing streak lowers valence and a win raises it, bounded to " "-1..1",
+        "a losing streak lowers valence and a win raises it, bounded to -1..1",
     ),
 }
 
@@ -175,6 +181,7 @@ def materialize(gap, root=None):
             **os.environ,
             "PYTHONPATH": root + os.pathsep + os.environ.get("PYTHONPATH", ""),
         },
+        check=False,
     )
     tail = ((proc.stdout or "") + (proc.stderr or "")).strip().splitlines()
     ok = proc.returncode == 0

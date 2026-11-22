@@ -138,6 +138,7 @@ class GoRunner:
                 env=self._go_env(),
                 capture_output=True,
                 timeout=60,
+                check=False,
             )
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
@@ -214,6 +215,7 @@ class GoRunner:
                 env=self._go_env(),
                 capture_output=True,
                 timeout=120,
+                check=False,
             )
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
@@ -278,6 +280,7 @@ class GoRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=120,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,
@@ -302,6 +305,7 @@ class GoRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=30,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,
@@ -325,6 +329,7 @@ class GoRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=60,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,
@@ -352,6 +357,7 @@ class GoRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=30,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,

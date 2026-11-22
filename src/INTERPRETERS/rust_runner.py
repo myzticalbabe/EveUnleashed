@@ -131,7 +131,7 @@ class RustRunner:
         try:
             start = time.time()
             # D7: bytes capture; display via replace, evidence via stderr_bytes.
-            result = subprocess.run(cmd, capture_output=True, timeout=60)
+            result = subprocess.run(cmd, capture_output=True, timeout=60, check=False)
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
@@ -192,7 +192,7 @@ class RustRunner:
         cmd = [str(binary_path)] + (args or [])
         try:
             start = time.time()
-            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, timeout=30, check=False)
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
@@ -262,7 +262,7 @@ class RustRunner:
 
         cmd = ["rustc", "--edition", self.edition.value, "--check", str(source)]
         try:
-            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, timeout=30, check=False)
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
             return RustResult(
@@ -298,6 +298,7 @@ class RustRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=120,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,
@@ -330,6 +331,7 @@ class RustRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=120,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,
@@ -357,6 +359,7 @@ class RustRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=30,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,
@@ -381,6 +384,7 @@ class RustRunner:
                 encoding="utf-8",
                 errors="replace",
                 timeout=30,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,

@@ -243,8 +243,10 @@ def _provenance_problems(source, where: str, repo: Path) -> list[str]:
     tokens = _paths_in(source)
     if not tokens:
         return [
-            f"{where}: source names no repository path ({source!r}); a figure with no "
-            "re-runnable command is a claim, not evidence"
+            (
+                f"{where}: source names no repository path ({source!r}); a figure with no "
+                "re-runnable command is a claim, not evidence"
+            )
         ]
     problems = []
     for token in tokens:
@@ -1185,9 +1187,11 @@ def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> s
                 data.get("status"), data.get("updated")
             ),
             "",
-            f"_Generated from `{corpus_label}` by "
-            "`python tools/bible_check.py --render --write`. Do not edit this "
-            "file: edit the corpus._",
+            (
+                f"_Generated from `{corpus_label}` by "
+                "`python tools/bible_check.py --render --write`. Do not edit this "
+                "file: edit the corpus._"
+            ),
         ]
     )
     for book in data.get("books", []):

@@ -160,6 +160,7 @@ def verify():
                 text=True,
                 timeout=300,
                 cwd=str(REPO),
+                check=False,
             )
             tail = (proc.stdout.strip().splitlines() or [""])[-1][:120]
             results.append(

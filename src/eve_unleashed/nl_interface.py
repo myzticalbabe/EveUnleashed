@@ -282,9 +282,11 @@ class ConversationalKLINK:
             stats = self._engine.stats()
             pend = self._engine.pending()
             parts = [
-                f"{stats['total']} decisions tracked "
-                f"({stats['by_status'].get('executed', 0)} executed, "
-                f"{stats['by_status'].get('pending', 0)} pending)."
+                (
+                    f"{stats['total']} decisions tracked "
+                    f"({stats['by_status'].get('executed', 0)} executed, "
+                    f"{stats['by_status'].get('pending', 0)} pending)."
+                )
             ]
             if pend:
                 parts.append(

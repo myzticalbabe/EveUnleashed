@@ -444,7 +444,10 @@ def _sha_committed(root: Path, relative: str) -> str | None:
     for ref in (":" + relative, "HEAD:" + relative):
         try:
             completed = subprocess.run(
-                ["git", "-C", str(root), "show", ref], capture_output=True, timeout=20
+                ["git", "-C", str(root), "show", ref],
+                capture_output=True,
+                timeout=20,
+                check=False,
             )
         except (OSError, subprocess.SubprocessError):  # no git, or too slow
             break

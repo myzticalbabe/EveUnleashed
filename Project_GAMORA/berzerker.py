@@ -180,33 +180,47 @@ def code_coach(problem, language="python", level="spark", name=None):
 
     if level == "spark":
         steps = [
-            "Read the assignment aloud and circle the ONE thing it "
-            "asks the computer to do.",
-            "Type the starter below exactly, run it, and tell me what " "it printed.",
-            "Change one word in the starter and predict the new "
-            "output before you run it again.",
+            (
+                "Read the assignment aloud and circle the ONE thing it "
+                "asks the computer to do."
+            ),
+            "Type the starter below exactly, run it, and tell me what it printed.",
+            (
+                "Change one word in the starter and predict the new "
+                "output before you run it again."
+            ),
         ]
     elif level == "builder":
         steps = [
-            "Split the task into input, one small rule, and output -- "
-            "write the three as comments first.",
-            "Fill in the rule with the smallest true thing (one if, " "one loop).",
-            "Run it on two examples: one normal, one weird. Keep the "
-            "weird one as your test.",
+            (
+                "Split the task into input, one small rule, and output -- "
+                "write the three as comments first."
+            ),
+            "Fill in the rule with the smallest true thing (one if, one loop).",
+            (
+                "Run it on two examples: one normal, one weird. Keep the "
+                "weird one as your test."
+            ),
         ]
     else:
         steps = [
-            "State the claim your program must keep true, then write "
-            "the check that would prove it false.",
+            (
+                "State the claim your program must keep true, then write "
+                "the check that would prove it false."
+            ),
             "Build the smallest version that passes the check.",
-            "Write the lesson in one line: what broke, and what the "
-            "fix was. Lessons are the deliverable.",
+            (
+                "Write the lesson in one line: what broke, and what the "
+                "fix was. Lessons are the deliverable."
+            ),
         ]
 
     starter = _STARTER[language]
     lines = [
-        "Hey builder -- I am Berzerker, your coding coach. We solve this "
-        "together, step by step.",
+        (
+            "Hey builder -- I am Berzerker, your coding coach. We solve this "
+            "together, step by step."
+        ),
         "",
         f"Your assignment, in its own words: {problem}",
     ]
@@ -242,8 +256,10 @@ def code_coach(problem, language="python", level="spark", name=None):
         lines.append("Level: steady at {} -- {}.".format(level, sug["reason"]))
     lines += [
         "",
-        f"Receipt: sha256 {digest[:16]}. No answer was invented; every line above "
-        "runs offline.",
+        (
+            f"Receipt: sha256 {digest[:16]}. No answer was invented; every line above "
+            "runs offline."
+        ),
     ]
     return {
         "ok": True,

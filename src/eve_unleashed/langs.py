@@ -47,7 +47,9 @@ def have_tools(lang):
 
 def _run(cmd, timeout=300):
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=False
+        )
     except FileNotFoundError as e:
         return 127, "", f"tool missing: {e}"
     except subprocess.TimeoutExpired:

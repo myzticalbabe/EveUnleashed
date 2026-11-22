@@ -59,7 +59,7 @@ def _git(*args: str) -> bytes:
     site instead.
     """
     return subprocess.run(
-        ["git", *args], cwd=str(ROOT), capture_output=True, timeout=60
+        ["git", *args], cwd=str(ROOT), capture_output=True, timeout=60, check=False
     ).stdout
 
 
@@ -116,6 +116,7 @@ def main() -> int:
             cwd=str(ROOT),
             capture_output=True,
             timeout=60,
+            check=False,
         )
         if probe.returncode != 0:
             print(

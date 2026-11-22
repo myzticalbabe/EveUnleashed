@@ -448,7 +448,11 @@ def _go_root():
     if not go:
         raise RuntimeError("go not on PATH")
     proc = subprocess.run(
-        [go, "env", "GOROOT"], capture_output=True, text=True, timeout=60
+        [go, "env", "GOROOT"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
     )
     root = (proc.stdout or "").strip()
     if proc.returncode != 0 or not root:
@@ -489,6 +493,7 @@ def build_wasm_go(src_dir, timeout=600):
             timeout=timeout,
             cwd=str(src),
             env=env,
+            check=False,
         )
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:build-spawn", e)
@@ -538,6 +543,7 @@ def run_wasm_go(src_dir, timeout=120):
             text=True,
             timeout=timeout,
             cwd=str(src),
+            check=False,
         )
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:run-spawn", e)
@@ -588,6 +594,7 @@ def run_wasm(pkg_dir, timeout=120):
             text=True,
             timeout=timeout,
             cwd=str(pkg),
+            check=False,
         )
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:run-spawn", e)
@@ -622,6 +629,7 @@ def build_wasm(crate_dir, timeout=600, target="web"):
             capture_output=True,
             text=True,
             timeout=timeout,
+            check=False,
         )
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:build-spawn", e)

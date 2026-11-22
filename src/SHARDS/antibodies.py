@@ -490,6 +490,7 @@ def _seek_checkout(root: str, timeout: int = _BOX_TIMEOUT_S) -> dict[str, Any]:
             cwd=root,
             capture_output=True,
             timeout=timeout,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as e:
         note_failure("antibodies:checkout-seek", e)

@@ -552,8 +552,10 @@ def render_theme(data: dict, corpus_name: str = "unknown") -> str:
         lines.extend(
             [
                 "",
-                f"A themed edition of `{source}`: every verse below cites a verse "
-                "of the corpus, and adds none.",
+                (
+                    f"A themed edition of `{source}`: every verse below cites a verse "
+                    "of the corpus, and adds none."
+                ),
             ]
         )
     lines.extend(
@@ -563,9 +565,11 @@ def render_theme(data: dict, corpus_name: str = "unknown") -> str:
                 data.get("status"), data.get("updated")
             ),
             "",
-            f"_Generated from `docs/bible/themes/{corpus_name}.json` by "
-            "`python tools/bible_theme.py --all --render --write`. Do not edit "
-            "this file: edit the corpus._",
+            (
+                f"_Generated from `docs/bible/themes/{corpus_name}.json` by "
+                "`python tools/bible_theme.py --all --render --write`. Do not edit "
+                "this file: edit the corpus._"
+            ),
         ]
     )
 

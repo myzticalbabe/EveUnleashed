@@ -317,7 +317,7 @@ def _absorb(binary, capability, raw_args) -> int:
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"{binary}: untraced ({e}) -- running anyway.", file=sys.stderr)
     try:
-        return int(subprocess.run([exe] + fwd).returncode or 0)
+        return int(subprocess.run([exe] + fwd, check=False).returncode or 0)
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"{binary}: failed ({e})")
         return 1

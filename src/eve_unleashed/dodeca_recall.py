@@ -550,11 +550,15 @@ def cast_projection(
     md_lines = [
         f"# Cast stone: `{gid}`",
         "",
-        f"- solid: **{store.shape}** "
-        f"({store.n} slots, diameter "
-        f"{diameter(store.n, store.nbr)})",
-        f"- lineage: gen {genome.get('generation', '?')}, "
-        f"parents {genome.get('parent_ids', [])}",
+        (
+            f"- solid: **{store.shape}** "
+            f"({store.n} slots, diameter "
+            f"{diameter(store.n, store.nbr)})"
+        ),
+        (
+            f"- lineage: gen {genome.get('generation', '?')}, "
+            f"parents {genome.get('parent_ids', [])}"
+        ),
         f"- hunches: {list(genome.get('hunches') or [])}",
         f"- entries: {len(entries)}",
         f"- cast: {prov['cast_utc']}",

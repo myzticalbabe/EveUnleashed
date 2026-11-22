@@ -90,6 +90,7 @@ def build(genome, tag):
             capture_output=True,
             text=True,
             timeout=BUILD_TIMEOUT_S,
+            check=False,
         )
         ok = p.returncode == 0
         tail = (p.stderr or "")[-2000:]
@@ -105,7 +106,9 @@ def measure(tag):
     size = os.path.getsize(exe)
     t0 = time.perf_counter()
     try:
-        p = subprocess.run([exe, "doctor"], capture_output=True, text=True, timeout=300)
+        p = subprocess.run(
+            [exe, "doctor"], capture_output=True, text=True, timeout=300, check=False
+        )
     except (subprocess.TimeoutExpired, OSError) as e:
         return {"feasible": False, "reason": f"doctor run failed: {e}"}
     cold = time.perf_counter() - t0

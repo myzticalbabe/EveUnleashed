@@ -89,7 +89,11 @@ def probe_soil():
     if shutil.which("systemd-detect-virt"):
         try:
             det = subprocess.run(
-                ["systemd-detect-virt"], capture_output=True, text=True, timeout=10
+                ["systemd-detect-virt"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             ).stdout.strip()
         except OSError:
             det = None
@@ -171,7 +175,9 @@ def probe_pci():
     if not lspci:
         return na("lspci not on PATH")
     try:
-        p = subprocess.run([lspci, "-nnmm"], capture_output=True, text=True, timeout=30)
+        p = subprocess.run(
+            [lspci, "-nnmm"], capture_output=True, text=True, timeout=30, check=False
+        )
     except OSError as e:
         return na(f"lspci exec failed: {e}")
     if p.returncode != 0:
@@ -349,6 +355,7 @@ def probe_secureboot():
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    check=False,
                 )
                 out = (p.stdout + p.stderr).strip().lower()
                 if "enabled" in out:

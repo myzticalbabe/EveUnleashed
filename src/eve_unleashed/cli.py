@@ -1735,7 +1735,7 @@ def cmd_e2e(args) -> int:
         "tests/test_eve_websearch_challenge.py::test_tls_impersonation_rung_live",
     ]
     try:
-        pr = _sp.run(cmd, capture_output=True, text=True, timeout=300)
+        pr = _sp.run(cmd, capture_output=True, text=True, timeout=300, check=False)
         lines = (pr.stdout + pr.stderr).strip().splitlines()
         tail = lines[-1] if lines else "no output"
         ok_t = pr.returncode == 0
