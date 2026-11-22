@@ -15,12 +15,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15", "3.16"]
         include:
-          # Free-threaded builds (3.16/3.16t dropped: no such release on hosted runners)
+          # Free-threaded builds
           - python-version: "3.14t"
             os: ubuntu-latest
           - python-version: "3.15t"
+            os: ubuntu-latest
+          - python-version: "3.16t"
             os: ubuntu-latest
       fail-fast: false
 
@@ -29,10 +31,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
+          # 3.16/3.16t may exist only as prereleases in the versions manifest;
+          # without this the setup step fails instead of falling back to them.
+          allow-prereleases: true
 
       - name: Install dependencies
         # bash-isms below (2>/dev/null, ||) need bash: PowerShell misparses the redirect.
