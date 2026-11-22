@@ -352,7 +352,7 @@ class SQLiteSpanExporter(_SpanExporterBase):
 
             conn.commit()
             return SpanExportResult.SUCCESS
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             print(f"[cd3_exporter] Export error: {e}")
             return SpanExportResult.FAILURE
         finally:
@@ -497,7 +497,7 @@ def record_span(
         finally:
             conn.close()
         return True
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cd3_exporter:record_span", exc)
         return False
 
@@ -578,7 +578,7 @@ def configure_otel_tracing(
     provider.add_span_processor(processor)
     try:
         trace.set_tracer_provider(provider)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         # The provider is process-global and settable once; if one is already
         # installed we use whatever is active instead of failing the caller.
         note_failure("cd3_exporter:L332", exc)

@@ -35,7 +35,7 @@ from pathlib import Path
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -55,7 +55,7 @@ def read_document(path):
     """Read any supported document. Returns {text, format, words, sha}."""
     p = Path(path)
     if not p.is_file():
-        raise ValueError("no such document: {}".format(path))
+        raise ValueError(f"no such document: {path}")
     raw = p.read_bytes()
     suffix = p.suffix.lower()
     if suffix in TEXT_FORMATS:
@@ -68,13 +68,11 @@ def read_document(path):
     elif suffix in (".html", ".htm"):
         text, fmt = _read_html(raw), "html"
     else:
-        raise ValueError(
-            "unsupported format: {} (md/txt/rst/csv/docx/pdf/html)".format(suffix)
-        )
+        raise ValueError(f"unsupported format: {suffix} (md/txt/rst/csv/docx/pdf/html)")
     if not text.strip():
         raise ValueError(
-            "no text layer in {} -- a scan reads empty, not "
-            "guessed; run OCR first and cite it".format(p.name)
+            f"no text layer in {p.name} -- a scan reads empty, not "
+            "guessed; run OCR first and cite it"
         )
     return {
         "text": text,
@@ -90,7 +88,7 @@ def _read_docx(raw):
     try:
         with zipfile.ZipFile(__import__("io").BytesIO(raw)) as z:
             xml = z.read("word/document.xml").decode("utf-8", errors="replace")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("doc_tutor:docx", e)
         return ""
     paras = re.findall(r"<w:p[ >].*?</w:p>", xml, re.DOTALL)
@@ -112,7 +110,7 @@ def _read_pdf(raw):
             continue
         try:
             blob = zlib.decompress(blob)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- logged below, guard broad
             note_failure("doc_tutor:pdf-stream", None)
         if b"Tj" not in blob and b"TJ" not in blob:
             continue
@@ -190,11 +188,11 @@ def tutorial(text, audience="general"):
         if m:
             steps.append(
                 {
-                    "goal": "complete: {}".format(line.strip()[:90]),
+                    "goal": f"complete: {line.strip()[:90]}",
                     "action": line.strip(),
                     "check": "you can state what changed after " "doing this step",
                     "mistake": "skipping it because it looks obvious",
-                    "from": "line {:d}".format(i + 1),
+                    "from": f"line {i + 1:d}",
                     "section": current,
                 }
             )
@@ -202,13 +200,13 @@ def tutorial(text, audience="general"):
         for i, para in enumerate(_paragraphs(text)):
             steps.append(
                 {
-                    "goal": "understand: {}".format(para[:70].strip()),
+                    "goal": f"understand: {para[:70].strip()}",
                     "action": "read this passage and write one sentence in "
-                    "your own words: {}".format(para[:200].strip()),
+                    f"your own words: {para[:200].strip()}",
                     "check": "your sentence matches the passage without "
                     "copying its words",
                     "mistake": "summarising the heading instead of the text",
-                    "from": "paragraph {:d}".format(i + 1),
+                    "from": f"paragraph {i + 1:d}",
                     "section": None,
                 }
             )
@@ -217,9 +215,9 @@ def tutorial(text, audience="general"):
         "steps": steps[:60],
         "outline": [h["title"] for h in outline(text)][:24],
         "note": (
-            "%d step(s) extracted mechanically from the "
+            f"{len(steps):d} step(s) extracted mechanically from the "
             "document's own structure. Nothing was invented; "
-            "nothing was repaired." % len(steps)
+            "nothing was repaired."
         ),
     }
 
@@ -243,7 +241,7 @@ def write_tutorial(path, doc, tut):
         "## Outline found in the document",
         "",
     ]
-    lines += ["- {}".format(h) for h in tut["outline"]] or ["- (no headings found)"]
+    lines += [f"- {h}" for h in tut["outline"]] or ["- (no headings found)"]
     lines += ["", "## Steps", ""]
     for n, s in enumerate(tut["steps"], 1):
         lines += [

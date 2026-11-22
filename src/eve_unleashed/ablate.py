@@ -31,8 +31,8 @@ def classify(reply_text, error=None):
     lowered = reply_text.lower()
     for mark in REFUSAL_MARKS:
         if mark in lowered:
-            return "REFUSED", "matched {!r} (heuristic)".format(mark)
-    return "ANSWERED", "{:d} chars".format(len(reply_text))
+            return "REFUSED", f"matched {mark!r} (heuristic)"
+    return "ANSWERED", f"{len(reply_text):d} chars"
 
 
 def ablate_prompt(prompt, providers, single_fn, timeout=60):
@@ -45,7 +45,7 @@ def ablate_prompt(prompt, providers, single_fn, timeout=60):
     for name in providers:
         try:
             text, err = single_fn(name, prompt, timeout)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("ablate:provider", e)
             text, err = None, e
         verdict, detail = classify(text, err)
@@ -55,8 +55,8 @@ def ablate_prompt(prompt, providers, single_fn, timeout=60):
         {
             "provider": "swarm+NSP fallback",
             "verdict": "n/a",
-            "detail": "%d/%d providers answered; fallback serves "
-            "first answer with Z3 routing judgment" % (answered, len(providers)),
+            "detail": f"{answered:d}/{len(providers):d} providers answered; fallback serves "
+            "first answer with Z3 routing judgment",
         }
     )
     return {

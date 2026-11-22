@@ -367,7 +367,7 @@ class GGUFEngine:
         max_tokens: int = 256,
         temperature: float = 0.8,
         top_p: float = 0.95,
-    ) -> AsyncGenerator[StreamToken, None]:
+    ) -> AsyncGenerator[StreamToken]:
         """Stream inference results token by token."""
         if handle not in self.loaded_models:
             raise KeyError(f"Model not loaded: {handle}")
@@ -1070,7 +1070,7 @@ class InferenceEngine:
         handle: str,
         inputs: str | list | dict,
         max_tokens: int = 256,
-    ) -> AsyncGenerator[StreamToken, None]:
+    ) -> AsyncGenerator[StreamToken]:
         """Stream inference results token by token.
 
         Supports native streaming for GGUF (llama.cpp) and transformers.

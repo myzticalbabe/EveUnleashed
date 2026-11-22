@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -77,9 +77,9 @@ def parse_instruction(text):
     if _MUTATE_RE.match(s):
         return {"op": "mutate", "raw": s}
     raise ValueError(
-        "not understood: {} -- try 'replace X with Y', "
+        f"not understood: {s[:80]} -- try 'replace X with Y', "
         "'uppercase', 'make steps', 'outline', 'mutate', "
-        "'undo'".format(s[:80])
+        "'undo'"
     )
 
 
@@ -122,7 +122,7 @@ def apply_op(text, op):
         for i in range(lo, hi):
             lines[i] = lines[i].upper() if op["upper"] else lines[i].lower()
         where = "section {!r}".format(op["section"]) if op.get("section") else "all"
-        return "\n".join(lines), "cased {:d} line(s) {}".format(hi - lo, where)
+        return "\n".join(lines), f"cased {hi - lo:d} line(s) {where}"
     if kind == "steps":
         from .doc_tutor import tutorial as _tut
 
@@ -152,8 +152,8 @@ def apply_op(text, op):
         j = rng.randrange(len(words))
         words[j] = words[j][::-1]
         lines[i] = " ".join(words)
-        return "\n".join(lines), "mutated line {:d} (one word reversed)".format(i + 1)
-    raise ValueError("cannot apply: {}".format(kind))
+        return "\n".join(lines), f"mutated line {i + 1:d} (one word reversed)"
+    raise ValueError(f"cannot apply: {kind}")
 
 
 class LiveState:
@@ -190,13 +190,13 @@ class LiveState:
             entry = {
                 "instruction": raw,
                 "result": "UNDONE",
-                "detail": "one step back, {:d} left".format(len(self.history)),
+                "detail": f"one step back, {len(self.history):d} left",
             }
             self.log.append(entry)
             return {"ok": True, "text": self.text, "entry": entry, "log": self.log}
         try:
             new_text, detail = apply_op(self.text, op)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("live_morph:apply", e)
             entry = {"instruction": raw, "result": "FAILED", "detail": str(e)[:160]}
             self.log.append(entry)
@@ -298,7 +298,7 @@ def make_app(state):
             try:
                 n = int(self.headers.get("Content-Length", 0))
                 payload = _json.loads(self.rfile.read(n) or b"{}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("live_morph:payload", e)
                 payload = {}
             res = state.instruct(payload.get("text", ""))
@@ -319,7 +319,7 @@ def make_app(state):
 def serve(state, port=0):
     """Serve the live window on loopback. Returns (server, url)."""
     server = ThreadingHTTPServer(("127.0.0.1", port), make_app(state))
-    url = "http://127.0.0.1:{:d}/".format(server.server_address[1])
+    url = f"http://127.0.0.1:{server.server_address[1]:d}/"
     t = _threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     return server, url

@@ -194,7 +194,7 @@ def run_antibody(name: str) -> dict[str, Any]:
         return {"name": key, "status": "unknown-antibody", "ok": False}
     try:
         found = _PROBES[key]()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("antibodies:probe", e)
         return {"name": key, "status": "probe-crashed", "ok": False, "error": str(e)}
     return {
@@ -405,7 +405,7 @@ def _default_box_roots() -> list[str]:
     try:
         repo = Path(__file__).resolve().parents[2]
         roots.append(str(repo.parent))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("antibodies:box-roots", e)
     env = os.environ.get("AZAZAEL_BOX_ROOTS", "")
     if env:

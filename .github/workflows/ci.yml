@@ -66,7 +66,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - name: Install linting tools
-        run: pip install ruff black mypy
+        # Pinned: unpinned ruff/black move the gate on every release.
+        run: pip install ruff==0.17.6 black==26.10.1 mypy
       - name: Run ruff
         run: ruff check .
       - name: Run black --check

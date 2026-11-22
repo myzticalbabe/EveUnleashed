@@ -113,7 +113,7 @@ class ModelLoader:
                 # Intel XPU (Arc GPU via Level Zero / SYCL)
                 # Uses subprocess sandbox to survive segfaults on headless systems
                 frameworks["xpu"] = _check_xpu_available()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("core:L175", exc)
                 frameworks["cuda"] = False
                 frameworks["metal"] = False
@@ -127,7 +127,7 @@ class ModelLoader:
 
                 platforms = pyopencl.get_platforms()
                 frameworks["opencl"] = len(platforms) > 0
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("core:L187", exc)
 
         # Vulkan detection (cross-platform GPU compute)
@@ -138,7 +138,7 @@ class ModelLoader:
 
                 _vulkan = getattr(torch, "vulkan", None)
                 frameworks["vulkan"] = bool(_vulkan and _vulkan.is_available())
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("core:L198", exc)
 
         return frameworks
@@ -260,7 +260,9 @@ class ModelLoader:
                                     "backend": "xpu",
                                 }
                             )
-                        except Exception as exc:
+                        except (
+                            Exception  # noqa: BLE001 -- logged below, guard broad
+                        ) as exc:
                             note_failure("core:L301", exc)
                             info["devices"].append(
                                 {
@@ -301,7 +303,7 @@ class ModelLoader:
                         )
         except ImportError:
             pass
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("core:L345", exc)
 
         # Set recommended device

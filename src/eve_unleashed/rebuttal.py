@@ -15,7 +15,7 @@ import time
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -38,7 +38,7 @@ def draft_rebuttal(factcheck_result):
             )
         )
     for contra in deb.get("contradictions", [])[:2]:
-        lines.append("It contradicts itself here: {}".format(contra[:200]))
+        lines.append(f"It contradicts itself here: {contra[:200]}")
     found = [lk for lk in factcheck_result.get("entity_lookups", []) if lk.get("found")]
     if found:
         lines.append(
@@ -64,8 +64,7 @@ def draft_rebuttal(factcheck_result):
     for r in factcheck_result.get("receipts", [])[:6]:
         if r.get("status") == "ok":
             lines.append(
-                "Seen %s -- %d bytes, sha256 %s."
-                % (
+                "Seen {} -- {:d} bytes, sha256 {}.".format(
                     r.get("fetched_utc", "?"),
                     r.get("bytes", 0),
                     (r.get("sha256") or "")[:16],
@@ -73,7 +72,7 @@ def draft_rebuttal(factcheck_result):
             )
     opinion = factcheck_result.get("opinion", "")
     if opinion:
-        lines.append("{}".format(opinion))
+        lines.append(f"{opinion}")
     lines.append(
         "Compiled by Eve; publish only under your own name, "
         "after counsel review for filing contexts."

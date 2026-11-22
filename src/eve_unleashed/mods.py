@@ -24,7 +24,7 @@ def _read_mod(mod_dir):
 def _backup(game_dir, rel, bak_dir):
     src = Path(game_dir) / rel
     if not src.is_file():
-        raise ValueError("game file missing: {}".format(rel))
+        raise ValueError(f"game file missing: {rel}")
     dst = Path(bak_dir) / rel
     dst.parent.mkdir(parents=True, exist_ok=True)
     if not dst.exists():
@@ -49,12 +49,12 @@ def _patch_kv(path, key, value):
     lines, hit = [], False
     for line in text.splitlines():
         if line.split("=")[0].strip() == key:
-            lines.append("{}={}".format(key, value))
+            lines.append(f"{key}={value}")
             hit = True
         else:
             lines.append(line)
     if not hit:
-        lines.append("{}={}".format(key, value))
+        lines.append(f"{key}={value}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -102,7 +102,7 @@ def evolve_mod(game_dir, mod_dir, generations=5, seed=7, fitness=None):
         raise ValueError("evolution needs at least one numeric patch")
     history = []
     for g in range(generations):
-        gen_dir = evo / ("gen{:d}".format(g))
+        gen_dir = evo / (f"gen{g:d}")
         shutil.copytree(
             game, gen_dir, ignore=shutil.ignore_patterns(".evebak", ".eveevo")
         )
@@ -113,7 +113,7 @@ def evolve_mod(game_dir, mod_dir, generations=5, seed=7, fitness=None):
                 span = abs(q["value"]) or 1.0
                 q["value"] = round(q["value"] + rng.uniform(-span, span), 3)
             trial.append(q)
-        gen_mod = evo / ("mod{:d}".format(g))
+        gen_mod = evo / (f"mod{g:d}")
         gen_mod.mkdir()
         (gen_mod / "mod.json").write_text(
             json.dumps({"patches": trial, "assets": assets}), encoding="utf-8"

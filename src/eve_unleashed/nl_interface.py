@@ -60,7 +60,7 @@ class IntentParser:
 
             self._bridge = InferenceBridge()
             return self._bridge
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("nlp:bridge", exc)
             return None
 
@@ -80,7 +80,7 @@ class IntentParser:
                     verdict = bridge.send_to_llama(prompt).strip().lower()
                     if verdict in _INTENT_KEYWORDS:
                         return Intent(action=verdict, confidence=0.9, raw=text)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("nlp:llm_classify", exc)
 
         # Fallback: keyword matching (whole-word to avoid "start" inside "restart").

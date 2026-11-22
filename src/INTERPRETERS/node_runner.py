@@ -89,7 +89,7 @@ class NodeRunner:
                 timeout=15,
             )
             self.version = out.stdout.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("node_runner:version", e)
         return True
 
@@ -166,7 +166,7 @@ class NodeRunner:
                     }
                 ],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("node_runner:exec", e)
             return NodeResult(
                 success=False,

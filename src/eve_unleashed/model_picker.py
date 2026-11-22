@@ -95,7 +95,7 @@ def _fetch_ids(base: str, api_key: str | None = None, timeout: float = 2.0):
             req = urllib.request.Request(base.rstrip("/") + suffix, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 payload = json.loads(resp.read().decode("utf-8", "replace") or "{}")
-        except Exception:
+        except Exception:  # noqa: BLE001 -- _fetch_ids: best-effort continue
             continue
         ids = []
         for item in payload.get("data") or payload.get("models") or []:
@@ -133,10 +133,10 @@ def discover(timeout: float = 2.0) -> list:
             port = urlsplit(c.get("base", "")).port
             if port and port not in ports:
                 ports.append(port)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- discover: best-effort pass
             pass
     for port in ports:
-        base = "http://localhost:{:d}".format(port)
+        base = f"http://localhost:{port:d}"
         ids = _fetch_ids(base, timeout=timeout)
         if not ids:
             continue
@@ -198,7 +198,7 @@ def discover(timeout: float = 2.0) -> list:
                         "note": "" if gguf_runner else "needs llama-server",
                     }
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001 -- discover: best-effort continue
             continue
 
     # cradle registry
@@ -221,7 +221,7 @@ def discover(timeout: float = 2.0) -> list:
                     "note": "" if runner_ok else "needs llama-server",
                 }
             )
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- discover: best-effort pass
         pass
 
     # keyed clouds (OpenAI-compatible only)
@@ -272,7 +272,7 @@ def _kilo_credentials() -> int:
         data = json.loads(KILO_AUTH_FILE.read_text())
         creds = data.get("credentials") or data
         return len(creds) if isinstance(creds, (list, dict)) else 0
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return 0
 
 
@@ -297,7 +297,7 @@ def discover_agents(timeout: float = 30.0) -> list:
                 line = line.strip().strip("`")
                 if "/" in line and " " not in line and line.startswith(agent + "/"):
                     models.append(line[len(agent) + 1 :])
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- discover_agents: best-effort pass
             pass
         authed = _kilo_credentials() > 0 if agent == "kilo" else True
         if not models:
@@ -316,7 +316,7 @@ def discover_agents(timeout: float = 30.0) -> list:
                 {
                     "provider": agent,
                     "model": m,
-                    "run_model": "{}/{}".format(agent, m),
+                    "run_model": f"{agent}/{m}",
                     "kind": "agent",
                     "agent": agent,
                     "authed": authed,
@@ -331,15 +331,15 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
 
     exe = _which(agent)
     if not exe:
-        return {"status": "error", "error": "{}: not on PATH".format(agent)}
+        return {"status": "error", "error": f"{agent}: not on PATH"}
     argv = [exe, "run"]
     if model:
         argv += ["-m", model]
     argv += ["--format", "json", prompt]
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
-    except Exception as exc:
-        return {"status": "error", "error": "{}: {}".format(agent, exc)}
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
+        return {"status": "error", "error": f"{agent}: {exc}"}
     out = (proc.stdout or "").strip()
     texts: list = []
     for line in out.splitlines():
@@ -348,7 +348,7 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
             continue
         try:
             obj = json.loads(line)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- run_agent: best-effort continue
             continue
         if obj.get("type") == "error":
             err = obj.get("error") or {}
@@ -357,7 +357,7 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
                 try:
                     body = json.loads(err.get("responseBody", "") or "{}")
                     msg = (body.get("error") or {}).get("message")
-                except Exception:
+                except Exception:  # noqa: BLE001 -- run_agent: best-effort msg = None
                     msg = None
             return {
                 "status": "error",
@@ -370,17 +370,13 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
     if proc.returncode != 0:
         tail = ((proc.stderr or "").strip().splitlines() or [""])[-1]
         hint = (
-            " (run `{} auth login` first?)".format(agent)
-            if "sign in" in tail.lower()
-            else ""
+            f" (run `{agent} auth login` first?)" if "sign in" in tail.lower() else ""
         )
         return {
             "status": "error",
-            "error": "{} exit {:d}: {}{}".format(
-                agent, proc.returncode, tail[:200], hint
-            ),
+            "error": f"{agent} exit {proc.returncode:d}: {tail[:200]}{hint}",
         }
-    return {"status": "error", "error": "{} returned no text".format(agent)}
+    return {"status": "error", "error": f"{agent} returned no text"}
 
 
 def _collect_text(obj) -> list:
@@ -413,7 +409,7 @@ def _collect_text(obj) -> list:
 def load_customs() -> list:
     try:
         return json.loads(PROVIDERS_FILE.read_text()) or []
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return []
 
 
@@ -443,7 +439,7 @@ def load_selection() -> dict | None:
     try:
         data = json.loads(SELECTION_FILE.read_text())
         return data if isinstance(data, dict) and data.get("model") else None
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return None
 
 

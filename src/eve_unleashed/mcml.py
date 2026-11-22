@@ -41,9 +41,7 @@ class Dense:
 
     def __init__(self, in_dim: int, out_dim: int, seed: int = 7) -> None:
         if in_dim < 1 or out_dim < 1:
-            raise ValueError(
-                "dense dims must be >= 1, got {:d} -> {:d}".format(in_dim, out_dim)
-            )
+            raise ValueError(f"dense dims must be >= 1, got {in_dim:d} -> {out_dim:d}")
         rng = random.Random(seed)
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -59,9 +57,7 @@ class Dense:
     def forward(self, x: Vec) -> Vec:
         if len(x) != self.in_dim:
             raise ValueError(
-                "dense {:d}->{:d} got input len {:d}".format(
-                    self.in_dim, self.out_dim, len(x)
-                )
+                f"dense {self.in_dim:d}->{self.out_dim:d} got input len {len(x):d}"
             )
         return [
             sum(w * v for w, v in zip(row, x)) + b for row, b in zip(self.W, self.b)
@@ -123,9 +119,7 @@ class Activate:
 
     def __init__(self, kind: str = "tanh") -> None:
         if kind not in ACTIVATIONS:
-            raise ValueError(
-                "activations: {} (got {!r})".format(sorted(ACTIVATIONS), kind)
-            )
+            raise ValueError(f"activations: {sorted(ACTIVATIONS)} (got {kind!r})")
         self.kind = kind
         self.f, self.df = ACTIVATIONS[kind]
 
@@ -171,7 +165,7 @@ class Sequential:
             [b.in_dim for b in blocks if isinstance(b, Dense)][1:],
         ):
             if a != b:
-                raise ValueError("dim mismatch at assembly: {:d} != {:d}".format(a, b))
+                raise ValueError(f"dim mismatch at assembly: {a:d} != {b:d}")
         self.blocks = blocks
         self.in_dim = next(b.in_dim for b in blocks if isinstance(b, Dense))
         self.out_dim = next(b.out_dim for b in reversed(blocks) if isinstance(b, Dense))
@@ -218,7 +212,7 @@ class Sequential:
 def digest(model: Sequential) -> str:
     """sha256 over packed f32 params -- the model's golden identity."""
     vals = model.params()
-    return hashlib.sha256(struct.pack("<%df" % len(vals), *vals)).hexdigest()
+    return hashlib.sha256(struct.pack(f"<{len(vals):d}f", *vals)).hexdigest()
 
 
 def replicate(model_fn: Callable[[], Sequential]) -> dict:
@@ -277,7 +271,7 @@ def load_ship(path: str) -> Sequential:
             flat = flat[b.out_dim :]
     if digest(model) != artifact["digest"]:
         raise ValueError(
-            "shipment refused: digest mismatch (have {})".format(digest(model)[:12])
+            f"shipment refused: digest mismatch (have {digest(model)[:12]})"
         )
     return model
 

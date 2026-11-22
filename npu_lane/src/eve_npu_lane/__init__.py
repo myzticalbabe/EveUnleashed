@@ -58,8 +58,8 @@ def probe(out_path=None):
     for d in devs:
         try:
             report["names"][d] = core.get_property(d, "FULL_DEVICE_NAME")
-        except Exception as e:
-            report["names"][d] = "name query failed: {}".format(str(e)[:100])
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+            report["names"][d] = f"name query failed: {str(e)[:100]}"
     if "NPU" not in devs:
         report["verdict"] = "NO-NPU-HERE"
         report["note"] = (

@@ -115,7 +115,7 @@ class PredictiveWorm:
             self._thread.start()
             self._running.set()
             return True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure(f"{self.NAME}:start", exc)
             return False
 
@@ -146,7 +146,7 @@ class PredictiveWorm:
                 from CORE.PamsRecorder import get_recorder
 
                 rec = get_recorder()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure(f"{self.NAME}:recorder", exc)
                 rec = None
         if rec is None:
@@ -158,7 +158,7 @@ class PredictiveWorm:
                 source=self.NAME,
                 severity="warning" if forecast.anomaly else "info",
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure(f"{self.NAME}:record", exc)
 
     # -- main loop -----------------------------------------------------------
@@ -175,7 +175,7 @@ class PredictiveWorm:
                         self._samples = [p for p in self._samples if p[0] >= cutoff]
                         self.last_forecast = self._compute_forecast(now)
                     self._record(self.last_forecast)
-            except Exception as exc:  # never kill the worm
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure(f"{self.NAME}:beat", exc)
             self._stop.wait(self.SAMPLE_INTERVAL)
 
@@ -237,7 +237,7 @@ class DISKZ(PredictiveWorm):
         try:
             usage = psutil.disk_usage("/")
             return usage.percent
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("predictive_worms:sample", exc)
             return None
 
@@ -273,7 +273,7 @@ class NETWORXZ(PredictiveWorm):
             self._last_counters = c
             self._last_t = now
             return 0.0
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("predictive_worms:sample", exc)
             return None
 
@@ -290,7 +290,7 @@ class PROCESSZ(PredictiveWorm):
             return None
         try:
             return float(len(psutil.pids()))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("predictive_worms:sample", exc)
             return None
 
@@ -307,7 +307,7 @@ class CLOCKZ(PredictiveWorm):
             return None
         try:
             return psutil.cpu_percent(interval=None)  # inverse proxy for idle
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("predictive_worms:sample", exc)
             return None
 

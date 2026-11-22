@@ -70,8 +70,8 @@ def _to_bash_path(path, bash_bin=""):
         return p
     rest = m.group(2).replace(chr(92), "/")
     if _bash_flavor(bash_bin) == "wsl":
-        return "/mnt/{}/{}".format(m.group(1).lower(), rest)
-    return "/{}/{}".format(m.group(1).lower(), rest)
+        return f"/mnt/{m.group(1).lower()}/{rest}"
+    return f"/{m.group(1).lower()}/{rest}"
 
 
 _DEFAULT_ROOT = (
@@ -124,7 +124,7 @@ class ShRunner:
                 timeout=15,
             )
             self.version = out.stdout.split("\n")[0].strip() if out.stdout else ""
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("sh_runner:version", e)
         return True
 
@@ -186,7 +186,7 @@ class ShRunner:
                     }
                 ],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("sh_runner:exec", e)
             return ShResult(
                 success=False,

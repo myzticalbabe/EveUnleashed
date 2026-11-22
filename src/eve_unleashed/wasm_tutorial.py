@@ -197,8 +197,9 @@ def state_to_steps(state):
     """Inner state dict -> ordered tutorial steps."""
     steps = [
         {
-            "title": "Swarm overview: %d providers, %d answered"
-            % (state.get("total", 0), state.get("answered", 0)),
+            "title": "Swarm overview: {:d} providers, {:d} answered".format(
+                state.get("total", 0), state.get("answered", 0)
+            ),
             "verdict": "OVERVIEW",
             "detail": state.get("summary", ""),
         }
@@ -283,7 +284,7 @@ def have_toolchain(kind):
         return {"go": shutil.which("go")}
     if kind == "node":
         return {"node": shutil.which("node")}
-    raise ValueError("wasm tiers are rust, go, node: {}".format(kind))
+    raise ValueError(f"wasm tiers are rust, go, node: {kind}")
 
 
 GO_WASM_SRC = """package main
@@ -489,13 +490,13 @@ def build_wasm_go(src_dir, timeout=600):
             cwd=str(src),
             env=env,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:build-spawn", e)
-        raise RuntimeError("go build would not start: {}".format(e))
+        raise RuntimeError(f"go build would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
         note_failure("wasm-go:build-fail", Exception(err[:200]))
-        raise RuntimeError("go build failed: {}".format(err))
+        raise RuntimeError(f"go build failed: {err}")
     try:
         root = _go_root()
         staged = None
@@ -507,13 +508,13 @@ def build_wasm_go(src_dir, timeout=600):
                 staged = cand
                 break
         if staged is None:
-            raise RuntimeError("wasm_exec.js not found under {}".format(root))
+            raise RuntimeError(f"wasm_exec.js not found under {root}")
         (src / "wasm_exec.js").write_bytes(staged.read_bytes())
     except RuntimeError:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:stage", e)
-        raise RuntimeError("could not stage wasm_exec.js: {}".format(e))
+        raise RuntimeError(f"could not stage wasm_exec.js: {e}")
     return src
 
 
@@ -529,7 +530,7 @@ def run_wasm_go(src_dir, timeout=120):
         raise RuntimeError("node not on PATH")
     for need in ("main.wasm", "wasm_exec.js", "run_node.js"):
         if not (src / need).is_file():
-            raise RuntimeError("missing {} (build first)".format(need))
+            raise RuntimeError(f"missing {need} (build first)")
     try:
         proc = subprocess.run(
             [node, "run_node.js"],
@@ -538,16 +539,16 @@ def run_wasm_go(src_dir, timeout=120):
             timeout=timeout,
             cwd=str(src),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:run-spawn", e)
-        raise RuntimeError("node would not start: {}".format(e))
+        raise RuntimeError(f"node would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
         note_failure("wasm-go:run-fail", Exception(err[:200]))
-        raise RuntimeError("wasm run failed: {}".format(err))
+        raise RuntimeError(f"wasm run failed: {err}")
     try:
         rep = json.loads((proc.stdout or "").strip().splitlines()[-1])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:run-parse", e)
         raise RuntimeError(
             "wasm run printed no JSON: {}".format((proc.stdout or "")[:300])
@@ -574,13 +575,11 @@ def run_wasm(pkg_dir, timeout=120):
         and p.name not in ("run_node.mjs", "run_node.cjs")
     )
     if len(mods) != 1:
-        raise RuntimeError(
-            "expected one module in {}, found {:d}".format(pkg, len(mods))
-        )
+        raise RuntimeError(f"expected one module in {pkg}, found {len(mods):d}")
     stem = mods[0].stem
     for need in (stem + ".js", stem + "_bg.wasm"):
         if not (pkg / need).is_file():
-            raise RuntimeError("missing {} (build --target nodejs first)".format(need))
+            raise RuntimeError(f"missing {need} (build --target nodejs first)")
     (pkg / "run_node.cjs").write_text(NODE_RUST_HARNESS % stem, encoding="utf-8")
     try:
         proc = subprocess.run(
@@ -590,16 +589,16 @@ def run_wasm(pkg_dir, timeout=120):
             timeout=timeout,
             cwd=str(pkg),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:run-spawn", e)
-        raise RuntimeError("node would not start: {}".format(e))
+        raise RuntimeError(f"node would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
         note_failure("wasm:run-fail", Exception(err[:200]))
-        raise RuntimeError("wasm run failed: {}".format(err))
+        raise RuntimeError(f"wasm run failed: {err}")
     try:
         rep = json.loads((proc.stdout or "").strip().splitlines()[-1])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:run-parse", e)
         raise RuntimeError(
             "wasm run printed no JSON: {}".format((proc.stdout or "")[:300])
@@ -616,7 +615,7 @@ def build_wasm(crate_dir, timeout=600, target="web"):
     verification runs.
     """
     if target not in ("web", "nodejs"):
-        raise ValueError("wasm target is web or nodejs: {}".format(target))
+        raise ValueError(f"wasm target is web or nodejs: {target}")
     try:
         proc = subprocess.run(
             ["wasm-pack", "build", "--target", target, str(crate_dir)],
@@ -624,11 +623,11 @@ def build_wasm(crate_dir, timeout=600, target="web"):
             text=True,
             timeout=timeout,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:build-spawn", e)
-        raise RuntimeError("wasm-pack would not start: {}".format(e))
+        raise RuntimeError(f"wasm-pack would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
         note_failure("wasm:build-fail", Exception(err[:200]))
-        raise RuntimeError("wasm-pack failed: {}".format(err))
+        raise RuntimeError(f"wasm-pack failed: {err}")
     return Path(crate_dir) / "pkg"

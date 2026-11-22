@@ -28,7 +28,7 @@ from pathlib import Path
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -75,7 +75,7 @@ def _gdir():
 def file_grievance(respondent, category, narrative, redress_sought, evidence=None):
     """File a grievance record. Returns the record (with id)."""
     if category not in CATEGORIES:
-        raise ValueError("category must be one of {}".format(CATEGORIES))
+        raise ValueError(f"category must be one of {CATEGORIES}")
     gid = "grv-{}".format(time.strftime("%Y%m%dT%H%M%S", time.gmtime()))
     record = {
         "id": gid,
@@ -100,7 +100,7 @@ def list_grievances():
         try:
             with open(p, encoding="utf-8") as f:
                 out.append(json.load(f))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("redress:list", e)
     return out
 
@@ -161,9 +161,9 @@ def search_dockets(term, api_key=None):
             }
             for d in data.get("data", [])
         ]
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("redress:dockets", e)
-        return [{"error": "docket search failed: {}".format(e)}]
+        return [{"error": f"docket search failed: {e}"}]
 
 
 def legal_referral(state=None):
@@ -173,8 +173,8 @@ def legal_referral(state=None):
         refs.insert(
             0,
             (
-                "LawHelp state page for {}".format(state.upper()),
-                "https://www.lawhelp.org/states/{}/".format(state.lower()),
+                f"LawHelp state page for {state.upper()}",
+                f"https://www.lawhelp.org/states/{state.lower()}/",
             ),
         )
     return refs
@@ -191,7 +191,7 @@ def prove_case(gid):
 
     recs = [r for r in list_grievances() if r["id"] == gid]
     if not recs:
-        raise ValueError("no grievance {}".format(gid))
+        raise ValueError(f"no grievance {gid}")
     rec = recs[0]
     checks = []
 
@@ -212,13 +212,13 @@ def prove_case(gid):
     check(
         "record_schema_complete",
         not missing,
-        "missing={}".format(missing) if missing else "all fields present",
+        f"missing={missing}" if missing else "all fields present",
     )
     check("category_known", rec.get("category") in CATEGORIES, rec.get("category"))
     manifest = []
     try:
         from .evidence import resolve as _resolve
-    except Exception:
+    except Exception:  # noqa: BLE001 -- check: best-effort def _resolve(ref):
 
         def _resolve(ref):
             return ref
@@ -243,8 +243,9 @@ def prove_case(gid):
     check(
         "evidence_present",
         all(m["present"] for m in manifest) if manifest else True,
-        "%d/%d files present"
-        % (sum(1 for m in manifest if m["present"]), len(manifest)),
+        "{:d}/{:d} files present".format(
+            sum(1 for m in manifest if m["present"]), len(manifest)
+        ),
     )
     check(
         "narrative_substantive",
@@ -271,18 +272,18 @@ def prove_case(gid):
             events,
             ["valid_query_features", "valid_provider_selection", "no_dead_provider"],
         )
-        nsp_note = "nsp:{} [{}]".format(verdict, detail)
+        nsp_note = f"nsp:{verdict} [{detail}]"
         check("nsp_judgment", verdict == "verified", nsp_note)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("redress:prove-nsp", e)
-        check("nsp_judgment", False, "checker failed: {}".format(e))
+        check("nsp_judgment", False, f"checker failed: {e}")
     checkable = [c for c in checks]
     passed = sum(1 for c in checkable if c["passed"])
     bundle = {
         "grievance": rec,
         "evidence_manifest": manifest,
         "checks": checks,
-        "judgment": "{:d}/{:d} machine checks passed".format(passed, len(checks)),
+        "judgment": f"{passed:d}/{len(checks):d} machine checks passed",
         "opinion": (
             "OPINION (not machine-checked): on the checked "
             "record above, the grievance states a coherent "

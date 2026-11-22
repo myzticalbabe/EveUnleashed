@@ -152,7 +152,7 @@ class IntrospectionLoop:
 
             self._bridge = InferenceBridge()
             return self._bridge
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("consciousness:bridge", exc)
             return None
 
@@ -164,7 +164,7 @@ class IntrospectionLoop:
 
             self._distill = DistillZ()
             return self._distill
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("consciousness:distill", exc)
             return None
 
@@ -176,7 +176,7 @@ class IntrospectionLoop:
 
             self._recorder = get_recorder()
             return self._recorder
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("consciousness:recorder", exc)
             return None
 
@@ -202,7 +202,7 @@ class IntrospectionLoop:
         while self._running:
             try:
                 self.run_once()
-            except Exception as exc:  # never kill the loop
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("consciousness:loop", exc)
             self._stop_event.wait(timeout=self.interval_s)
 
@@ -228,7 +228,7 @@ class IntrospectionLoop:
                 )
                 analysis = bridge.send_to_llama(prompt)
                 insight["bridge_analysis"] = analysis[:2000]
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("consciousness:bridge_analyze", exc)
                 insight["bridge_analysis"] = f"unavailable ({exc})"
         else:
@@ -238,7 +238,7 @@ class IntrospectionLoop:
             try:
                 distilled = distill.distill()
                 insight["distilled"] = distilled
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("consciousness:distill", exc)
 
         with self._lock:
@@ -263,7 +263,7 @@ class IntrospectionLoop:
                     source="consciousness",
                     severity="warning",
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("consciousness:action_record", exc)
 
         # Execute proposed mesh action via act_fn if available
@@ -274,7 +274,7 @@ class IntrospectionLoop:
                 )
                 if proposed is not None:
                     self._act_fn(proposed)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("consciousness:act_fn", exc)
 
         self._record(insight)
@@ -291,7 +291,7 @@ class IntrospectionLoop:
                 source="introspection_loop",
                 severity="info",
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("consciousness:record", exc)
 
     def recent_insights(self, limit: int = 10) -> list[dict[str, Any]]:
@@ -329,7 +329,7 @@ class GoalSetting:
 
             self._recorder = get_recorder()
             return self._recorder
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("goal_setting:recorder", exc)
             return None
 
@@ -411,7 +411,7 @@ class Reflection:
 
             self._recorder = get_recorder()
             return self._recorder
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("reflection:recorder", exc)
             return None
 
@@ -445,7 +445,7 @@ class Reflection:
                 source="reflection",
                 severity="info",
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("reflection:record", exc)
 
     def snapshot(self) -> list[dict[str, Any]]:

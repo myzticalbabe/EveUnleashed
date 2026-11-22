@@ -19,7 +19,7 @@ import re
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -156,12 +156,12 @@ def debunk_claim(text):
     check(
         "has_checkable_proposition",
         bool(props),
-        "{:d} proposition(s), {:d} opinion(s)".format(len(props), len(opinions)),
+        f"{len(props):d} proposition(s), {len(opinions):d} opinion(s)",
     )
     check(
         "no_self_contradiction",
         not contra,
-        "contradicted={}".format(contra) if contra else "none found",
+        f"contradicted={contra}" if contra else "none found",
     )
     check(
         "no_fallacy_shapes",

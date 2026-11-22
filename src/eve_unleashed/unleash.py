@@ -111,9 +111,9 @@ def matrix():
                         tools = ("rustfmt", "gofmt")
                     if not any(shutil.which(t) for t in tools):
                         ok, detail = False, "toolchain missing"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("unleash:matrix", e)
-            ok, detail = False, "{}".format(e)
+            ok, detail = False, f"{e}"
         rows.append(
             {
                 "function": f["name"],
@@ -132,7 +132,7 @@ def build_vessel(name, seed=7):
 
     cdir = Path(CRADLE_DIR)
     cdir.mkdir(parents=True, exist_ok=True)
-    path = cdir / ("{}.gguf".format(name))
+    path = cdir / (f"{name}.gguf")
     manifest = [f["name"] for f in FUNCTIONS]
     entry = _f.build_gguf(path, name, seed)
     # Re-stamp identity: vessel metadata lives beside the artifact.
@@ -144,7 +144,7 @@ def build_vessel(name, seed=7):
         "native_functions": manifest,
         "artifact": entry,
     }
-    (cdir / ("{}.eve.json".format(name))).write_text(
+    (cdir / (f"{name}.eve.json")).write_text(
         json.dumps(ident, indent=2), encoding="utf-8"
     )
     return path, ident
@@ -171,7 +171,7 @@ def scan_calls(reply):
     if skipped:
         note_failure(
             "unleash:scan-skip",
-            Exception("{:d} malformed EVE_CALL lines ignored".format(skipped)),
+            Exception(f"{skipped:d} malformed EVE_CALL lines ignored"),
         )
     return calls
 
@@ -201,4 +201,4 @@ def dispatch(fname, args):
         from .langs import check
 
         return check(args["file"])
-    raise ValueError("not a native hand (or needs its toolchain): {}".format(fname))
+    raise ValueError(f"not a native hand (or needs its toolchain): {fname}")

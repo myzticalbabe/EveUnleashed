@@ -77,7 +77,7 @@ class TerenceV2:
 
             self.bridge = InferenceBridge()
             return self.bridge
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("terence_v2:bridge", exc)
             return None
 
@@ -89,7 +89,7 @@ class TerenceV2:
 
             self.router = get_router()
             return self.router
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("terence_v2:router", exc)
             return None
 
@@ -99,7 +99,7 @@ class TerenceV2:
             return False
         try:
             return bool(bridge.get_bridge_status().get("llama_available", False))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("terence_v2:bridge_status", exc)
             return False
 
@@ -113,7 +113,7 @@ class TerenceV2:
 
             self._v1 = TERENCE()
             return self._v1
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("terence_v2:v1_import", exc)
             return None
 
@@ -148,7 +148,7 @@ class TerenceV2:
             try:
                 fixed = bridge.send_to_llama(prompt)
                 model_used = model or "llama-server"
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("terence_v2:llama_fix", exc)
 
         if not fixed:
@@ -162,7 +162,7 @@ class TerenceV2:
                         fixed = fn(file, line, error_type, context) or ""
                     else:
                         fixed = ""
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                     note_failure("terence_v2:v1_fix", exc)
             model_used = model_used or "terence_v1_pattern"
 
@@ -192,7 +192,7 @@ class TerenceV2:
 
         try:
             self.stats.duration_ms += (time.time() - start) * 1000
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("terence_v2:duration_update", exc)
         return proposal
 

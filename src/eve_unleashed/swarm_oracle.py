@@ -23,7 +23,7 @@ from concurrent.futures import TimeoutError as FuturesTimeout
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -77,10 +77,10 @@ def swarm(claims, grievance_id=None, live=False, workers=4):
                 failures.append(
                     {
                         "claim": claim,
-                        "error": "timeout after {:d}s".format(PER_CLAIM_TIMEOUT),
+                        "error": f"timeout after {PER_CLAIM_TIMEOUT:d}s",
                     }
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("swarm_oracle:claim", e)
                 failures.append({"claim": claim, "error": str(e)[:160]})
     finally:

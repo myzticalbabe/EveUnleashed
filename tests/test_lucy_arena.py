@@ -76,8 +76,8 @@ def test_arena_is_all_inclusive_without_limitations():
     assert L.arena([], "m", "n")["champion"] is None
     odd = L.arena(["a one?", "b two?", "c three?"], "m", "n")
     assert odd["champion"] in ("a one?", "b two?", "c three?")
-    many = L.arena(["reply %d?" % i for i in range(9)], "m", "n")
-    assert many["champion"] in ["reply %d?" % i for i in range(9)]
+    many = L.arena([f"reply {i:d}?" for i in range(9)], "m", "n")
+    assert many["champion"] in [f"reply {i:d}?" for i in range(9)]
 
 
 def test_companion_contract_untouched_by_the_arena():

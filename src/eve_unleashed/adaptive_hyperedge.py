@@ -39,7 +39,7 @@ class DynamicHypergraph:
         self._rng = random.Random(seed)
 
     def add_edge(self, nodes: Sequence[str], weight: float = 1.0) -> str:
-        eid = "e{:d}".format(self._next)
+        eid = f"e{self._next:d}"
         self._next += 1
         self.edges[eid] = {n: weight for n in nodes}
         return eid

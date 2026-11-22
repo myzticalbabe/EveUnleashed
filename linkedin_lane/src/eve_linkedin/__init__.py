@@ -47,7 +47,7 @@ def base_headers(jar):
         "X-RestLi-Protocol-Version": "2.0.0",
         "X-Li-Track": '{"clientVersion":"1.0"}',
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Cookie": "; ".join("{}={}".format(k, v) for k, v in sorted(jar.items())),
+        "Cookie": "; ".join(f"{k}={v}" for k, v in sorted(jar.items())),
     }
 
 
@@ -60,9 +60,7 @@ def fetch_owner_urn(jar, timeout=30):
     obj = mp.get("objectUrn", "")  # urn:li:member:<id>
     mid = obj.rsplit(":", 1)[-1] if obj else str(me.get("plainId", ""))
     if not mid:
-        raise ValueError(
-            "no member id in /me response keys={}".format(sorted(me.keys()))
-        )
+        raise ValueError(f"no member id in /me response keys={sorted(me.keys())}")
     return "urn:li:person:" + mid
 
 
@@ -87,7 +85,7 @@ def redact(headers):
     out = {}
     for k, v in headers.items():
         if k.lower() in ("cookie", "csrf-token"):
-            out[k] = "<redacted len={:d}>".format(len(v))
+            out[k] = f"<redacted len={len(v):d}>"
         else:
             out[k] = v
     return out
@@ -101,7 +99,7 @@ def post_live(url, headers, body, timeout=30):
     except urllib.error.HTTPError as e:
         return e.code, e.read(2000).decode("utf-8", "replace")
     except OSError as e:
-        return -1, "network: {}".format(e)
+        return -1, f"network: {e}"
 
 
 def main(argv=None):
@@ -126,21 +124,17 @@ def main(argv=None):
         with open(md_path, "r", encoding="utf-8") as f:
             text = f.read().strip()
     except OSError as e:
-        print("cannot read {}: {}".format(md_path, e))
+        print(f"cannot read {md_path}: {e}")
         return 2
     jar, missing = load_session(state_path)
-    print("session: {:d} linkedin cookies".format(len(jar)))
+    print(f"session: {len(jar):d} linkedin cookies")
     if missing:
-        print(
-            "BLOCKED: session missing {}; re-login and refresh {}".format(
-                missing, state_path
-            )
-        )
+        print(f"BLOCKED: session missing {missing}; re-login and refresh {state_path}")
         return 1
     try:
         owner = fetch_owner_urn(jar)
-    except Exception as e:
-        print("BLOCKED: owner lookup failed: {}".format(str(e)[:200]))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"BLOCKED: owner lookup failed: {str(e)[:200]}")
         return 1
     url, headers, body = build_request(text, jar, owner)
     shape = {
@@ -150,12 +144,12 @@ def main(argv=None):
         "payload_keys": sorted(json.loads(body.decode()).keys()),
         "text_chars": len(text),
     }
-    print("request shape: {}".format(json.dumps(shape)))
+    print(f"request shape: {json.dumps(shape)}")
     if not live:
         print("DRY-RUN: nothing posted. Re-run with --live to paste.")
         return 0
     status, resp = post_live(url, headers, body)
-    print("live POST status={} resp={}".format(status, resp[:500]))
+    print(f"live POST status={status} resp={resp[:500]}")
     return 0 if status in (200, 201) else 1
 
 

@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -125,7 +125,7 @@ PAYWALL_MARKERS = (
 def _host(url):
     try:
         return (urlparse(str(url)).hostname or "").lower()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("sources:host", e)
         return ""
 

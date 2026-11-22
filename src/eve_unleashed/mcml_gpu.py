@@ -113,7 +113,7 @@ class _CL:
             if f is None and n not in ("queue_props", "queue_legacy")
         ]
         if missing or (self.queue_props is None and self.queue_legacy is None):
-            raise RuntimeError("ICD missing entry points: {}".format(missing))
+            raise RuntimeError(f"ICD missing entry points: {missing}")
 
         must = [
             "get_platform_ids",
@@ -131,7 +131,7 @@ class _CL:
         ]
         absent = [n for n in must if getattr(self, n) is None]
         if absent:
-            raise RuntimeError("ICD missing entry points: {}".format(absent))
+            raise RuntimeError(f"ICD missing entry points: {absent}")
 
 
 CL_DEVICE_TYPE_GPU = 1 << 2
@@ -153,7 +153,7 @@ def available() -> bool:
         if cl.get_platform_ids(0, None, ctypes.byref(n)) != 0 or n.value == 0:
             return False
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return False
 
 
@@ -259,13 +259,9 @@ class GpuDense:
         devtype: int = CL_DEVICE_TYPE_GPU,
     ) -> None:
         if in_dim < 1 or out_dim < 1:
-            raise ValueError(
-                "dense dims must be >= 1, got {:d} -> {:d}".format(in_dim, out_dim)
-            )
+            raise ValueError(f"dense dims must be >= 1, got {in_dim:d} -> {out_dim:d}")
         if activation not in _ACTS:
-            raise ValueError(
-                "activations: {} (got {!r})".format(sorted(_ACTS), activation)
-            )
+            raise ValueError(f"activations: {sorted(_ACTS)} (got {activation!r})")
         self.in_dim, self.out_dim, self.seed = in_dim, out_dim, seed
         self.act = _ACTS[activation]
 
@@ -353,7 +349,7 @@ class GpuDense:
             h = ctypes.c_void_p(cl.create_kernel(prog, n_.encode(), ctypes.byref(err)))
             self._ok(err.value)
             if not h:
-                raise RuntimeError("clCreateKernel({}) returned NULL".format(n_))
+                raise RuntimeError(f"clCreateKernel({n_}) returned NULL")
             self.k[n_] = h
 
         rng = random.Random(seed)
@@ -369,10 +365,10 @@ class GpuDense:
     @staticmethod
     def _ok(rc: int) -> None:
         if rc != 0:
-            raise RuntimeError("OpenCL call failed: {:d}".format(rc))
+            raise RuntimeError(f"OpenCL call failed: {rc:d}")
 
     def _buf(self, vals) -> ctypes.c_void_p:
-        raw = struct.pack("<%df" % len(vals), *vals)
+        raw = struct.pack(f"<{len(vals):d}f", *vals)
         err = ctypes.c_int32()
         h = ctypes.c_void_p(
             self.cl.create_buffer(
@@ -425,10 +421,10 @@ class GpuDense:
                 self.queue, h, CL_BLOCKING, 0, nfloats * 4, out, 0, None, None
             )
         )
-        return list(struct.unpack("<{:d}f".format(nfloats, bytes(out))))
+        return list(struct.unpack(f"<{nfloats:d}f"))
 
     def _write(self, h, vals) -> None:
-        raw = struct.pack("<%df" % len(vals), *vals)
+        raw = struct.pack(f"<{len(vals):d}f", *vals)
         data = (ctypes.c_ubyte * len(raw)).from_buffer_copy(raw)
         self._ok(
             self.cl.enqueue_write(
@@ -556,7 +552,7 @@ class HybridDense:
         self.cpu_d, self.cpu_a = _cpu_dense(in_dim, out_dim, seed, activation)
         try:
             self.gpu = GpuDense(in_dim, out_dim, seed=seed, activation=activation)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             self.gpu = None
             self._gpu_err = str(e)
         self.split = 1.0 if self.gpu is not None else 0.0
@@ -705,23 +701,13 @@ def main() -> int:
     Y2, _ = g.forward_batch(X)
     gpu_ms = (time.perf_counter() - t0) * 1e3
 
+    print(f"shape: batch={B:d} in={IN:d} out={OUT:d}  params={g._nw + g._nb:d}")
+    print(f"forward kernel: {fwd_kt:.2f} ms | backward kernels: {bwd_kt:.2f} ms")
     print(
-        "shape: batch={:d} in={:d} out={:d}  params={:d}".format(
-            B, IN, OUT, g._nw + g._nb
-        )
+        f"CPU batch forward: {cpu_ms:.2f} ms | GPU batch wall (up+run+down): {gpu_ms:.2f} ms | {cpu_ms / max(gpu_ms, 1e-9):.1f}x"
     )
     print(
-        "forward kernel: {:.2f} ms | backward kernels: {:.2f} ms".format(fwd_kt, bwd_kt)
-    )
-    print(
-        "CPU batch forward: {:.2f} ms | GPU batch wall (up+run+down): {:.2f} ms | {:.1f}x".format(
-            cpu_ms, gpu_ms, cpu_ms / max(gpu_ms, 1e-9)
-        )
-    )
-    print(
-        "exactness: forward max|d|={:.2e}  grads max|d|={:.2e}  post-step weights max|d|={:.2e}".format(
-            fwd_err, bwd_err, w_err
-        )
+        f"exactness: forward max|d|={fwd_err:.2e}  grads max|d|={bwd_err:.2e}  post-step weights max|d|={w_err:.2e}"
     )
     ok = fwd_err < 2e-5 and bwd_err < 2e-5 and w_err < 2e-5
     print(
@@ -735,13 +721,14 @@ def main() -> int:
 
     # -- hybrid: tunable percentages of ALL backends ----------------------
     h = HybridDense(IN, OUT, seed=7, activation="tanh")
-    print("backends: {}".format(h.backends))
+    print(f"backends: {h.backends}")
     best, table = h.tune(X)
     print(
-        "tune (fraction of %d rows on GPU -> ms): %s"
-        % (B, "  ".join("{:.2f}:{:.2f}".format(s, ms) for s, ms in table))
+        "tune (fraction of {:d} rows on GPU -> ms): {}".format(
+            B, "  ".join(f"{s:.2f}:{ms:.2f}" for s, ms in table)
+        )
     )
-    print("pinned split: {:.2f} of batch on GPU".format(best))
+    print(f"pinned split: {best:.2f} of batch on GPU")
     hY = h.forward_batch(X)
     herr = max(abs(yv - cv) for yr, cr in zip(hY, cpu_Y) for yv, cv in zip(yr, cr))
     h.zero_grad()
@@ -755,15 +742,11 @@ def main() -> int:
         )
     else:
         rep_err = 0.0
-    print(
-        "hybrid: routing max|d|={:.2e}  replica-agreement max|d|={:.2e}".format(
-            herr, rep_err
-        )
-    )
+    print(f"hybrid: routing max|d|={herr:.2e}  replica-agreement max|d|={rep_err:.2e}")
     hok = herr < 2e-5 and rep_err < 1e-6
     print(
-        "OK: hybrid split {:.2f} routes rows across backends with identical "
-        "replicas".format(best)
+        f"OK: hybrid split {best:.2f} routes rows across backends with identical "
+        "replicas"
         if hok
         else "FAIL: hybrid mismatch"
     )

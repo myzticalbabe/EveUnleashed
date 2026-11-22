@@ -266,7 +266,7 @@ def _records_for(path: Path, kind: str, mode: str) -> list[dict]:
             record_kind = "limitation"
         fields = _fields(body)
         record = {
-            "id": "{}-L{:d}".format(slug, line_number),
+            "id": f"{slug}-L{line_number:d}",
             "surface": relative,
             "line": line_number,
             "kind": record_kind,
@@ -324,7 +324,7 @@ def engram_records(
     if not db.exists():
         return [], 0
     try:
-        connection = sqlite3.connect("file:{}?mode=ro".format(db), uri=True)
+        connection = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     except sqlite3.Error:
         return [], 0
     try:
@@ -357,7 +357,7 @@ def engram_records(
         )
         records.append(
             {
-                "id": "engram-{:d}".format(identifier),
+                "id": f"engram-{identifier:d}",
                 "surface": "~/.engram/engram.db",
                 "line": identifier,
                 "kind": "engram:" + (kind or "manual"),
@@ -602,20 +602,15 @@ def main(argv: list[str] | None = None) -> int:
             print("STALE: " + problem)
         if newer:
             print(
-                "note: %d observation(s) recorded since the snapshot (as_of id %d); "
-                "re-run --write to fold them in"
-                % (
+                "note: {:d} observation(s) recorded since the snapshot (as_of id {:d}); "
+                "re-run --write to fold them in".format(
                     newer,
                     json.loads(LEDGER.read_text(encoding="utf-8"))
                     .get("engram", {})
                     .get("as_of_id", 0),
                 )
             )
-        print(
-            "clean"
-            if not stale_paths
-            else "{:d} stale surface(s)".format(len(stale_paths))
-        )
+        print("clean" if not stale_paths else f"{len(stale_paths):d} stale surface(s)")
         return 0 if not stale_paths else 1
 
     data = harvest()
@@ -623,8 +618,7 @@ def main(argv: list[str] | None = None) -> int:
         BIBLE_DIR.mkdir(parents=True, exist_ok=True)
         LEDGER.write_text(render(data), encoding="utf-8", newline="\n")
         print(
-            "wrote %s (%d records from %d file surfaces + %d observations)"
-            % (
+            "wrote {} ({:d} records from {:d} file surfaces + {:d} observations)".format(
                 LEDGER.relative_to(REPO),
                 data["totals"]["records"],
                 data["totals"]["surfaces"],
@@ -637,11 +631,11 @@ def main(argv: list[str] | None = None) -> int:
             if record["id"] == args.show:
                 print(json.dumps(record, indent=1, ensure_ascii=False))
                 return 0
-        print("no record with id {!r}".format(args.show), file=sys.stderr)
+        print(f"no record with id {args.show!r}", file=sys.stderr)
         return 1
     if args.themes:
         for word, count in themes(data):
-            print("{:<20} {:d}".format(word, count))
+            print(f"{word:<20} {count:d}")
         return 0
     if args.json:
         print(render(data), end="")

@@ -91,10 +91,14 @@ def seal_svg(source_sha, size=120):
     cx = cy = size // 2
     r = size // 2 - 6
     parts = [
-        "<circle cx='%d' cy='%d' r='%d' fill='none' stroke='#7a1f1f' "
-        "stroke-width='3'/>" % (cx, cy, r),
-        "<circle cx='%d' cy='%d' r='%d' fill='none' stroke='#7a1f1f' "
-        "stroke-width='1'/>" % (cx, cy, r - 8),
+        (
+            f"<circle cx='{cx:d}' cy='{cy:d}' r='{r:d}' fill='none' stroke='#7a1f1f' "
+            "stroke-width='3'/>"
+        ),
+        (
+            f"<circle cx='{cx:d}' cy='{cy:d}' r='{r - 8:d}' fill='none' stroke='#7a1f1f' "
+            "stroke-width='1'/>"
+        ),
     ]
     import math as _math
 
@@ -102,13 +106,12 @@ def seal_svg(source_sha, size=120):
         a = 2 * _math.pi * i / petals
         x = cx + int((r - 14) * _math.cos(a))
         y = cy + int((r - 14) * _math.sin(a))
-        parts.append("<circle cx='{:d}' cy='{:d}' r='4' fill='#7a1f1f'/>".format(x, y))
+        parts.append(f"<circle cx='{x:d}' cy='{y:d}' r='4' fill='#7a1f1f'/>")
     parts.append(
-        "<text x='%d' y='%d' text-anchor='middle' font-size='14' "
-        "fill='#7a1f1f' font-family='serif'>%s</text>"
-        % (cx, cy + 5, source_sha[:4].upper())
+        f"<text x='{cx:d}' y='{cy + 5:d}' text-anchor='middle' font-size='14' "
+        f"fill='#7a1f1f' font-family='serif'>{source_sha[:4].upper()}</text>"
     )
-    return "<svg width='%d' height='%d' viewBox='0 0 %d %d'>%s</svg>" % (
+    return "<svg width='{:d}' height='{:d}' viewBox='0 0 {:d} {:d}'>{}</svg>".format(
         size,
         size,
         size,
@@ -120,7 +123,7 @@ def seal_svg(source_sha, size=120):
 def _strokes_js():
     import json as _json
 
-    return "const STROKES = {};".format(_json.dumps(STROKES))
+    return f"const STROKES = {_json.dumps(STROKES)};"
 
 
 CALLIGRAPHY_JS = """
@@ -172,17 +175,15 @@ def render_stationery(title, subtitle, sections, source_sha, out_path):
         safe_h = heading.replace('"', "")
         body.append(
             "<section class='reveal'><canvas class='calli' "
-            'data-text="{}"></canvas>'.format(safe_h[:60])
+            f'data-text="{safe_h[:60]}"></canvas>'
         )
         for p in paras:
             esc = p.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             if first and esc.strip():
-                body.append(
-                    "<p><span class='drop'>{}</span>{}</p>".format(esc[0], esc[1:])
-                )
+                body.append(f"<p><span class='drop'>{esc[0]}</span>{esc[1:]}</p>")
                 first = False
             elif esc.strip():
-                body.append("<p>{}</p>".format(esc))
+                body.append(f"<p>{esc}</p>")
         body.append("</section>")
     page = """<!doctype html><html><head><meta charset="utf-8">
 <title>{}</title><style>
@@ -242,7 +243,7 @@ def stationery_from_tutorial(doc, tut, out_path):
     for i, s in enumerate(tut.get("steps", [])[:20], 1):
         sections.append(
             (
-                "Step {:d}".format(i),
+                f"Step {i:d}",
                 [
                     "Do: {}".format(s.get("action", "")),
                     "Check yourself: {}".format(s.get("check", "")),
@@ -252,8 +253,7 @@ def stationery_from_tutorial(doc, tut, out_path):
         )
     return render_stationery(
         "Tutorial from {}".format(doc.get("source", "a document")),
-        "audience %s | %d words | sha %s"
-        % (
+        "audience {} | {:d} words | sha {}".format(
             tut.get("audience", "general"),
             doc.get("words", 0),
             doc.get("sha256", "")[:16],

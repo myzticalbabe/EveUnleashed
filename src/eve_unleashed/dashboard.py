@@ -21,7 +21,7 @@ CRADLE_DIR = AZ / "cradle"
 PID_FILE = AZ / "cradle-server.pid"
 LOG_FILE = AZ / "log" / "cradle-server.log"
 CRADLE_PORT = 8080
-CRADLE_BASE = "http://127.0.0.1:{:d}".format(CRADLE_PORT)
+CRADLE_BASE = f"http://127.0.0.1:{CRADLE_PORT:d}"
 
 
 # ---------------------------------------------------------------- probes
@@ -33,7 +33,7 @@ def _http_json(url, timeout=3.0):
             if r.status != 200:
                 return None
             return json.loads(r.read().decode("utf-8", "replace"))
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return None
 
 
@@ -41,7 +41,7 @@ def _pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return False
 
 
@@ -51,7 +51,7 @@ def _mem() -> dict:
 
         m = psutil.virtual_memory()
         return {"total_gb": round(m.total / 1e9, 1), "pct": m.percent}
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- _mem: best-effort pass
         pass
     try:
         info = {}
@@ -62,7 +62,7 @@ def _mem() -> dict:
         avail = int(info.get("MemAvailable", "0").split()[0]) // 1024
         pct = round(100.0 * (total - avail) / total, 1) if total else 0.0
         return {"total_gb": round(total / 1024, 1), "pct": pct}
-    except Exception:
+    except Exception:  # noqa: BLE001 -- _mem: error recorded below, guard stays broad
         return {"total_gb": 0.0, "pct": 0.0}
 
 
@@ -72,7 +72,7 @@ def _disk() -> dict:
 
         d = psutil.disk_usage(str(HOME))
         return {"total_gb": round(d.total / 1e9, 1), "pct": d.percent}
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- _disk: best-effort pass
         pass
     try:
         st = os.statvfs(str(HOME))
@@ -80,7 +80,7 @@ def _disk() -> dict:
         free = st.f_bavail * st.f_frsize
         pct = round(100.0 * (total - free) / total, 1) if total else 0.0
         return {"total_gb": round(total / 1e9, 1), "pct": pct}
-    except Exception:
+    except Exception:  # noqa: BLE001 -- _disk: error recorded below, guard stays broad
         return {"total_gb": 0.0, "pct": 0.0}
 
 
@@ -98,7 +98,7 @@ def build_status() -> dict:
     pid = None
     try:
         pid = int(PID_FILE.read_text().strip().split()[0])
-    except Exception:
+    except Exception:  # noqa: BLE001 -- build_status: best-effort pid = None
         pid = None
     return {
         "ok": True,
@@ -183,27 +183,27 @@ def cradle_start() -> dict:
 def cradle_stop() -> dict:
     try:
         pid = int(PID_FILE.read_text().strip().split()[0])
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return {"ok": True, "already": True, "note": "no pidfile"}
     if not _pid_alive(pid):
         try:
             PID_FILE.unlink()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- cradle_stop: best-effort pass
             pass
         return {"ok": True, "already": True, "note": "stale pidfile cleared"}
     try:
         os.kill(pid, signal.SIGTERM)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         return {"ok": False, "error": str(e)}
     for _ in range(20):
         if not _pid_alive(pid):
             try:
                 PID_FILE.unlink()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 -- cradle_stop: best-effort pass
                 pass
             return {"ok": True, "stopped": pid}
         time.sleep(0.5)
-    return {"ok": False, "error": "pid {:d} did not exit".format(pid)}
+    return {"ok": False, "error": f"pid {pid:d} did not exit"}
 
 
 def log_tail(name: str = "cradle", lines: int = 60) -> str:
@@ -213,8 +213,8 @@ def log_tail(name: str = "cradle", lines: int = 60) -> str:
     try:
         data = path.read_text(errors="replace").splitlines()
         return "\n".join(data[-lines:])
-    except Exception as e:
-        return "(unreadable: {})".format(e)
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return f"(unreadable: {e})"
 
 
 # ---------------------------------------------------------------- page
@@ -300,13 +300,13 @@ class _Handler(BaseHTTPRequestHandler):
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- _body: best-effort n = 0
             n = 0
         if not n:
             return {}
         try:
             return json.loads(self.rfile.read(n).decode("utf-8") or "{}")
-        except Exception:
+        except Exception:  # noqa: BLE001 -- logged below, guard broad
             return {}
 
     def do_GET(self):
@@ -324,13 +324,13 @@ class _Handler(BaseHTTPRequestHandler):
         if u.path == "/api/status":
             try:
                 self._send(build_status())
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 self._send({"ok": False, "ready": False, "error": str(e)}, 500)
             return
         if u.path == "/api/models":
             try:
                 self._send(build_models())
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 self._send({"current": None, "entries": [], "error": str(e)}, 500)
             return
         if u.path == "/api/log":
@@ -352,9 +352,7 @@ class _Handler(BaseHTTPRequestHandler):
                     (e for e in entries if lowered in _mp.entry_id(e).lower()), None
                 )
             if match is None:
-                self._send(
-                    {"ok": False, "error": "no provider matches {!r}".format(want)}
-                )
+                self._send({"ok": False, "error": f"no provider matches {want!r}"})
                 return
             _mp.save_selection(match)
             self._send({"ok": True, "selected": _mp.entry_id(match)})
@@ -373,7 +371,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 def serve(port: int = 8899) -> int:
     srv = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
-    print("eve dashboard: http://127.0.0.1:{:d}  (Ctrl-C to stop)".format(port))
+    print(f"eve dashboard: http://127.0.0.1:{port:d}  (Ctrl-C to stop)")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

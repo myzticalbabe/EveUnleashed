@@ -125,7 +125,7 @@ class EveInterpreterBridge:
         try:
             with urllib.request.urlopen(url, timeout=self.PROBE_TIMEOUT) as resp:
                 payload = json.loads(resp.read().decode("utf-8", "replace") or "{}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("eve_interpreter:probe_models", exc)
             return None
         ids: list[str] = []
@@ -160,7 +160,7 @@ class EveInterpreterBridge:
         text_targets: list[dict[str, Any]] = []
         embedding_only: list[dict[str, Any]] = []
         for port in self._probe_ports:
-            base = "http://localhost:{:d}".format(port)
+            base = f"http://localhost:{port:d}"
             model_ids = self._fetch_model_ids(base)
             if model_ids is None:
                 probed.append({"port": port, "reachable": False})
@@ -232,7 +232,7 @@ class EveInterpreterBridge:
             llm.api_key = "dummy"
             llm.supports_functions = False
             llm.supports_vision = False
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("eve_interpreter:config", exc)
             ok = False
         for attr in ("logprobs", "top_logprobs", "logit_bias"):
@@ -240,7 +240,7 @@ class EveInterpreterBridge:
                 llm = getattr(self._interpreter, "llm", None)
                 if llm is not None:
                     setattr(llm, attr, None)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("eve_interpreter:clear_logit_params", exc)
                 ok = False
         return ok
@@ -321,7 +321,7 @@ class EveInterpreterBridge:
                 "error": detail,
                 "failure_class": self.classify_failure(detail),
             }
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             detail = "{} {}: {}".format(target["base"], type(exc).__name__, exc)
             note_failure("eve_interpreter:direct_chat", exc)
             return None, {
@@ -362,7 +362,7 @@ class EveInterpreterBridge:
                 str(Path.home() / ".lmstudio" / "models" / "**" / "*.gguf"),
                 recursive=True,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("eve_interpreter:gguf_scan", exc)
             return None
         text_models = [
@@ -392,7 +392,7 @@ class EveInterpreterBridge:
             from .cradle import resolve_model, run_gguf
         except ImportError as exc:
             note_failure("eve_interpreter:cradle_import", exc)
-            return {"status": "error", "error": "cradle unavailable: {}".format(exc)}
+            return {"status": "error", "error": f"cradle unavailable: {exc}"}
         try:
             path = resolve_model(model or "", None) if model else None
             if path is None:
@@ -439,7 +439,7 @@ class EveInterpreterBridge:
             llm = Llama(model_path=model_path, n_ctx=2048, verbose=False)
             output = llm(prompt, max_tokens=self.FALLBACK_MAX_TOKENS, echo=False)
             text = output["choices"][0]["text"]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("eve_interpreter:gguf_run", exc)
             return None
         return {
@@ -473,12 +473,14 @@ class EveInterpreterBridge:
                 if configured:
                     try:
                         result = self._interpreter.chat(prompt)
-                    except Exception as exc:
+                    except (
+                        Exception  # noqa: BLE001 -- logged below, guard broad
+                    ) as exc:
                         note_failure("eve_interpreter:chat", exc)
                         failures.append(
                             {
                                 "server": target,
-                                "error": "{}: {}".format(type(exc).__name__, exc),
+                                "error": f"{type(exc).__name__}: {exc}",
                                 "failure_class": self.classify_failure(str(exc)),
                             }
                         )

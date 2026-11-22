@@ -76,7 +76,7 @@ class PamSEvolution:
 
             self.recorder = get_recorder()
             return self.recorder
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pams_evolution:recorder", exc)
             return None
 
@@ -106,7 +106,7 @@ class PamSEvolution:
             candidates = rec.search_memories(
                 query=query, source=source, limit=limit * 4
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pams_evolution:search_memories", exc)
             return []
         scored = []
@@ -147,7 +147,7 @@ class PamSEvolution:
             return []
         try:
             events = rec.query_memories(limit=limit)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pams_evolution:query_memories", exc)
             return []
         scored = [self.score_importance(e) for e in events]
@@ -174,7 +174,7 @@ class PamSEvolution:
         try:
             rec._ensure_local_store()
             store = rec._local_store
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             store = None
             note_failure("pams_evolution:ensure_local_store", exc)
         cutoff = time.time() - days * 86400
@@ -184,7 +184,7 @@ class PamSEvolution:
                 pruned = store.prune_before(cutoff)  # may not exist on store
             except AttributeError:
                 pruned = 0
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("pams_evolution:prune_store", exc)
         else:
             # fallback buffer trim
@@ -202,7 +202,7 @@ class PamSEvolution:
 def _parse_ts(ts: str) -> float:
     try:
         return time.mktime(time.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S"))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         note_failure("pams_evolution:parse_ts", exc)
         return 0.0
 
@@ -233,7 +233,7 @@ def distill_to_insights(use_llm: bool = False) -> dict[str, Any]:
             "recommendations": list(report.recommendations),
             "source_stats": dict(report.source_stats),
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         note_failure("pams_evolution:distill_to_insights", exc)
         return {
             "version": "",

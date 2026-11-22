@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -26,7 +26,7 @@ from .live_log import read_events
 def _host(url):
     try:
         return (urlparse(str(url)).hostname or "").lower()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("intuition:host", e)
         return ""
 
@@ -89,9 +89,7 @@ def intuit(url, log_path=None):
         "state": "guess" if rate >= 0.5 else "blocked",
         "confidence": round(min(0.75, rate), 3),
         "predicted_rung": modal,
-        "provenance": [
-            "host:{} {:d}/{:d} answered".format(host, len(ok), len(host_rows))
-        ],
+        "provenance": [f"host:{host} {len(ok):d}/{len(host_rows):d} answered"],
     }
 
 
@@ -273,8 +271,7 @@ def incubate(url, log_path=None):
     return {
         "original_rung": worst,
         "alternative": alternative,
-        "reason": "rung %s blocked %d time(s); try %s"
-        % (worst, blocked_rungs[worst], alternative),
+        "reason": f"rung {worst} blocked {blocked_rungs[worst]:d} time(s); try {alternative}",
     }
 
 
@@ -355,7 +352,7 @@ def counterfactual_replay(url, log_path=None):
         # Counterfactual: what if we had tried the next rung instead?
         counterfactual = None
         if not match and actual:
-            counterfactual = "if {} had been tried, outcome might differ".format(actual)
+            counterfactual = f"if {actual} had been tried, outcome might differ"
         results.append(
             {
                 "predicted": predicted,

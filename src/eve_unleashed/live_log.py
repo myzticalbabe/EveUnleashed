@@ -15,7 +15,7 @@ import time
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -43,8 +43,8 @@ def emit(phase, event, path=None, session=None, **fields):
             os.makedirs(parent, exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(line + "\n")
-    flat = " ".join("{}={}".format(k, v) for k, v in fields.items())
-    print("LIVE [{}] {} {}".format(phase, event, flat), flush=True)
+    flat = " ".join(f"{k}={v}" for k, v in fields.items())
+    print(f"LIVE [{phase}] {event} {flat}", flush=True)
     return rec
 
 

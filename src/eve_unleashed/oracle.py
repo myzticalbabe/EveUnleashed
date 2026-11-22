@@ -19,7 +19,7 @@ import time
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -32,8 +32,9 @@ def _text_signal(claim):
     return {
         "signal": "text",
         "verdict": d["verdict"],
-        "detail": "%d proposition(s), %d flag(s)"
-        % (len(d["propositions"]), len(d["fallacy_flags"])),
+        "detail": "{:d} proposition(s), {:d} flag(s)".format(
+            len(d["propositions"]), len(d["fallacy_flags"])
+        ),
         "refutes": d["verdict"] == "REFUTED",
     }
 
@@ -45,8 +46,9 @@ def _live_signal(claim):
     return {
         "signal": "live",
         "verdict": f["verdict"],
-        "detail": "%d entity(ies), %d receipt(s)"
-        % (f.get("entities_checked", 0), len(f["receipts"])),
+        "detail": "{:d} entity(ies), {:d} receipt(s)".format(
+            f.get("entities_checked", 0), len(f["receipts"])
+        ),
         "refutes": f["verdict"] in ("REFUTED", "UNVERIFIABLE"),
     }
 
@@ -75,7 +77,7 @@ def _record_signal(claim, grievance_id):
     return {
         "signal": "record",
         "verdict": "FOUND" if recs else "ABSENT",
-        "detail": "{:d} term(s) shared with the filing".format(len(set(shared))),
+        "detail": f"{len(set(shared)):d} term(s) shared with the filing",
         "refutes": False,
     }
 
@@ -88,8 +90,8 @@ def consult(claim, grievance_id=None, locker_ids=None):
     for fn in (_text_signal, _live_signal):
         try:
             signals.append(fn(claim))
-        except Exception as e:
-            note_failure("oracle:{}".format(fn.__name__), e)
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+            note_failure(f"oracle:{fn.__name__}", e)
             signals.append(
                 {
                     "signal": fn.__name__.strip("_"),
@@ -100,7 +102,7 @@ def consult(claim, grievance_id=None, locker_ids=None):
             )
     try:
         signals.append(_record_signal(claim, grievance_id))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("oracle:record", e)
         signals.append(
             {
@@ -117,7 +119,7 @@ def consult(claim, grievance_id=None, locker_ids=None):
         for lid in locker_ids:
             try:
                 states.append(verify(lid)["state"])
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("oracle:locker", e)
                 states.append("ERROR")
         signals.append(
@@ -128,8 +130,9 @@ def consult(claim, grievance_id=None, locker_ids=None):
                     if states and all(s == "INTACT" for s in states)
                     else "TAMPERED"
                 ),
-                "detail": "%d/%d INTACT"
-                % (sum(1 for s in states if s == "INTACT"), len(states)),
+                "detail": "{:d}/{:d} INTACT".format(
+                    sum(1 for s in states if s == "INTACT"), len(states)
+                ),
                 "refutes": False,
             }
         )

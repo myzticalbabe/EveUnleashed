@@ -31,14 +31,12 @@ def convert_text(src_path, dst_path):
         w.writerows(rows)
         dst.write_text(buf.getvalue(), encoding="utf-8")
         return len(rows)
-    raise ValueError(
-        "morph converts .csv<->.json only: {} -> {}".format(src.suffix, dst.suffix)
-    )
+    raise ValueError(f"morph converts .csv<->.json only: {src.suffix} -> {dst.suffix}")
 
 
 def morph_markdown(state, title="Eve report"):
     """Morph an Eve state/bundle dict into a Markdown report."""
-    lines = ["# {}".format(title), ""]
+    lines = [f"# {title}", ""]
     if state.get("judgment"):
         lines += ["**Judgment:** {}".format(state["judgment"]), ""]
     rows = state.get("rows") or state.get("checks") or []
@@ -80,7 +78,7 @@ def mutate_file(src_path, out_dir, seed=7, count=3):
         pos = rng.randrange(len(variant))
         was = variant[pos]
         variant[pos] = (was + 1 + i) % 256
-        vp = out / ("{}.mut{:d}".format(name, i))
+        vp = out / (f"{name}.mut{i:d}")
         vp.write_bytes(bytes(variant))
         manifest.append(
             {"variant": str(vp), "byte": pos, "was": was, "now": variant[pos]}

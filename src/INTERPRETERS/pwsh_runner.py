@@ -103,7 +103,7 @@ class PwshRunner:
                 timeout=20,
             )
             self.version = out.stdout.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pwsh_runner:version", e)
         return True
 
@@ -160,7 +160,7 @@ class PwshRunner:
                     }
                 ],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pwsh_runner:exec", e)
             return PwshResult(
                 success=False,
@@ -241,7 +241,7 @@ class PwshRunner:
             present = b"YES" in (probe.stdout or b"")
             PwshRunner._module_cache[name] = present
             return present
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pwsh_runner:module-probe", e)
             return False
 

@@ -219,7 +219,7 @@ def _capped(fn: Callable, cap_s: float, *a):
     return {
         "state": "blocked",
         "rung": "train-cap",
-        "kind": "per-fetch cap {}s".format(cap_s),
+        "kind": f"per-fetch cap {cap_s}s",
     }
 
 
@@ -438,7 +438,7 @@ def null_control(cfg: TrainConfig, budget: int) -> dict[str, Any]:
     scores = []
     for i in range(budget):
         d = WormDNA(
-            worm_id="null-{:d}".format(i),
+            worm_id=f"null-{i:d}",
             worm_type="fetcher",
             aggressiveness=rng.uniform(0.1, 0.9),
             min_confidence=rng.uniform(0.5, 0.95),
@@ -449,7 +449,7 @@ def null_control(cfg: TrainConfig, budget: int) -> dict[str, Any]:
         f = score_genome(d, cfg, calib=None)
         s = round(f.score(), 4)
         scores.append(s)
-        print("null %d/%d: score=%.4f" % (i + 1, budget, s), flush=True)
+        print(f"null {i + 1:d}/{budget:d}: score={s:.4f}", flush=True)
     return {
         "budget": budget,
         "best": round(max(scores), 4) if scores else 0.0,
@@ -550,8 +550,7 @@ def run(cfg: TrainConfig) -> list[dict[str, Any]]:
         out.append(one_generation(ga, g, cfg, tuner, calib))
     save_pop(ga, cfg.pop_path)
     print(
-        "DONE gens %d-%d final_gen=%d pop_saved=%s tuner=lillith mutw=%.3f"
-        % (start, start + cfg.gens - 1, ga.generation, cfg.pop_path, tuner.width),
+        f"DONE gens {start:d}-{start + cfg.gens - 1:d} final_gen={ga.generation:d} pop_saved={cfg.pop_path} tuner=lillith mutw={tuner.width:.3f}",
         flush=True,
     )
     return out

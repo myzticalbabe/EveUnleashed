@@ -24,7 +24,7 @@ from pathlib import Path
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -176,7 +176,7 @@ def build_gguf(path, name, seed=7, rows=8, cols=8, dtype="Q8_0", hi_prec=()):
         importance[tname] = round(sum(static_importance(vals)) / len(vals), 4)
         ttype = "F32" if tname in hi_prec else dtype
         did = _DID[ttype]
-        per_tensor[tname] = "gguf:{}".format(ttype)
+        per_tensor[tname] = f"gguf:{ttype}"
         _pack_str(header, tname)
         header += struct.pack("<I", len(shape))
         for dim in shape:
@@ -202,7 +202,7 @@ def build_gguf(path, name, seed=7, rows=8, cols=8, dtype="Q8_0", hi_prec=()):
             back = dequantize_q40(blocks)[: len(vals)]
             max_err = max(max_err, max(abs(a - c) for a, c in zip(vals, back)))
         else:
-            blob = struct.pack("<%df" % len(vals), *vals)
+            blob = struct.pack(f"<{len(vals):d}f", *vals)
         data_blobs.append(blob)
         offset += len(blob)
         while offset % GGUF_ALIGN:
@@ -266,12 +266,12 @@ def read_gguf(path):
             (v,), off = struct.unpack_from("<f", data, off), off + 4
             meta[key] = v
         else:
-            raise ValueError("unexpected kv type {:d}".format(vtype))
+            raise ValueError(f"unexpected kv type {vtype:d}")
     tensors = []
     for _ in range(n_tensors):
         tname = take_str()
         (n_dims,), off = struct.unpack_from("<I", data, off), off + 4
-        dims = struct.unpack_from("<{:d}Q".format(n_dims, data, off))
+        dims = struct.unpack_from(f"<{n_dims:d}Q")
         off += 8 * n_dims
         (dtype, toff), off = struct.unpack_from("<IQ", data, off), off + 12
         if dtype == _GGUF_DTYPE_Q80:
@@ -318,9 +318,9 @@ def build_all(out_dir, name="eve-foundry-001", seed=7, dtype="Q8_0", hi_prec=())
     entries, skipped = [], []
 
     gguf_entry = build_gguf(
-        out / ("{}.gguf".format(name)), name, seed, dtype=dtype, hi_prec=hi_prec
+        out / (f"{name}.gguf"), name, seed, dtype=dtype, hi_prec=hi_prec
     )
-    parsed = read_gguf(out / ("{}.gguf".format(name)))
+    parsed = read_gguf(out / (f"{name}.gguf"))
     assert parsed["arch"] == "eve-foundry", parsed
     assert [t["name"] for t in parsed["tensors"]] == gguf_entry["tensors"]
     gguf_entry["parse_back"] = "ok"
@@ -334,20 +334,18 @@ def build_all(out_dir, name="eve-foundry-001", seed=7, dtype="Q8_0", hi_prec=())
             "bias": torch.randn(8),
             "foundry": {"name": name, "seed": seed},
         }
-        torch.save(bundle, str(out / ("{}.pt".format(name))))
+        torch.save(bundle, str(out / (f"{name}.pt")))
         import hashlib as _h
 
         entries.append(
             {
-                "path": "{}.pt".format(name),
+                "path": f"{name}.pt",
                 "format": "torch",
-                "bytes": (out / ("{}.pt".format(name))).stat().st_size,
-                "sha256": _h.sha256(
-                    (out / ("{}.pt".format(name))).read_bytes()
-                ).hexdigest(),
+                "bytes": (out / (f"{name}.pt")).stat().st_size,
+                "sha256": _h.sha256((out / (f"{name}.pt")).read_bytes()).hexdigest(),
                 "load_back": type(
                     torch.load(
-                        str(out / ("{}.pt".format(name))),
+                        str(out / (f"{name}.pt")),
                         map_location="cpu",
                         weights_only=True,
                     )
@@ -364,20 +362,20 @@ def build_all(out_dir, name="eve-foundry-001", seed=7, dtype="Q8_0", hi_prec=())
         model = LinearRegression().fit([[0], [1], [2]], [0, 1, 2])
         joblib.dump(
             {"model": model, "foundry": {"name": name}},
-            out / ("{}.joblib".format(name)),
+            out / (f"{name}.joblib"),
         )
         import hashlib as _h
 
         entries.append(
             {
-                "path": "{}.joblib".format(name),
+                "path": f"{name}.joblib",
                 "format": "sklearn",
-                "bytes": (out / ("{}.joblib".format(name))).stat().st_size,
+                "bytes": (out / (f"{name}.joblib")).stat().st_size,
                 "sha256": _h.sha256(
-                    (out / ("{}.joblib".format(name))).read_bytes()
+                    (out / (f"{name}.joblib")).read_bytes()
                 ).hexdigest(),
                 "load_back": type(
-                    joblib.load(out / ("{}.joblib".format(name)))["model"]
+                    joblib.load(out / (f"{name}.joblib"))["model"]
                 ).__name__,
             }
         )

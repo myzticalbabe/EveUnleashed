@@ -162,7 +162,7 @@ def scan_file(path: Path, root: Path, use_axe: bool):
     try:
         scanner.feed(text)
         scanner.close()
-    except Exception as exc:  # a parser that dies must not read as clean
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         add(
             "high",
             "unparseable",
@@ -267,7 +267,7 @@ def run_axe(path: Path, rel: str):
     """axe-core through playwright, only when the browser stack is importable."""
     try:
         from playwright.sync_api import sync_playwright
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return [
             {
                 "file": rel,
@@ -293,7 +293,7 @@ def run_axe(path: Path, rel: str):
                 "({id: v.id, impact: v.impact, help: v.help})))"
             )
             browser.close()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         return [
             {
                 "file": rel,

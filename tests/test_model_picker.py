@@ -64,8 +64,7 @@ def test_discover_finds_server_not_embeds(monkeypatch):
         found = [
             e
             for e in mp.discover()
-            if e["kind"] == "server"
-            and e.get("base", "").endswith(":{:d}/v1".format(port))
+            if e["kind"] == "server" and e.get("base", "").endswith(f":{port:d}/v1")
         ]
     finally:
         srv.shutdown()

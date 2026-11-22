@@ -51,7 +51,7 @@ def plan_track(style, goal):
             "unknown track {!r} (try: {})".format(style, ", ".join(list_tracks()))
         )
     goal = (goal or "my first STEM build").strip()[:120]
-    return ["GOAL: {}".format(goal)] + list(TRACKS[style])
+    return [f"GOAL: {goal}"] + list(TRACKS[style])
 
 
 def referrals():

@@ -28,10 +28,10 @@ for _mod in ("eve_unleashed._replay_cy", "_replay_cy"):
         _native_score = __import__(_mod, fromlist=["score_pairs"]).score_pairs
         _NATIVE_WHY = "loaded " + _mod
         break
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         # The fallback is recorded, not silent: backend() reports it, so a
         # run that silently drops to Python reads as Python-with-a-reason.
-        _NATIVE_WHY = "{}: {}: {}".format(_mod, type(exc).__name__, exc)
+        _NATIVE_WHY = f"{_mod}: {type(exc).__name__}: {exc}"
         _native_score = None
 
 BACKEND = "cython" if _native_score is not None else "python"
@@ -127,12 +127,9 @@ def score_columns(pred_rung, pred_kind, ans_rung, ans_ok):
     if _native_score is not None:
         try:
             out = _native_score(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             global _NATIVE_WHY
-            _NATIVE_WHY = "call failed ({}: {}), pure python".format(
-                type(exc).__name__,
-                exc,
-            )
+            _NATIVE_WHY = f"call failed ({type(exc).__name__}: {exc}), pure python"
         else:
             return tuple(out) + ("cython",)
     return py_score(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs) + ("python",)

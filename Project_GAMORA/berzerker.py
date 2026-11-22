@@ -70,8 +70,8 @@ def audit():
     _src_on_path()
     try:
         from eve_unleashed import cognition as _c
-    except Exception as e:
-        return {"ok": False, "reason": "cognition unavailable ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"cognition unavailable ({e})"}
     rep = _c.audit()
     by_stratum = {}
     for r in rep["processes"]:
@@ -93,20 +93,20 @@ def mind(request):
     _src_on_path()
     try:
         from eve_unleashed import cognition as _c
-    except Exception as e:
-        return {"ok": False, "reason": "cognition unavailable ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"cognition unavailable ({e})"}
     request = str(request or "").strip()[:500]
     if not request:
         return {"ok": False, "reason": "nothing to think about: empty request"}
     try:
         nx = _c.nexus(request)
-    except Exception as e:
-        return {"ok": False, "reason": "nexus unavailable ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"nexus unavailable ({e})"}
     paradigms = {}
     for s in ("conscious", "subconscious", "unconscious"):
         try:
             paradigms[s] = _c.paradigm(s)["members"]
-        except Exception:
+        except Exception:  # noqa: BLE001 -- mind: best-effort paradigms[s] = []
             paradigms[s] = []
     return {"ok": True, "request": request, "nexus": nx, "paradigms": paradigms}
 
@@ -116,12 +116,12 @@ def _debunk_notes(problem):
     _src_on_path()
     try:
         from eve_unleashed.debunk import debunk_claim as _d
-    except Exception as e:
-        return {"available": False, "reason": "debunk unavailable ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"available": False, "reason": f"debunk unavailable ({e})"}
     try:
         d = _d(problem)
-    except Exception as e:
-        return {"available": False, "reason": "debunk failed ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"available": False, "reason": f"debunk failed ({e})"}
     return {
         "available": True,
         "verdict": d.get("verdict"),
@@ -137,8 +137,7 @@ def _toolchain(lang):
         "tool": tool,
         "present": bool(found),
         "path": found
-        or "not on PATH -- the scaffold below still runs "
-        "once {} is installed".format(tool),
+        or "not on PATH -- the scaffold below still runs " f"once {tool} is installed",
     }
 
 
@@ -177,9 +176,7 @@ def code_coach(problem, language="python", level="spark", name=None):
 
     notes = _debunk_notes(problem)
     tools = _toolchain(language)
-    digest = hashlib.sha256(
-        ("{}|{}|{}".format(language, level, problem)).encode("utf-8")
-    ).hexdigest()
+    digest = hashlib.sha256((f"{language}|{level}|{problem}").encode()).hexdigest()
 
     if level == "spark":
         steps = [
@@ -211,14 +208,14 @@ def code_coach(problem, language="python", level="spark", name=None):
         "Hey builder -- I am Berzerker, your coding coach. We solve this "
         "together, step by step.",
         "",
-        "Your assignment, in its own words: {}".format(problem),
+        f"Your assignment, in its own words: {problem}",
     ]
     if notes.get("available"):
         lines.append("Rock throw (debunk): {}.".format(notes.get("verdict")))
         for p in notes.get("propositions", [])[:3]:
-            lines.append("  - checkable piece: {}".format(p))
+            lines.append(f"  - checkable piece: {p}")
         for f in notes.get("flags", [])[:3]:
-            lines.append("  - watch out for: {}".format(f))
+            lines.append(f"  - watch out for: {f}")
     else:
         lines.append("Rock throw: {}.".format(notes.get("reason")))
     lines += [
@@ -227,26 +224,26 @@ def code_coach(problem, language="python", level="spark", name=None):
             "found" if tools["present"] else "not found yet -- " + tools["path"],
         ),
         "",
-        "Starter ({}, level {}) -- type it, run it, own it:".format(language, level),
+        f"Starter ({language}, level {level}) -- type it, run it, own it:",
         starter.rstrip(),
         "",
         "Your 3 steps:",
     ]
     for i, s in enumerate(steps, 1):
-        lines.append("  {:d}. {}".format(i, s))
+        lines.append(f"  {i:d}. {s}")
     if level in ("builder", "pilot"):
         lines.append("")
         lines.append("Your weird tests (keep the weird one):")
         for w in weird_tests(language).get("weird", []):
-            lines.append("  - {}".format(w))
+            lines.append(f"  - {w}")
     if name:
         sug = suggest_level(name)
         lines.append("")
         lines.append("Level: steady at {} -- {}.".format(level, sug["reason"]))
     lines += [
         "",
-        "Receipt: sha256 {}. No answer was invented; every line above "
-        "runs offline.".format(digest[:16]),
+        f"Receipt: sha256 {digest[:16]}. No answer was invented; every line above "
+        "runs offline.",
     ]
     return {
         "ok": True,
@@ -280,12 +277,12 @@ def dream(host=None):
     _src_on_path()
     try:
         from eve_unleashed.intuition import dream as _dream
-    except Exception as e:
-        return {"ok": False, "reason": "dream unavailable ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"dream unavailable ({e})"}
     try:
         rep = _dream()
-    except Exception as e:
-        return {"ok": False, "reason": "dream failed ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"dream failed ({e})"}
     out = {
         "ok": True,
         "pairs": rep["pairs"],
@@ -305,12 +302,12 @@ def inhibited(host, threshold=0.5):
     _src_on_path()
     try:
         from eve_unleashed.intuition import inhibited_rungs as _inh
-    except Exception as e:
-        return {"ok": False, "reason": "inhibition unavailable ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"inhibition unavailable ({e})"}
     try:
         rungs = _inh(host, threshold=float(threshold))
-    except Exception as e:
-        return {"ok": False, "reason": "inhibition failed ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"inhibition failed ({e})"}
     return {
         "ok": True,
         "host": str(host or ""),
@@ -351,7 +348,7 @@ def weird_tests(language="python"):
     """The weird half of the pair: normal + weird, keep the weird one."""
     language = str(language or "python").lower().strip()
     if language not in COACH_LANGS:
-        return {"ok": False, "reason": "unknown language {!r}".format(language)}
+        return {"ok": False, "reason": f"unknown language {language!r}"}
     return {"ok": True, "language": language, "weird": list(_WEIRD[language])}
 
 
@@ -359,14 +356,14 @@ def _ledger_path():
     home = Path.home() / ".azazael"
     try:
         home.mkdir(parents=True, exist_ok=True)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- best-effort _ledger_path
         pass  # scanner:ignore silent_except_pass -- ledger dir is best-effort; record_completion reports unwritable below
 
 
 def _ledger_read():
     try:
         return json.loads(_ledger_path().read_text(encoding="utf-8"))
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return {}
 
 
@@ -380,8 +377,8 @@ def record_completion(name, level):
         cell = data.setdefault(name, {"spark": 0, "builder": 0, "pilot": 0})
         cell[level] = int(cell.get(level, 0)) + 1
         _ledger_path().write_text(json.dumps(data, indent=1), encoding="utf-8")
-    except Exception as e:
-        return {"ok": False, "reason": "ledger unwritable ({})".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "reason": f"ledger unwritable ({e})"}
     return {
         "ok": True,
         "name": name,
@@ -400,9 +397,7 @@ def suggest_level(name):
                 "ok": True,
                 "name": name,
                 "suggests": nxt,
-                "reason": "{:d} {} sessions finished -- try {}".format(
-                    counts[lvl], lvl, nxt
-                ),
+                "reason": f"{counts[lvl]:d} {lvl} sessions finished -- try {nxt}",
             }
     cur = "spark"
     for lvl in ("pilot", "builder"):
@@ -413,7 +408,7 @@ def suggest_level(name):
         "ok": True,
         "name": name,
         "suggests": cur,
-        "reason": "steady at {}".format(cur),
+        "reason": f"steady at {cur}",
     }
 
 
@@ -421,7 +416,7 @@ def as_jsonable(obj):
     try:
         json.dumps(obj)
         return obj
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return {
             "note": "unserializable -- reported, not raised",
             "type": str(type(obj)),

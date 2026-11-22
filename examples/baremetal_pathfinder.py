@@ -162,7 +162,7 @@ def probe_mem():
                 return ok(total_gb=round(st.ullTotalPhys / 1073741824, 2))
             return na("GlobalMemoryStatusEx failed")
         except OSError as e:
-            return na("ctypes: {}".format(e))
+            return na(f"ctypes: {e}")
     return na("mem probe not implemented for " + sysname)
 
 
@@ -173,9 +173,9 @@ def probe_pci():
     try:
         p = subprocess.run([lspci, "-nnmm"], capture_output=True, text=True, timeout=30)
     except OSError as e:
-        return na("lspci exec failed: {}".format(e))
+        return na(f"lspci exec failed: {e}")
     if p.returncode != 0:
-        return na("lspci exit {:d}: {}".format(p.returncode, p.stderr[:200]))
+        return na(f"lspci exit {p.returncode:d}: {p.stderr[:200]}")
     devs = []
     for line in p.stdout.splitlines():
         ll = line.lower()
@@ -245,7 +245,7 @@ def probe_opencl():
             name = ctypes.util.find_library("OpenCL") or "libOpenCL.so.1"
             lib = ctypes.CDLL(name)
     except OSError as e:
-        return na("no OpenCL loader: {}".format(e))
+        return na(f"no OpenCL loader: {e}")
     try:
         lib.clGetPlatformIDs.restype = ctypes.c_int32
         lib.clGetPlatformIDs.argtypes = [
@@ -325,7 +325,7 @@ def probe_opencl():
             plats.append(info)
         return ok(platforms=len(plats), detail=plats)
     except OSError as e:
-        return na("OpenCL query failed: {}".format(e))
+        return na(f"OpenCL query failed: {e}")
 
 
 def probe_secureboot():
@@ -341,7 +341,7 @@ def probe_secureboot():
                 state = "ON" if raw and raw[-1] == 1 else "OFF"
                 return ok(secure_boot=state, source=efivars[0])
             except OSError as e:
-                return na("efivar unreadable: {}".format(e))
+                return na(f"efivar unreadable: {e}")
         if shutil.which("mokutil"):
             try:
                 p = subprocess.run(
@@ -355,9 +355,9 @@ def probe_secureboot():
                     return ok(secure_boot="ON", source="mokutil")
                 if "disabled" in out:
                     return ok(secure_boot="OFF", source="mokutil")
-                return na("mokutil inconclusive: {}".format(out[:120]))
+                return na(f"mokutil inconclusive: {out[:120]}")
             except OSError as e:
-                return na("mokutil exec failed: {}".format(e))
+                return na(f"mokutil exec failed: {e}")
         return na("no efivars and no mokutil (BIOS boot or no permission)")
     if platform.system() == "Windows":
         return na("SecureBoot read needs admin BCD; check msinfo32 instead")
@@ -417,7 +417,7 @@ def verdict_frontier(r):
     if ocl.get("available") and sane:
         v["gpu_compute"] = ok(
             verdict="FIXED",
-            detail="{:d} OpenCL device(s), clocks sane".format(len(sane)),
+            detail=f"{len(sane):d} OpenCL device(s), clocks sane",
         )
     elif ocl.get("available"):
         v["gpu_compute"] = ok(
@@ -470,8 +470,8 @@ def main():
     ):
         try:
             report[name] = fn()
-        except Exception as e:  # last-resort net: a probe never kills the report
-            report[name] = na("probe crashed: {!r}".format(e))
+        except Exception as e:  # noqa: BLE001 -- best-effort main
+            report[name] = na(f"probe crashed: {e!r}")
     report["frontier"] = verdict_frontier(report)
     soil = report["soil"].get("soil", "unknown")
     n_gpu = (

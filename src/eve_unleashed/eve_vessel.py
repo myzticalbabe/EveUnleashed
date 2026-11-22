@@ -40,14 +40,12 @@ def load_vessel() -> dict:
     if not meta.exists():
         return {
             "ok": False,
-            "error": "no vessel in the cradle (~/.azazael/cradle/{})".format(
-                VESSEL_FILES[1]
-            ),
+            "error": f"no vessel in the cradle (~/.azazael/cradle/{VESSEL_FILES[1]})",
         }
     try:
         spec = json.loads(meta.read_text(encoding="utf-8"))
-    except Exception as e:
-        return {"ok": False, "error": "unreadable vessel: {}".format(e)}
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return {"ok": False, "error": f"unreadable vessel: {e}"}
     missing = [f for f in VESSEL_FILES if not (d / f).exists()]
     return {
         "ok": True,
@@ -58,7 +56,7 @@ def load_vessel() -> dict:
 
 
 def _call(modname: str, fnname: str, args: dict):
-    mod = __import__("eve_unleashed.{}".format(modname), fromlist=[fnname])
+    mod = __import__(f"eve_unleashed.{modname}", fromlist=[fnname])
     fn = getattr(mod, fnname)
     try:
         sig = inspect.signature(fn)
@@ -71,7 +69,7 @@ def _call(modname: str, fnname: str, args: dict):
 def _safe(obj, limit: int = 4000):
     try:
         s = json.dumps(obj, default=str)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- _safe: best-effort s = str(obj)
         s = str(obj)
     return s if len(s) <= limit else s[:limit] + "…[truncated]"
 
@@ -106,7 +104,7 @@ def parse_calls(text: str) -> list:
             args = json.loads(payload) if payload.strip() else {}
             if not isinstance(args, dict):
                 args = {"_arg": args}
-        except Exception:
+        except Exception:  # noqa: BLE001 -- best-effort parse_calls
             calls.append((name, {"_raw": payload, "_error": "args are not JSON"}))
             continue
         calls.append((name, args))
@@ -133,11 +131,11 @@ def execute_call(name: str, args: dict) -> dict:
             args = dict(args, src=json.loads(p.read_text(encoding="utf-8")))
         result = _call(modname, fnname, args)
         return {"ok": True, "function": name, "result": _safe(result)}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         return {
             "ok": False,
             "function": name,
-            "error": "{}: {}".format(type(e).__name__, e),
+            "error": f"{type(e).__name__}: {e}",
         }
 
 
@@ -167,7 +165,7 @@ def explore() -> dict:
                 "selection": st.get("selection"),
             }
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         rep["status_error"] = str(e)
     tools: dict = {}
     try:
@@ -176,9 +174,9 @@ def explore() -> dict:
         for lang in ("python", "rust", "go"):
             try:
                 tools[lang] = {t: bool(p) for t, p in _l.have_tools(lang).items()}
-            except Exception:
+            except Exception:  # noqa: BLE001 -- explore: best-effort tools[lang] = {}
                 tools[lang] = {}
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- explore: best-effort pass
         pass
     rep["tools"] = tools
     try:
@@ -187,7 +185,7 @@ def explore() -> dict:
         rep["cradle_files"] = [
             (m.get("name"), m.get("bytes", 0)) for m in (list_cradle_models() or [])
         ]
-    except Exception:
+    except Exception:  # noqa: BLE001 -- explore: best-effort rep["cradle_files"] = []
         rep["cradle_files"] = []
     try:
         entries = _mp.discover()
@@ -195,7 +193,7 @@ def explore() -> dict:
         for e in entries:
             kinds[e.get("kind", "?")] = kinds.get(e.get("kind", "?"), 0) + 1
         rep["providers"] = {"total": len(entries), "by_kind": kinds}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         rep["providers"] = {"total": 0, "error": str(e)}
     rep["gpu"] = bool(shutil.which("llama-server"))
     return rep

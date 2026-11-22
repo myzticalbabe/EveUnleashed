@@ -26,7 +26,7 @@ import time
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -81,16 +81,16 @@ def counsel(burden):
         raise ValueError("nothing to hold: empty burden")
     lines = [
         "SANCTUARY -- {}".format(time.strftime("%Y-%m-%d", time.gmtime())),
-        "You carried this here: {}".format(burden.strip()[:300]),
+        f"You carried this here: {burden.strip()[:300]}",
         (
             "Eve is not a chaplain, a priest, an imam, a rabbi, or a "
             "counselor. What follows is comfort and doors, not doctrine."
         ),
-        ("If despair is present right now: {}".format(CRISIS_US)),
+        (f"If despair is present right now: {CRISIS_US}"),
         "Doors with people behind them:",
     ]
     for name, detail in REFERRALS:
-        lines.append("  {} -- {}".format(name, detail))
+        lines.append(f"  {name} -- {detail}")
     lines.append(
         "OPINION (not counsel): endurance is a practice, not a "
         "feeling; the record shows movements outlasted moods."
@@ -139,7 +139,7 @@ def study(topic):
         from .factcheck import wikipedia_lookup
 
         hit = wikipedia_lookup(topic.strip())
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("sanctuary:study", e)
         return {"topic": topic, "found": False, "error": str(e)[:200]}
     entry = {

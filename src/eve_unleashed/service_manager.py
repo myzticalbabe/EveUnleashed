@@ -96,7 +96,7 @@ class LlamaServerManager:
                 f"http://127.0.0.1:{self.port}/health", timeout=3
             ) as r:
                 return r.status == 200
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("service_manager:healthy", exc)
             return False
 
@@ -113,7 +113,7 @@ class LlamaServerManager:
                         if self._proc is not None and self._proc.poll() is None:
                             pass
                         self._proc = self._spawn(self.exe, self.model, self.port)
-                except Exception:
+                except Exception:  # noqa: BLE001 -- best-effort _supervisor
                     time.sleep(2)
                     continue
             # health check
@@ -138,7 +138,7 @@ class LlamaServerManager:
                 try:
                     self._proc.terminate()
                     self._proc.wait(timeout=10)
-                except Exception:
+                except Exception:  # noqa: BLE001 -- stop: best-effort self._proc.kill()
                     self._proc.kill()
             self._proc = None
 
@@ -184,12 +184,12 @@ class LlamaServerManager:
                 ms = (time.perf_counter() - t0) * 1000
                 self.record_latency(ms)
                 times.append(ms)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 try:
                     from CORE.failure_ledger import note_failure
 
                     note_failure("service_manager:benchmark_inference", exc)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                     note_failure("service_manager:benchmark", exc)
                 times.append(None)
         return times

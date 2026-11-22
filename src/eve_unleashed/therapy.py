@@ -42,11 +42,11 @@ def fallback_response(mood, note):
     """Static grounding response when the swarm is unreachable."""
     mood = (mood or "stressed").strip()
     lines = [
-        "I hear you. Feeling {} makes sense, and you showed up anyway.".format(mood),
+        f"I hear you. Feeling {mood} makes sense, and you showed up anyway.",
         "",
         BREATHING,
         "",
-        "Grounding (pick one step): {}".format(GROUNDING_STEPS[0]),
+        f"Grounding (pick one step): {GROUNDING_STEPS[0]}",
         "",
         "Tiny next action: drink water, unclench your jaw, "
         "look 20 feet away for 20 seconds.",
@@ -54,7 +54,7 @@ def fallback_response(mood, note):
         "I am here with you. What do you need next?",
     ]
     if note:
-        lines.insert(1, "You shared: {}".format(note[:200]))
+        lines.insert(1, f"You shared: {note[:200]}")
     return "\n".join(lines)
 
 

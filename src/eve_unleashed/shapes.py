@@ -41,7 +41,7 @@ class ShapeGraph:
 
     def declare(self, src: str, dst: str, solid: str, note: str = "") -> None:
         if solid not in SHAPES:
-            raise ValueError("unknown solid {!r}; registered: {}".format(solid, SOLIDS))
+            raise ValueError(f"unknown solid {solid!r}; registered: {SOLIDS}")
         self.edges.append({"src": src, "dst": dst, "solid": solid, "note": note})
 
     def audit(self) -> dict:

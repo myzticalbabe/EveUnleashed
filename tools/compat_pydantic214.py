@@ -22,11 +22,11 @@ try:
         def eval_type_backport(value, globalns=None, localns=None, type_params=None):
             try:
                 return _typing._eval_type(value, globalns, localns)
-            except Exception:
+            except Exception:  # noqa: BLE001 -- best-effort eval_type_backport
                 if hasattr(_te, "eval_type_lenient"):
                     return _te.eval_type_lenient(value, globalns, localns)
                 return _te.eval_type(value, globalns, localns)
 
         _te.eval_type_backport = eval_type_backport
-except Exception:
+except Exception:  # noqa: BLE001, S110 -- best-effort eval_type_backport
     pass  # scanner:ignore silent_except_pass -- optional backport patch; absence just means this pydantic has no _eval_type to fix

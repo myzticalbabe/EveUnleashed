@@ -20,7 +20,7 @@ from pathlib import Path
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -41,7 +41,7 @@ def _load_watchlist():
         return []
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         note_failure("watch:load", exc)
         return []
 
@@ -76,7 +76,7 @@ def remove_watch(term):
 
 def _snapshot_path(term):
     safe = "".join(c if c.isalnum() else "_" for c in term)[:40]
-    return _wdir() / ("snap_{}.json".format(safe))
+    return _wdir() / (f"snap_{safe}.json")
 
 
 def check_watches():
@@ -88,7 +88,7 @@ def check_watches():
         term = w["term"]
         try:
             current = search_dockets(term)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("watch:poll", e)
             news.append({"term": term, "error": str(e)[:200]})
             continue
@@ -98,12 +98,12 @@ def check_watches():
         if snap.is_file():
             try:
                 before = json.loads(snap.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("watch:snap", exc)
         new = [i for i in ids if i not in before]
         try:
             snap.write_text(json.dumps(ids, indent=2), encoding="utf-8")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("watch:write", exc)
         news.append(
             {

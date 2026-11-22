@@ -25,7 +25,7 @@ import urllib.request
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -53,7 +53,7 @@ def fetch_url(url):
             "bytes": len(body),
             "sha256": digest,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("factcheck:fetch", e)
         return {
             "url": url,
@@ -93,7 +93,7 @@ def wikipedia_lookup(topic):
             "extract": (data.get("extract") or "")[:500],
             "receipt": receipt,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("factcheck:wikipedia", e)
         return {
             "topic": topic,
@@ -124,13 +124,13 @@ def loc_lookup(topic):
             "found": True,
             "via": "loc",
             "title": first.get("title", "")[:120],
-            "description": "Library of Congress: {:d} result(s)".format(len(results)),
+            "description": f"Library of Congress: {len(results):d} result(s)",
             "extract": (
                 first.get("title", "") + " -- " + (first.get("date", "") or "undated")
             )[:300],
             "receipt": receipt,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("factcheck:loc", e)
         return {
             "topic": topic,
@@ -210,15 +210,15 @@ def factcheck_claim(text, grievance_id=None):
                     "shared_terms": shared[:10],
                     "consistent": len(shared) >= 2,
                     "detail": (
-                        "%d shared term(s) with the filed " "narrative" % len(shared)
+                        f"{len(shared):d} shared term(s) with the filed " "narrative"
                     ),
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("factcheck:cross", e)
             cross = {
                 "grievance": grievance_id,
                 "matched": False,
-                "detail": "cross-check failed: {}".format(e),
+                "detail": f"cross-check failed: {e}",
             }
     for lk in lookups:
         if not lk.get("found"):

@@ -17,7 +17,7 @@ import sys
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -92,9 +92,9 @@ def verify_router_trace(events, spec_names=None):
         for o in report.outcomes:
             name = getattr(o, "spec_name", "spec")
             res = getattr(getattr(o, "result", ""), "value", o.result)
-            parts.append("{}={}".format(name, res))
+            parts.append(f"{name}={res}")
         overall = getattr(getattr(report, "overall", ""), "value", report.overall)
         return overall, "; ".join(parts)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("nsp_check:verify", e)
-        return "nsp-unavailable", "checker failed: {}".format(e)
+        return "nsp-unavailable", f"checker failed: {e}"

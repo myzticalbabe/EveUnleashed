@@ -27,7 +27,7 @@ from pathlib import Path
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -97,17 +97,17 @@ def _probe_gguf(model_path):
             if proc.poll() is not None:
                 return (
                     False,
-                    "sidecar exited during load (exit {})".format(proc.returncode),
+                    f"sidecar exited during load (exit {proc.returncode})",
                     runner,
                 )
             try:
                 with urllib.request.urlopen(
-                    "http://127.0.0.1:%d/health" % port, timeout=5
+                    f"http://127.0.0.1/{port:d}/health", timeout=5
                 ) as r:
                     if r.status == 200:
                         healthy = True
                         break
-            except Exception:
+            except Exception:  # noqa: BLE001 -- _probe_gguf: best-effort time.sleep(2)
                 time.sleep(2)
         if not healthy:
             return False, "sidecar never reached /health in 120 s", runner
@@ -115,7 +115,7 @@ def _probe_gguf(model_path):
             {"prompt": "Reply with the single word: ALIVE", "n_predict": 8}
         ).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:{:d}/completion".format(port),
+            f"http://127.0.0.1:{port:d}/completion",
             data=body,
             headers={"Content-Type": "application/json"},
         )
@@ -123,11 +123,11 @@ def _probe_gguf(model_path):
             out = json.load(r)
         text = (out.get("content") or "").strip()
         if text:
-            return True, "native completion: {}".format(text[:120]), runner
+            return True, f"native completion: {text[:120]}", runner
         return False, "sidecar answered with empty completion", runner
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cradle:gguf-probe", e)
-        return False, "probe failed: {}".format(e), runner
+        return False, f"probe failed: {e}", runner
     finally:
         if proc is not None and proc.poll() is None:
             proc.terminate()
@@ -140,25 +140,23 @@ def _probe_direct(model_path, framework):
             import torch
 
             obj = torch.load(str(model_path), map_location="cpu", weights_only=True)
-            return True, "torch load ok ({})".format(type(obj).__name__)
+            return True, f"torch load ok ({type(obj).__name__})"
         if framework in ("sklearn", "joblib", "pickle"):
             import joblib
 
             obj = joblib.load(str(model_path))
-            return True, "joblib load ok ({})".format(type(obj).__name__)
+            return True, f"joblib load ok ({type(obj).__name__})"
         if framework == "onnx":
             import onnxruntime
 
             sess = onnxruntime.InferenceSession(str(model_path))
-            return True, "onnxruntime session ok ({:d} inputs)".format(
-                len(sess.get_inputs())
-            )
+            return True, f"onnxruntime session ok ({len(sess.get_inputs()):d} inputs)"
     except ImportError as e:
-        return False, "framework not installed: {}".format(e)
-    except Exception as e:
+        return False, f"framework not installed: {e}"
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cradle:direct-probe", e)
-        return False, "load probe failed: {}".format(e)
-    return False, "no probe for framework {}".format(framework)
+        return False, f"load probe failed: {e}"
+    return False, f"no probe for framework {framework}"
 
 
 def list_cradle_models(cradle_dir=None):
@@ -196,7 +194,7 @@ def resolve_model(name, cradle_dir=None):
         if m["name"] == name or Path(m["name"]).stem == name
     ]
     if not cands:
-        raise ValueError("no cradle model {!r} ({})".format(name, cdir))
+        raise ValueError(f"no cradle model {name!r} ({cdir})")
     if len(cands) > 1:
         raise ValueError(
             "ambiguous {!r}: {}".format(name, ", ".join(m["name"] for m in cands))
@@ -229,17 +227,17 @@ def run_gguf(model_path, prompt, max_tokens=256, sidebar_timeout=180):
                 raise RuntimeError("sidecar exited during load")
             try:
                 with urllib.request.urlopen(
-                    "http://127.0.0.1:%d/health" % port, timeout=5
+                    f"http://127.0.0.1/{port:d}/health", timeout=5
                 ) as r:
                     if r.status == 200:
                         break
-            except Exception:
+            except Exception:  # noqa: BLE001 -- run_gguf: best-effort time.sleep(2)
                 time.sleep(2)
         else:
             raise RuntimeError("sidecar never reached /health")
         body = json.dumps({"prompt": prompt, "n_predict": max_tokens}).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:{:d}/completion".format(port),
+            f"http://127.0.0.1:{port:d}/completion",
             data=body,
             headers={"Content-Type": "application/json"},
         )
@@ -276,7 +274,7 @@ def adopt_cradle(cradle_dir=None):
             ok, detail, runner = _probe_gguf(path)
         elif fw in ("torch", "sklearn", "joblib", "pickle", "onnx"):
             ok, detail = _probe_direct(path, fw)
-            runner = "direct:{}".format(fw)
+            runner = f"direct:{fw}"
         else:
             ok, detail, runner = False, "no native runner yet; swarm at infer", None
         nsp_note = "nsp-unavailable"
@@ -301,8 +299,8 @@ def adopt_cradle(cradle_dir=None):
                         "no_dead_provider",
                     ],
                 )
-                nsp_note = "nsp:{} [{}]".format(verdict, vdetail)
-            except Exception as e:
+                nsp_note = f"nsp:{verdict} [{vdetail}]"
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("cradle:nsp", e)
         receipt = {
             "model": path.name,
@@ -318,12 +316,12 @@ def adopt_cradle(cradle_dir=None):
         try:
             rdir.mkdir(parents=True, exist_ok=True)
             with open(
-                rdir / ("eve-cradle-{}.receipt.json".format(path.stem)),
+                rdir / (f"eve-cradle-{path.stem}.receipt.json"),
                 "w",
                 encoding="utf-8",
             ) as f:
                 json.dump(receipt, f, indent=2)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("cradle:receipt", e)
         if ok:
             registry.register(str(path), framework=fw, project="cradle")

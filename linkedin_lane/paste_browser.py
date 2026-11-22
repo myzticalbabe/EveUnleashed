@@ -87,13 +87,13 @@ def paste(state, md_path, headed):
     with open(md_path, encoding="utf-8") as f:
         text = clean(f.read())
     probe = " ".join(text.splitlines()[0:2])[:80]
-    print("paste: {:d} chars; probe={!r}".format(len(text), probe))
+    print(f"paste: {len(text):d} chars; probe={probe!r}")
     calls = []
     with sync_playwright() as p:
         try:
             browser = p.chromium.launch(channel="chrome", headless=not headed)
-        except Exception as e:
-            print("chrome channel failed ({}); trying default".format(str(e)[:120]))
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+            print(f"chrome channel failed ({str(e)[:120]}); trying default")
             browser = p.chromium.launch(headless=not headed)
         ctx = browser.new_context(storage_state=state)
         pg = ctx.new_page()
@@ -125,7 +125,7 @@ def paste(state, md_path, headed):
                 try:
                     if post.is_enabled():
                         break
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 -- paste: best-effort pass
                     pass
                 pg.wait_for_timeout(1000)
             else:
@@ -143,11 +143,7 @@ def paste(state, md_path, headed):
                 or "ugc" in u.lower()
                 or "updates" in u
             ]
-            print(
-                "voyager XHR total={:d}; write-shaped={:d}".format(
-                    len(calls), len(writes)
-                )
-            )
+            print(f"voyager XHR total={len(calls):d}; write-shaped={len(writes):d}")
             for s, u in writes[:10]:
                 print("  ", s, u[:160])
             try:
@@ -155,7 +151,7 @@ def paste(state, md_path, headed):
                     "toasts:",
                     pg.locator("[role=status], .artdeco-toast-item").all_inner_texts(),
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 print("toast read err:", str(e)[:150])
             # F1: author surface, never the feed.
             slug = resolve_slug(pg)
@@ -166,15 +162,15 @@ def paste(state, md_path, headed):
             try:
                 pg.screenshot(path="/tmp/lipaste_fail.png")
                 print("screenshot: /tmp/lipaste_fail.png")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 -- paste: best-effort pass
                 pass
             return 1
-        except Exception as e:
-            print("FAILED: {}".format(str(e)[:300]))
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+            print(f"FAILED: {str(e)[:300]}")
             try:
                 pg.screenshot(path="/tmp/lipaste_fail.png")
                 print("screenshot: /tmp/lipaste_fail.png")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 -- paste: best-effort pass
                 pass
             return 1
         finally:

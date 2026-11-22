@@ -71,7 +71,7 @@ def flags_for(genome, tag):
         flags.append("--nofollow-import-to=numpy")
     if nf in ("z3", "both"):
         flags.append("--nofollow-import-to=z3-solver")
-    flags.append("--output-filename=Gamora-evo-{}.exe".format(tag))
+    flags.append(f"--output-filename=Gamora-evo-{tag}.exe")
     flags.append(os.path.join("Project_GAMORA", "gamora.py"))
     return flags
 
@@ -94,12 +94,12 @@ def build(genome, tag):
         ok = p.returncode == 0
         tail = (p.stderr or "")[-2000:]
     except subprocess.TimeoutExpired:
-        ok, tail = False, "TIMEOUT after {}s".format(BUILD_TIMEOUT_S)
+        ok, tail = False, f"TIMEOUT after {BUILD_TIMEOUT_S}s"
     return ok, time.perf_counter() - t0, tail
 
 
 def measure(tag):
-    exe = os.path.join(OUT_DIR, "Gamora-evo-{}.exe".format(tag))
+    exe = os.path.join(OUT_DIR, f"Gamora-evo-{tag}.exe")
     if not os.path.exists(exe):
         return None
     size = os.path.getsize(exe)
@@ -107,7 +107,7 @@ def measure(tag):
     try:
         p = subprocess.run([exe, "doctor"], capture_output=True, text=True, timeout=300)
     except (subprocess.TimeoutExpired, OSError) as e:
-        return {"feasible": False, "reason": "doctor run failed: {}".format(e)}
+        return {"feasible": False, "reason": f"doctor run failed: {e}"}
     cold = time.perf_counter() - t0
     out = p.stdout or ""
     ready = "doctor: READY" in out
@@ -115,9 +115,7 @@ def measure(tag):
     if p.returncode != 0 or not ready or not audit_ok:
         return {
             "feasible": False,
-            "reason": "doctor rc={} ready={} audit={}".format(
-                p.returncode, ready, audit_ok
-            ),
+            "reason": f"doctor rc={p.returncode} ready={ready} audit={audit_ok}",
             "size_bytes": size,
             "cold_start_s": round(cold, 2),
         }
@@ -136,7 +134,7 @@ def evaluate(genome, tag):
         rec.update(
             {
                 "feasible": False,
-                "reason": "build failed: {}".format(tail[-300:]),
+                "reason": f"build failed: {tail[-300:]}",
                 "fitness": 0.0,
             }
         )
@@ -219,7 +217,7 @@ def run(generations=2, pop_size=3, seed=31616):
     for gen in range(start_gen, start_gen + generations):
         recs = []
         for i, genome in enumerate(pop):
-            tag = "g{:d}m{:d}".format(gen, i)
+            tag = f"g{gen:d}m{i:d}"
             rec = evaluate(genome, tag)
             recs.append(rec)
             save_pop({"generation": gen, "population": recs, "history": history})
@@ -232,8 +230,7 @@ def run(generations=2, pop_size=3, seed=31616):
             var = sum((f - mean) ** 2 for f in feas) / len(feas)
             if var**0.5 < 0.01:
                 print(
-                    "EARLY STOP gen %d: flat gradient stddev=%.4f (E2R-6)"
-                    % (gen, var**0.5),
+                    f"EARLY STOP gen {gen:d}: flat gradient stddev={var**0.5:.4f} (E2R-6)",
                     flush=True,
                 )
                 history.append({"generation": gen, "results": recs, "early_stop": True})

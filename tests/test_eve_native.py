@@ -21,9 +21,7 @@ from eve_unleashed.dodeca_recall import SHAPES
 # exist, and the fallback contract is asserted everywhere instead.
 requires_cython = pytest.mark.skipif(
     native_replay.BACKEND != "cython",
-    reason="compiled replay kernel is not built here ({})".format(
-        native_replay.fallback_reason()
-    ),
+    reason=f"compiled replay kernel is not built here ({native_replay.fallback_reason()})",
 )
 requires_native_forensics = pytest.mark.skipif(
     resilience.ENGINE != "native", reason="compiled forensic kernel is not built here"

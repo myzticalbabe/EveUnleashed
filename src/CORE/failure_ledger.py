@@ -41,7 +41,7 @@ def note_failure(where: str, exc: BaseException | None = None) -> None:
         )
         with _FAILURE_LOCK:
             _FAILURE_NOTES[key] = _FAILURE_NOTES.get(key, 0) + 1
-    except Exception:  # never raise from the recorder
+    except Exception:  # noqa: BLE001 -- note_failure: best-effort _LOST_NOTES[0] += 1
         _LOST_NOTES[0] += 1
 
 

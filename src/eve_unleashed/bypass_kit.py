@@ -32,7 +32,7 @@ measured, not invincible: the kit grows, the walls keep score.
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -119,11 +119,11 @@ def _try_instruction(case):
     except ValueError:
         return "HELD", "refused at parse"
     if op["op"] == "replace" and (not op["old"] or not op["new"]):
-        return "BYPASSED", "empty side survived parse: {!r}".format(op)
+        return "BYPASSED", f"empty side survived parse: {op!r}"
     try:
         _, detail = apply_op("alpha beta\ngamma delta\n", op)
-    except Exception as e:
-        return "HELD", "refused at apply: {}".format(str(e)[:80])
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return "HELD", f"refused at apply: {str(e)[:80]}"
     # A multi-word new side ("replace a with b with c" -> new "b with c")
     # is a legitimate greedy parse, not a smuggle: the whole tail becomes
     # the replacement, and the log shows it. Only an empty side surviving
@@ -136,12 +136,12 @@ def _try_path(case):
 
     try:
         read_document(case)
-        return "BYPASSED", "opened without refusal: {!r}".format(case[:60])
+        return "BYPASSED", f"opened without refusal: {case[:60]!r}"
     except ValueError:
         return "HELD", "refused: no such document or bad format"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("bypass_kit:path", e)
-        return "HELD", "refused by OS: {}".format(str(e)[:80])
+        return "HELD", f"refused by OS: {str(e)[:80]}"
 
 
 def _try_oversized(case):
@@ -156,9 +156,9 @@ def _try_oversized(case):
             if ok
             else ("BYPASSED", "bulk broke outline")
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("bypass_kit:bulk", e)
-        return "HELD", "refused: {}".format(str(e)[:80])
+        return "HELD", f"refused: {str(e)[:80]}"
 
 
 def _try_unicode(case):
@@ -168,15 +168,15 @@ def _try_unicode(case):
 def _try_spoof(case):
     from .live_morph import apply_op
 
-    doc = "{}\nbody line here\n## Next\nmore text\n".format(case)
+    doc = f"{case}\nbody line here\n## Next\nmore text\n"
     try:
         _, detail = apply_op(
             doc, {"op": "case", "upper": True, "section": "Inspection", "raw": case}
         )
-        return "HELD", "section span contained: {}".format(detail[:80])
-    except Exception as e:
+        return "HELD", f"section span contained: {detail[:80]}"
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("bypass_kit:spoof", e)
-        return "HELD", "refused: {}".format(str(e)[:80])
+        return "HELD", f"refused: {str(e)[:80]}"
 
 
 _SUITES = (
@@ -195,9 +195,9 @@ def run_suite():
         for case in cases_fn():
             try:
                 verdict, detail = try_fn(case)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("bypass_kit:case", e)
-                verdict, detail = "HELD", "harness refused: {}".format(str(e)[:80])
+                verdict, detail = "HELD", f"harness refused: {str(e)[:80]}"
             results.append(
                 {
                     "suite": suite_name,

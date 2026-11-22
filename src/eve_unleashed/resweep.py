@@ -29,7 +29,7 @@ def sweep(manifest_path: str = "state/honey/honey.json") -> dict:
     try:
         man = json.load(open(manifest_path, encoding="utf-8"))
     except (OSError, ValueError) as e:
-        bad = {"pass": False, "detail": "UNREADABLE {}".format(e)}
+        bad = {"pass": False, "detail": f"UNREADABLE {e}"}
         chains = {
             k: bad
             for k in (
@@ -66,36 +66,26 @@ def sweep(manifest_path: str = "state/honey/honey.json") -> dict:
             ),
         }
     except OSError as e:
-        chains["fixture_pin"] = {"pass": False, "detail": "UNREADABLE {}".format(e)}
+        chains["fixture_pin"] = {"pass": False, "detail": f"UNREADABLE {e}"}
 
     stale = []
     for solid in SHAPES:
         rec = man.get("resilience", {}).get("reports", {}).get(solid)
         if rec is None:
-            stale.append("{}:missing-column".format(solid))
+            stale.append(f"{solid}:missing-column")
             continue
         live_r = regime_report(solid)
         for f in INT_FIELDS:
             if rec.get(f) != live_r[f]:
-                stale.append(
-                    "{}.{} recorded={!r} live={!r}".format(
-                        solid, f, rec.get(f), live_r[f]
-                    )
-                )
+                stale.append(f"{solid}.{f} recorded={rec.get(f)!r} live={live_r[f]!r}")
         for f in FLOAT_FIELDS:
             if not math.isclose(rec.get(f, float("nan")), live_r[f], rel_tol=1e-9):
-                stale.append(
-                    "{}.{} recorded={!r} live={!r}".format(
-                        solid, f, rec.get(f), live_r[f]
-                    )
-                )
+                stale.append(f"{solid}.{f} recorded={rec.get(f)!r} live={live_r[f]!r}")
         ls, rs = live_r["survival"], rec.get("survival", {})
         for f in ("fault_diameter", "disconnects"):
             if rs.get(f) != ls[f]:
                 stale.append(
-                    "{}.survival.{} recorded={!r} live={!r}".format(
-                        solid, f, rs.get(f), ls[f]
-                    )
+                    f"{solid}.survival.{f} recorded={rs.get(f)!r} live={ls[f]!r}"
                 )
         if not math.isclose(
             rs.get("fault_stretch", float("nan")), ls["fault_stretch"], rel_tol=1e-9
@@ -107,7 +97,7 @@ def sweep(manifest_path: str = "state/honey/honey.json") -> dict:
             )
     chains["resilience_numbers"] = {
         "pass": not stale,
-        "detail": ";".join(stale) if stale else "7/7 match (engine={})".format(ENGINE),
+        "detail": ";".join(stale) if stale else f"7/7 match (engine={ENGINE})",
     }
 
     g = ShapeGraph()

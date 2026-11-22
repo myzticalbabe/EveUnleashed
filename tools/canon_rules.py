@@ -97,18 +97,18 @@ def rule_problem(
     if block is None:
         if text and ("RULE " + rule_id) in text:
             return (
-                "RULE {} is named in MANDATES.md but has no section: the corpus "
+                f"RULE {rule_id} is named in MANDATES.md but has no section: the corpus "
                 "cites a rule that was repealed or never written, and a "
-                "`Related:` pointer is not a body".format(rule_id)
+                "`Related:` pointer is not a body"
             )
         return (
-            "RULE {} is not in MANDATES.md; the corpus narrates canon, it does "
-            "not legislate".format(rule_id)
+            f"RULE {rule_id} is not in MANDATES.md; the corpus narrates canon, it does "
+            "not legislate"
         )
     if block["chars"] < MIN_BODY_CHARS:
         return (
-            "RULE %s has a heading at MANDATES.md:%d but no body under it; a law "
-            "that states nothing cannot be kept" % (rule_id, block["line"])
+            "RULE {} has a heading at MANDATES.md:{:d} but no body under it; a law "
+            "that states nothing cannot be kept".format(rule_id, block["line"])
         )
     return None
 
@@ -131,20 +131,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.rule:
         cited = " ".join(args.rule)
         problem = rule_problem(cited, blocks, text)
-        print(
-            "lands: {}".format(cited)
-            if problem is None
-            else "does not land: {}".format(problem)
-        )
+        print(f"lands: {cited}" if problem is None else f"does not land: {problem}")
         return 0 if problem is None else 1
     for rule_id in ids(blocks):
         block = blocks[rule_id]
         marker = "" if block["chars"] >= MIN_BODY_CHARS else "  [HEADING ONLY]"
         print(
-            "RULE %-8s %5d chars  line %-5d %s%s"
-            % (rule_id, block["chars"], block["line"], block["heading"][:60], marker)
+            "RULE {:<8} {:5d} chars  line {:<5d} {}{}".format(
+                rule_id, block["chars"], block["line"], block["heading"][:60], marker
+            )
         )
-    print("\n{:d} rule(s) defined".format(len(blocks)))
+    print(f"\n{len(blocks):d} rule(s) defined")
     return 0
 
 

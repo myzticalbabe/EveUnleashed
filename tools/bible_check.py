@@ -217,11 +217,11 @@ class CorpusError(Exception):
 
 def load(path: Path = CORPUS) -> dict:
     if not path.exists():
-        raise CorpusError("{} is absent; there is no corpus to check".format(path))
+        raise CorpusError(f"{path} is absent; there is no corpus to check")
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise CorpusError("{} is not valid JSON: {}".format(path.name, exc)) from exc
+        raise CorpusError(f"{path.name} is not valid JSON: {exc}") from exc
 
 
 def _paths_in(text: str) -> list[str]:
@@ -238,15 +238,13 @@ def _provenance_problems(source, where: str, repo: Path) -> list[str]:
     """
     if not isinstance(source, str) or not source.strip():
         return [
-            "{}: a number needs `source`: the command or path that produced it".format(
-                where
-            )
+            f"{where}: a number needs `source`: the command or path that produced it"
         ]
     tokens = _paths_in(source)
     if not tokens:
         return [
-            "{}: source names no repository path ({!r}); a figure with no "
-            "re-runnable command is a claim, not evidence".format(where, source)
+            f"{where}: source names no repository path ({source!r}); a figure with no "
+            "re-runnable command is a claim, not evidence"
         ]
     problems = []
     for token in tokens:
@@ -254,29 +252,27 @@ def _provenance_problems(source, where: str, repo: Path) -> list[str]:
         if head == "logs":
             continue
         if not (Path(repo) / token.split("#", 1)[0]).exists():
-            problems.append(
-                "{}: source path does not exist here: {}".format(where, token)
-            )
+            problems.append(f"{where}: source path does not exist here: {token}")
     return problems
 
 
 def _text_problems(text, where: str) -> list[str]:
     problems: list[str] = []
     if not isinstance(text, str) or not text.strip():
-        return ["{}: text is empty".format(where)]
+        return [f"{where}: text is empty"]
     if not re.search(r"[A-Za-z]", text):
-        problems.append("{}: text carries no words".format(where))
+        problems.append(f"{where}: text carries no words")
     lowered = text.lower()
     for token in REFUSED_SUBSTRINGS:
         if token.lower() in lowered:
             problems.append(
-                "{}: refused substring {!r} -- methodology ships, people "
-                "do not".format(where, token)
+                f"{where}: refused substring {token!r} -- methodology ships, people "
+                "do not"
             )
     if EMAIL_RE.search(text):
-        problems.append("{}: an email address is refused".format(where))
+        problems.append(f"{where}: an email address is refused")
     if PHONE_RE.search(text):
-        problems.append("{}: a phone number is refused".format(where))
+        problems.append(f"{where}: a phone number is refused")
     return problems
 
 
@@ -285,22 +281,20 @@ def _prose_block_problems(paragraphs, sources, where: str, repo: Path) -> list[s
     for free: the moment it carries a digit, the block must name its sources."""
     problems: list[str] = []
     if not isinstance(paragraphs, list) or not paragraphs:
-        return ["{}: paragraphs must be a non-empty list".format(where)]
+        return [f"{where}: paragraphs must be a non-empty list"]
     carries_digit = False
     for index, paragraph in enumerate(paragraphs):
-        problems.extend(
-            _text_problems(paragraph, "{} paragraph {:d}".format(where, index + 1))
-        )
+        problems.extend(_text_problems(paragraph, f"{where} paragraph {index + 1:d}"))
         if isinstance(paragraph, str) and DIGIT_RE.search(paragraph):
             carries_digit = True
     if sources is not None and not isinstance(sources, list):
-        problems.append("{}: sources must be a list".format(where))
+        problems.append(f"{where}: sources must be a list")
         sources = []
     if carries_digit:
         if not sources:
             problems.append(
-                "{}: a paragraph carries a figure, so the block must name "
-                "`sources` -- or spell the number out".format(where)
+                f"{where}: a paragraph carries a figure, so the block must name "
+                "`sources` -- or spell the number out"
             )
         for source in sources or []:
             problems.extend(_provenance_problems(source, where, repo))
@@ -315,20 +309,18 @@ def _statute_problems(
     canon_text: str | None = None,
 ) -> list[str]:
     if not isinstance(statute, dict):
-        return ["{}: statute must be an object with `rule` and `check`".format(where)]
+        return [f"{where}: statute must be an object with `rule` and `check`"]
     problems: list[str] = []
     unknown = set(statute) - STATUTE_KEYS
     if unknown:
-        problems.append("{}: unknown statute key(s) {}".format(where, sorted(unknown)))
+        problems.append(f"{where}: unknown statute key(s) {sorted(unknown)}")
     rule = statute.get("rule")
     if not isinstance(rule, str) or not RULE_RE.search(rule):
-        problems.append(
-            '{}: statute.rule must name a RULE (e.g. "RULE 0B")'.format(where)
-        )
+        problems.append(f'{where}: statute.rule must name a RULE (e.g. "RULE 0B")')
     elif canon is None:
         problems.append(
-            "{}: MANDATES.md is unreadable -- the rule {!r} cannot be "
-            "verified against canon".format(where, rule)
+            f"{where}: MANDATES.md is unreadable -- the rule {rule!r} cannot be "
+            "verified against canon"
         )
     else:
         # A heading with a body, not a mention anywhere in the file: `RULE 0B-D`
@@ -336,24 +328,22 @@ def _statute_problems(
         # was reading as a law.
         defect = canon_rules.rule_problem(rule, canon, canon_text)
         if defect:
-            problems.append("{}: {}".format(where, defect))
+            problems.append(f"{where}: {defect}")
     check = statute.get("check")
     if not isinstance(check, str) or not check.strip():
         problems.append(
-            "{}: statute.check is empty -- a law with nothing executing "
-            "it is a proverb, not a statute".format(where)
+            f"{where}: statute.check is empty -- a law with nothing executing "
+            "it is a proverb, not a statute"
         )
     else:
         tokens = _paths_in(check)
         if not tokens:
             problems.append(
-                "{}: statute.check names no repository path ({!r})".format(where, check)
+                f"{where}: statute.check names no repository path ({check!r})"
             )
         for token in tokens:
             if not (Path(repo) / token.split("#", 1)[0]).exists():
-                problems.append(
-                    "{}: statute.check does not exist here: {}".format(where, token)
-                )
+                problems.append(f"{where}: statute.check does not exist here: {token}")
     return problems
 
 
@@ -366,17 +356,17 @@ def _resolve_citation(
         book_id, chapter_text, verse_text = match.groups()
         chapter, verse = int(chapter_text), int(verse_text)
         if book_id not in index:
-            return "cites unknown book {!r}".format(book_id)
+            return f"cites unknown book {book_id!r}"
         if chapter not in index[book_id] or verse not in index[book_id][chapter]:
-            return "cites {}, which does not exist".format(citation)
+            return f"cites {citation}, which does not exist"
         return None
     if PATH_RE.fullmatch(citation):
         if (repo / citation).exists():
             return None
-        return "cites {}, which does not exist in this repository".format(citation)
+        return f"cites {citation}, which does not exist in this repository"
     return (
-        'citation {!r} must read "<book> <chapter>:<verse>" or name a '
-        "repository path".format(citation)
+        f'citation {citation!r} must read "<book> <chapter>:<verse>" or name a '
+        "repository path"
     )
 
 
@@ -397,9 +387,7 @@ def declared_domains(repo: Path = REPO) -> set | None:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
     except SyntaxError as exc:
-        raise CorpusError(
-            "{} could not be parsed: {}".format(DOMAINS_MODULE, exc)
-        ) from exc
+        raise CorpusError(f"{DOMAINS_MODULE} could not be parsed: {exc}") from exc
     for node in tree.body:
         # Both forms are in use in this tree: a bare assignment and an annotated
         # one (`DOMAINS: Dict[str, ...] = {`). Reading only the first reported
@@ -431,9 +419,7 @@ def harvest_ids(repo: Path = REPO) -> set | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise CorpusError(
-            "docs/bible/harvest.json could not be read: {}".format(exc)
-        ) from exc
+        raise CorpusError(f"docs/bible/harvest.json could not be read: {exc}") from exc
     return {record.get("id") for record in data.get("records", []) if record.get("id")}
 
 
@@ -445,53 +431,51 @@ def _practice_problems(practice, where: str, repo: Path, ids: set | None) -> lis
     is somebody's impression, and it belongs in a footnote, not in a canon.
     """
     if not isinstance(practice, dict):
-        return ["{}: practice must be an object".format(where)]
+        return [f"{where}: practice must be an object"]
     problems: list[str] = []
     unknown = set(practice) - PRACTICE_KEYS
     if unknown:
-        problems.append("{}: unknown practice key(s) {}".format(where, sorted(unknown)))
+        problems.append(f"{where}: unknown practice key(s) {sorted(unknown)}")
     for key in ("symptom", "cause", "detection", "remedy"):
         value = practice.get(key)
-        problems.extend(_text_problems(value, "{} practice.{}".format(where, key)))
+        problems.extend(_text_problems(value, f"{where} practice.{key}"))
         if isinstance(value, str) and DIGIT_RE.search(value):
             problems.append(
-                "{}: practice.{} carries a figure; a practice states the "
+                f"{where}: practice.{key} carries a figure; a practice states the "
                 "shape of a failure, and the record that measured it is "
-                "cited in `evidence`".format(where, key)
+                "cited in `evidence`"
             )
     detection = practice.get("detection")
     if isinstance(detection, str) and detection.strip():
         tokens = _paths_in(detection)
         if not tokens:
             problems.append(
-                "{}: practice.detection names no repository path -- "
-                "what command would show this is happening?".format(where)
+                f"{where}: practice.detection names no repository path -- "
+                "what command would show this is happening?"
             )
         for token in tokens:
             if not (Path(repo) / token.split("#", 1)[0]).exists():
                 problems.append(
-                    "{}: practice.detection does not exist here: {}".format(
-                        where, token
-                    )
+                    f"{where}: practice.detection does not exist here: {token}"
                 )
     evidence = practice.get("evidence")
     if not isinstance(evidence, list) or len(set(evidence)) < MIN_EVIDENCE:
         problems.append(
-            "%s: practice.evidence must cite at least %d harvest records; "
-            "a rule distilled from fewer is an anecdote" % (where, MIN_EVIDENCE)
+            f"{where}: practice.evidence must cite at least {MIN_EVIDENCE:d} harvest records; "
+            "a rule distilled from fewer is an anecdote"
         )
         evidence = evidence if isinstance(evidence, list) else []
     if ids is None:
         problems.append(
-            "{}: docs/bible/harvest.json is absent, so no citation can "
-            "be checked -- run tools/bible_harvest.py --write".format(where)
+            f"{where}: docs/bible/harvest.json is absent, so no citation can "
+            "be checked -- run tools/bible_harvest.py --write"
         )
     else:
         for record_id in evidence:
             if record_id not in ids:
                 problems.append(
-                    "{}: practice.evidence cites {!r}, which the harvest "
-                    "ledger does not contain".format(where, record_id)
+                    f"{where}: practice.evidence cites {record_id!r}, which the harvest "
+                    "ledger does not contain"
                 )
     return problems
 
@@ -523,41 +507,39 @@ def _config_problems(configs, repo: Path) -> tuple[list[str], list[str]]:
     warnings: list[str] = []
     seen = set()
     for index, config in enumerate(configs):
-        where = "configs[{:d}]".format(index)
+        where = f"configs[{index:d}]"
         if not isinstance(config, dict):
-            problems.append("{}: must be an object".format(where))
+            problems.append(f"{where}: must be an object")
             continue
         cid = config.get("id")
         if not isinstance(cid, str) or not re.match(r"^[a-z0-9][a-z0-9-]*$", cid or ""):
-            problems.append("{}: id must be a lowercase slug".format(where))
+            problems.append(f"{where}: id must be a lowercase slug")
         elif cid in seen:
-            problems.append("{}: duplicate id {!r}".format(where, cid))
+            problems.append(f"{where}: duplicate id {cid!r}")
         else:
             seen.add(cid)
         if isinstance(cid, str) and cid:
-            where = "configs[{}]".format(cid)
+            where = f"configs[{cid}]"
 
         if (
             not isinstance(config.get("name"), str)
             or not config.get("name", "").strip()
         ):
-            problems.append(
-                "{}: name is empty -- say what the setting is for".format(where)
-            )
+            problems.append(f"{where}: name is empty -- say what the setting is for")
         scope = config.get("scope", "repo")
         if scope not in CONFIG_SCOPES:
-            problems.append("{}: scope must be one of {}".format(where, CONFIG_SCOPES))
+            problems.append(f"{where}: scope must be one of {CONFIG_SCOPES}")
         kind = config.get("kind")
         if kind not in CONFIG_KINDS:
-            problems.append("{}: kind must be one of {}".format(where, CONFIG_KINDS))
+            problems.append(f"{where}: kind must be one of {CONFIG_KINDS}")
             continue
 
         detail = config.get("detail", "")
         for text in (config.get("governs"), config.get("remedy")):
             if not isinstance(text, str) or not text.strip():
                 problems.append(
-                    "{}: `governs` and `remedy` are both required -- a "
-                    "setting with no consequence and no repair is trivia".format(where)
+                    f"{where}: `governs` and `remedy` are both required -- a "
+                    "setting with no consequence and no repair is trivia"
                 )
                 break
         remedy_problems = _provenance_problems(
@@ -571,20 +553,18 @@ def _config_problems(configs, repo: Path) -> tuple[list[str], list[str]]:
         for mirror in config.get("mirrors") or []:
             files.append((mirror, True))
         if not files and kind != "path":
-            problems.append("{}: names no `file`".format(where))
+            problems.append(f"{where}: names no `file`")
 
         value = config.get("value")
         if kind in ("text", "json") and value is None:
-            problems.append("{}: a {} config needs `value`".format(where, kind))
+            problems.append(f"{where}: a {kind} config needs `value`")
 
         if kind == "path":
             # A path config names a thing, not a line in a file: the interpreter,
             # a directory, a store. Checked once, outside the file loop.
             text = str(value)
             if not ((Path(repo) / text).exists() or Path(text).exists()):
-                message = "{}: declared path does not exist here: {}".format(
-                    where, text
-                )
+                message = f"{where}: declared path does not exist here: {text}"
                 if scope == "host":
                     warnings.append("HOST-DIFFERS " + message)
                 else:
@@ -594,14 +574,14 @@ def _config_problems(configs, repo: Path) -> tuple[list[str], list[str]]:
         for rel, is_mirror in files:
             rel = str(rel)
             path = Path(repo) / rel
-            label = "{}.mirrors[{}]".format(where, rel) if is_mirror else where
+            label = f"{where}.mirrors[{rel}]" if is_mirror else where
             if not path.exists():
-                problems.append("{}: file does not exist: {}".format(label, rel))
+                problems.append(f"{label}: file does not exist: {rel}")
                 continue
             try:
                 raw = path.read_text(encoding="utf-8", errors="replace")
             except OSError as exc:
-                problems.append("{}: unreadable: {} ({})".format(label, rel, exc))
+                problems.append(f"{label}: unreadable: {rel} ({exc})")
                 continue
 
             if kind == "text":
@@ -613,15 +593,15 @@ def _config_problems(configs, repo: Path) -> tuple[list[str], list[str]]:
                     )
                     if not hit:
                         message = (
-                            "{}: no line in {} carries {!r} with {!r} -- the value "
-                            "drifted from the corpus".format(label, rel, needle, anchor)
+                            f"{label}: no line in {rel} carries {needle!r} with {anchor!r} -- the value "
+                            "drifted from the corpus"
                         )
                     else:
                         continue
                 elif needle in raw:
                     continue
                 else:
-                    message = "{}: {!r} not found in {}".format(label, needle, rel)
+                    message = f"{label}: {needle!r} not found in {rel}"
                 if scope == "host":
                     warnings.append("HOST-DIFFERS " + message)
                 else:
@@ -630,11 +610,11 @@ def _config_problems(configs, repo: Path) -> tuple[list[str], list[str]]:
                 try:
                     document = json.loads(raw)
                 except json.JSONDecodeError as exc:
-                    problems.append("{}: {} is not JSON ({})".format(label, rel, exc))
+                    problems.append(f"{label}: {rel} is not JSON ({exc})")
                     continue
                 key = config.get("key")
                 if not isinstance(key, str) or not key.strip():
-                    problems.append("{}: a json config needs `key`".format(label))
+                    problems.append(f"{label}: a json config needs `key`")
                     continue
                 node = document
                 for part in key.split("."):
@@ -644,12 +624,10 @@ def _config_problems(configs, repo: Path) -> tuple[list[str], list[str]]:
                         node = None
                         break
                 if node is None:
-                    problems.append("{}: {} has no key {!r}".format(label, rel, key))
+                    problems.append(f"{label}: {rel} has no key {key!r}")
                 elif not _same_scalar(node, value):
                     problems.append(
-                        "{}: {}[{}] is {!r}, the corpus says {!r}".format(
-                            label, rel, key, node, value
-                        )
+                        f"{label}: {rel}[{key}] is {node!r}, the corpus says {value!r}"
                     )
 
         if detail:
@@ -695,7 +673,7 @@ def validate(data: dict, repo: Path = REPO) -> dict:
 
     unknown = set(data) - TOP_KEYS
     if unknown:
-        problems.append("unknown top-level key(s) {}".format(sorted(unknown)))
+        problems.append(f"unknown top-level key(s) {sorted(unknown)}")
     if data.get("schema") != SCHEMA:
         problems.append(
             "schema must be {!r}, found {!r}".format(SCHEMA, data.get("schema"))
@@ -704,7 +682,7 @@ def validate(data: dict, repo: Path = REPO) -> dict:
         problems.append("title is empty")
     status = data.get("status")
     if status not in STATUSES:
-        problems.append("status must be one of {}".format(STATUSES))
+        problems.append(f"status must be one of {STATUSES}")
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(data.get("updated", ""))):
         problems.append("updated must be YYYY-MM-DD")
 
@@ -714,16 +692,16 @@ def validate(data: dict, repo: Path = REPO) -> dict:
         problems.append("limits must be an object")
     unknown = set(limits) - set(CEILINGS)
     if unknown:
-        problems.append("unknown limits key(s) {}".format(sorted(unknown)))
+        problems.append(f"unknown limits key(s) {sorted(unknown)}")
     for name, ceiling in sorted(CEILINGS.items()):
         value = limits.get(name, DEFAULT_LIMITS[name])
         if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-            problems.append("limits.{} must be a positive integer".format(name))
+            problems.append(f"limits.{name} must be a positive integer")
             limits[name] = DEFAULT_LIMITS[name]
         elif value > ceiling:
             problems.append(
-                "limits.%s may not exceed %d; a cap the author can raise "
-                "is not a cap" % (name, ceiling)
+                f"limits.{name} may not exceed {ceiling:d}; a cap the author can raise "
+                "is not a cap"
             )
             limits[name] = ceiling
 
@@ -753,30 +731,30 @@ def validate(data: dict, repo: Path = REPO) -> dict:
         else:
             unknown = set(edition) - EDITION_KEYS
             if unknown:
-                problems.append("unknown edition key(s) {}".format(sorted(unknown)))
+                problems.append(f"unknown edition key(s) {sorted(unknown)}")
             for key in sorted(EDITION_KEYS):
                 if (
                     not isinstance(edition.get(key), str)
                     or not edition.get(key, "").strip()
                 ):
-                    problems.append("edition.{} is empty".format(key))
+                    problems.append(f"edition.{key} is empty")
 
     glossary = data.get("glossary", [])
     if not isinstance(glossary, list):
         problems.append("glossary must be a list")
         glossary = []
     for index, entry in enumerate(glossary):
-        where = "glossary[{:d}]".format(index)
+        where = f"glossary[{index:d}]"
         if not isinstance(entry, dict):
-            problems.append("{}: must be an object".format(where))
+            problems.append(f"{where}: must be an object")
             continue
         unknown = set(entry) - GLOSSARY_KEYS
         if unknown:
-            problems.append("{}: unknown key(s) {}".format(where, sorted(unknown)))
+            problems.append(f"{where}: unknown key(s) {sorted(unknown)}")
         for key in ("term", "gloss"):
             if not isinstance(entry.get(key), str) or not entry.get(key, "").strip():
-                problems.append("{}: {} is empty".format(where, key))
-        problems.extend(_text_problems(entry.get("gloss"), "{} gloss".format(where)))
+                problems.append(f"{where}: {key} is empty")
+        problems.extend(_text_problems(entry.get("gloss"), f"{where} gloss"))
         if isinstance(entry.get("gloss"), str) and DIGIT_RE.search(entry["gloss"]):
             problems.extend(_provenance_problems(entry.get("source"), where, repo))
 
@@ -786,8 +764,9 @@ def validate(data: dict, repo: Path = REPO) -> dict:
         books = []
     if isinstance(limits.get("max_books"), int) and len(books) > limits["max_books"]:
         problems.append(
-            "%d books declared, limit is %d -- retire one to add one"
-            % (len(books), limits["max_books"])
+            "{:d} books declared, limit is {:d} -- retire one to add one".format(
+                len(books), limits["max_books"]
+            )
         )
 
     index: dict[str, dict[int, dict[int, dict]]] = {}
@@ -795,34 +774,34 @@ def validate(data: dict, repo: Path = REPO) -> dict:
     seen_text: dict[str, list[str]] = {}
 
     for position, book in enumerate(books):
-        where = "books[{:d}]".format(position)
+        where = f"books[{position:d}]"
         if not isinstance(book, dict):
-            problems.append("{}: must be an object".format(where))
+            problems.append(f"{where}: must be an object")
             continue
         unknown = set(book) - BOOK_KEYS
         if unknown:
-            problems.append("{}: unknown key(s) {}".format(where, sorted(unknown)))
+            problems.append(f"{where}: unknown key(s) {sorted(unknown)}")
         identifier = book.get("id")
         if not isinstance(identifier, str) or not re.match(
             r"^[a-z][a-z0-9_]*$", identifier
         ):
-            problems.append("{}: id must be lower_snake_case".format(where))
+            problems.append(f"{where}: id must be lower_snake_case")
             continue
-        where = "book {!r}".format(identifier)
+        where = f"book {identifier!r}"
         if identifier in index:
-            problems.append("{}: duplicate book id".format(where))
+            problems.append(f"{where}: duplicate book id")
             continue
         for key in ("name", "subtitle"):
             if not isinstance(book.get(key), str) or not book.get(key, "").strip():
-                problems.append("{}: {} is empty".format(where, key))
+                problems.append(f"{where}: {key} is empty")
         if book.get("genre") not in GENRES:
-            problems.append("{}: genre must be one of {}".format(where, GENRES))
+            problems.append(f"{where}: genre must be one of {GENRES}")
         if "domain" in book:
             domain = book["domain"]
             if domains is None:
                 problems.append(
-                    "{}: {} is unreadable, so the declared domain {!r} "
-                    "cannot be verified".format(where, DOMAINS_MODULE, domain)
+                    f"{where}: {DOMAINS_MODULE} is unreadable, so the declared domain {domain!r} "
+                    "cannot be verified"
                 )
             elif domain not in domains:
                 problems.append(
@@ -832,83 +811,81 @@ def validate(data: dict, repo: Path = REPO) -> dict:
                 )
         if status == "complete" and "introduction" not in book:
             problems.append(
-                "{}: a complete canon gives every book an introduction".format(where)
+                f"{where}: a complete canon gives every book an introduction"
             )
         introduction = book.get("introduction")
         if introduction is not None:
             if not isinstance(introduction, dict):
-                problems.append("{}: introduction must be an object".format(where))
+                problems.append(f"{where}: introduction must be an object")
             else:
                 unknown = set(introduction) - INTRODUCTION_KEYS
                 if unknown:
                     problems.append(
-                        "{}: unknown introduction key(s) {}".format(
-                            where, sorted(unknown)
-                        )
+                        f"{where}: unknown introduction key(s) {sorted(unknown)}"
                     )
                 problems.extend(
                     _prose_block_problems(
                         introduction.get("paragraphs"),
                         introduction.get("sources", []),
-                        "{} introduction".format(where),
+                        f"{where} introduction",
                         repo,
                     )
                 )
         chapters = book.get("chapters")
         if not isinstance(chapters, list) or not chapters:
-            problems.append("{}: chapters must be a non-empty list".format(where))
+            problems.append(f"{where}: chapters must be a non-empty list")
             continue
         if (
             isinstance(limits.get("max_chapters_per_book"), int)
             and len(chapters) > limits["max_chapters_per_book"]
         ):
             problems.append(
-                "%s: %d chapters, limit is %d"
-                % (where, len(chapters), limits["max_chapters_per_book"])
+                "{}: {:d} chapters, limit is {:d}".format(
+                    where, len(chapters), limits["max_chapters_per_book"]
+                )
             )
         index[identifier] = {}
         for chapter_position, chapter in enumerate(chapters):
-            cwhere = "{} chapter {:d}".format(where, chapter_position + 1)
+            cwhere = f"{where} chapter {chapter_position + 1:d}"
             if not isinstance(chapter, dict):
-                problems.append("{}: must be an object".format(cwhere))
+                problems.append(f"{cwhere}: must be an object")
                 continue
             unknown = set(chapter) - CHAPTER_KEYS
             if unknown:
-                problems.append("{}: unknown key(s) {}".format(cwhere, sorted(unknown)))
+                problems.append(f"{cwhere}: unknown key(s) {sorted(unknown)}")
             number = chapter.get("number")
             if number != chapter_position + 1:
                 problems.append(
-                    "%s: chapter numbering must be contiguous from 1; "
-                    "found %r at position %d" % (cwhere, number, chapter_position + 1)
+                    f"{cwhere}: chapter numbering must be contiguous from 1; "
+                    f"found {number!r} at position {chapter_position + 1:d}"
                 )
                 continue
             verses = chapter.get("verses")
             if not isinstance(verses, list) or not verses:
-                problems.append("{}: verses must be a non-empty list".format(cwhere))
+                problems.append(f"{cwhere}: verses must be a non-empty list")
                 continue
             if (
                 isinstance(limits.get("max_verses_per_chapter"), int)
                 and len(verses) > limits["max_verses_per_chapter"]
             ):
                 problems.append(
-                    "%s: %d verses, limit is %d"
-                    % (cwhere, len(verses), limits["max_verses_per_chapter"])
+                    "{}: {:d} verses, limit is {:d}".format(
+                        cwhere, len(verses), limits["max_verses_per_chapter"]
+                    )
                 )
             sections = chapter.get("sections", [])
             if not isinstance(sections, list):
-                problems.append("{}: sections must be a list".format(cwhere))
+                problems.append(f"{cwhere}: sections must be a list")
                 sections = []
             previous = 0
             for section_position, section in enumerate(sections):
-                swhere = "{} section {:d}".format(cwhere, section_position + 1)
+                swhere = f"{cwhere} section {section_position + 1:d}"
                 if not isinstance(section, dict):
-                    problems.append("{}: must be an object".format(swhere))
+                    problems.append(f"{swhere}: must be an object")
                     continue
                 unknown = set(section) - SECTION_KEYS
                 if unknown:
-                    problems.append(
-                        "{}: unknown key(s) {}".format(swhere, sorted(unknown))
-                    )
+                    problems.append(f"{swhere}: unknown key(s) {sorted(unknown)}")
                 start = section.get("before_verse")
                 if (
                     not isinstance(start, int)
@@ -916,44 +893,39 @@ def validate(data: dict, repo: Path = REPO) -> dict:
                     or not 1 <= start <= len(verses)
                 ):
                     problems.append(
-                        "%s: before_verse must name a verse in this chapter "
-                        "(1..%d)" % (swhere, len(verses))
+                        f"{swhere}: before_verse must name a verse in this chapter "
+                        f"(1..{len(verses):d})"
                     )
                 elif start <= previous:
                     problems.append(
-                        "%s: sections must ascend; %d follows %d"
-                        % (swhere, start, previous)
+                        f"{swhere}: sections must ascend; {start:d} follows {previous:d}"
                     )
                 else:
                     previous = start
                 heading = section.get("heading")
-                problems.extend(_text_problems(heading, "{} heading".format(swhere)))
+                problems.extend(_text_problems(heading, f"{swhere} heading"))
                 if isinstance(heading, str) and DIGIT_RE.search(heading):
                     problems.append(
-                        "{}: a heading is a label, not a claim -- a figure "
+                        f"{swhere}: a heading is a label, not a claim -- a figure "
                         "belongs in a verse, where it must name its "
-                        "command".format(swhere)
+                        "command"
                     )
             if status == "complete" and (
                 not sections or sections[0].get("before_verse") != 1
             ):
                 problems.append(
-                    "{}: a complete canon opens every chapter with a "
-                    "section heading at verse 1".format(cwhere)
+                    f"{cwhere}: a complete canon opens every chapter with a "
+                    "section heading at verse 1"
                 )
             index[identifier][number] = {}
             for verse_position, verse in enumerate(verses):
-                vwhere = "{} chapter {:d} verse {:d}".format(
-                    where, number, verse_position + 1
-                )
+                vwhere = f"{where} chapter {number:d} verse {verse_position + 1:d}"
                 if not isinstance(verse, dict):
-                    problems.append("{}: must be an object".format(vwhere))
+                    problems.append(f"{vwhere}: must be an object")
                     continue
                 unknown = set(verse) - VERSE_KEYS
                 if unknown:
-                    problems.append(
-                        "{}: unknown key(s) {}".format(vwhere, sorted(unknown))
-                    )
+                    problems.append(f"{vwhere}: unknown key(s) {sorted(unknown)}")
                 if verse.get("number") != verse_position + 1:
                     problems.append(
                         "{}: verse numbering must be contiguous from 1; "
@@ -966,7 +938,7 @@ def validate(data: dict, repo: Path = REPO) -> dict:
                 if isinstance(text, str):
                     key = " ".join(text.split()).lower()
                     seen_text.setdefault(key, []).append(
-                        "{} {:d}:{:d}".format(identifier, number, verse_position + 1)
+                        f"{identifier} {number:d}:{verse_position + 1:d}"
                     )
                 if isinstance(text, str) and DIGIT_RE.search(text):
                     problems.extend(
@@ -974,19 +946,17 @@ def validate(data: dict, repo: Path = REPO) -> dict:
                     )
                 citations_list = verse.get("cites", [])
                 if not isinstance(citations_list, list):
-                    problems.append("{}: cites must be a list".format(vwhere))
+                    problems.append(f"{vwhere}: cites must be a list")
                     citations_list = []
                 for citation in citations_list:
                     if not isinstance(citation, str):
                         problems.append(
-                            "{}: citation {!r} is not a string".format(vwhere, citation)
+                            f"{vwhere}: citation {citation!r} is not a string"
                         )
                         continue
                     citations.append(
                         (
-                            "{} {:d}:{:d}".format(
-                                identifier, number, verse_position + 1
-                            ),
+                            f"{identifier} {number:d}:{verse_position + 1:d}",
                             citation,
                         )
                     )
@@ -1004,25 +974,23 @@ def validate(data: dict, repo: Path = REPO) -> dict:
                     )
                 variants = verse.get("variants", [])
                 if not isinstance(variants, list):
-                    problems.append("{}: variants must be a list".format(vwhere))
+                    problems.append(f"{vwhere}: variants must be a list")
                     variants = []
                 for variant_position, variant in enumerate(variants):
-                    xwhere = "{} variant {:d}".format(vwhere, variant_position + 1)
+                    xwhere = f"{vwhere} variant {variant_position + 1:d}"
                     if not isinstance(variant, dict):
-                        problems.append("{}: must be an object".format(xwhere))
+                        problems.append(f"{xwhere}: must be an object")
                         continue
                     unknown = set(variant) - VARIANT_KEYS
                     if unknown:
-                        problems.append(
-                            "{}: unknown key(s) {}".format(xwhere, sorted(unknown))
-                        )
+                        problems.append(f"{xwhere}: unknown key(s) {sorted(unknown)}")
                     if (
                         not isinstance(variant.get("reading"), str)
                         or not variant.get("reading", "").strip()
                     ):
                         problems.append(
-                            "{}: reading is empty (name the manuscript "
-                            "or the source of the variant)".format(xwhere)
+                            f"{xwhere}: reading is empty (name the manuscript "
+                            "or the source of the variant)"
                         )
                     problems.extend(_text_problems(variant.get("text"), xwhere))
                     if (
@@ -1030,46 +998,41 @@ def validate(data: dict, repo: Path = REPO) -> dict:
                         or not variant.get("source", "").strip()
                     ):
                         problems.append(
-                            "{}: a variant must say where its reading comes "
-                            "from; that is the whole point of an apparatus".format(
-                                xwhere
-                            )
+                            f"{xwhere}: a variant must say where its reading comes "
+                            "from; that is the whole point of an apparatus"
                         )
                 annotations = verse.get("annotations", [])
                 if not isinstance(annotations, list):
-                    problems.append("{}: annotations must be a list".format(vwhere))
+                    problems.append(f"{vwhere}: annotations must be a list")
                     annotations = []
                 if (
                     isinstance(limits.get("max_annotations_per_verse"), int)
                     and len(annotations) > limits["max_annotations_per_verse"]
                 ):
                     problems.append(
-                        "%s: %d annotations, limit is %d -- a verse with a "
-                        "page of notes has stopped being annotated"
-                        % (
+                        "{}: {:d} annotations, limit is {:d} -- a verse with a "
+                        "page of notes has stopped being annotated".format(
                             vwhere,
                             len(annotations),
                             limits["max_annotations_per_verse"],
                         )
                     )
                 for note_position, annotation in enumerate(annotations):
-                    nwhere = "{} annotation {:d}".format(vwhere, note_position + 1)
+                    nwhere = f"{vwhere} annotation {note_position + 1:d}"
                     if not isinstance(annotation, dict):
-                        problems.append("{}: must be an object".format(nwhere))
+                        problems.append(f"{nwhere}: must be an object")
                         continue
                     unknown = set(annotation) - ANNOTATION_KEYS
                     if unknown:
-                        problems.append(
-                            "{}: unknown key(s) {}".format(nwhere, sorted(unknown))
-                        )
+                        problems.append(f"{nwhere}: unknown key(s) {sorted(unknown)}")
                     if annotation.get("kind") not in ANNOTATION_KINDS:
                         problems.append(
-                            "{}: kind must be one of {} -- a reader is "
+                            f"{nwhere}: kind must be one of {ANNOTATION_KINDS} -- a reader is "
                             "entitled to know whether a note is a reading "
-                            "or a claim".format(nwhere, ANNOTATION_KINDS)
+                            "or a claim"
                         )
                     problems.extend(
-                        _text_problems(annotation.get("note"), "{} note".format(nwhere))
+                        _text_problems(annotation.get("note"), f"{nwhere} note")
                     )
                     if isinstance(annotation.get("note"), str) and DIGIT_RE.search(
                         annotation["note"]
@@ -1083,7 +1046,7 @@ def validate(data: dict, repo: Path = REPO) -> dict:
     for source_ref, citation in citations:
         problem = _resolve_citation(citation, index, repo)
         if problem:
-            problems.append("{} {}".format(source_ref, problem))
+            problems.append(f"{source_ref} {problem}")
     for position, entry in enumerate(glossary):
         reference = entry.get("see") if isinstance(entry, dict) else None
         if not isinstance(reference, str):
@@ -1099,8 +1062,8 @@ def validate(data: dict, repo: Path = REPO) -> dict:
     for key, refs in seen_text.items():
         if len(refs) > 1:
             warnings.append(
-                "the same verse text appears %d times (%s) -- usually a "
-                "paste, occasionally a refrain" % (len(refs), ", ".join(refs))
+                "the same verse text appears {:d} times ({}) -- usually a "
+                "paste, occasionally a refrain".format(len(refs), ", ".join(refs))
             )
 
     cited_by = reference_index(books)
@@ -1108,7 +1071,7 @@ def validate(data: dict, repo: Path = REPO) -> dict:
         for identifier, chapters in index.items():
             for number, verses in chapters.items():
                 for verse_number, verse in verses.items():
-                    ref = "{} {:d}:{:d}".format(identifier, number, verse_number)
+                    ref = f"{identifier} {number:d}:{verse_number:d}"
                     if (
                         cited_by.get(ref)
                         or verse.get("cites")
@@ -1118,15 +1081,16 @@ def validate(data: dict, repo: Path = REPO) -> dict:
                     ):
                         continue
                     problems.append(
-                        "{}: a complete canon has no verse that does no "
+                        f"{ref}: a complete canon has no verse that does no "
                         "work -- cite it, or give it a note, a statute or "
-                        "an apparatus".format(ref)
+                        "an apparatus"
                     )
 
     if problems:
         raise CorpusError(
-            "%s failed %d check(s):\n  - %s"
-            % (CORPUS.name, len(problems), "\n  - ".join(problems))
+            "{} failed {:d} check(s):\n  - {}".format(
+                CORPUS.name, len(problems), "\n  - ".join(problems)
+            )
         )
 
     verses_flat = [
@@ -1221,9 +1185,9 @@ def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> s
                 data.get("status"), data.get("updated")
             ),
             "",
-            "_Generated from `{}` by "
+            f"_Generated from `{corpus_label}` by "
             "`python tools/bible_check.py --render --write`. Do not edit this "
-            "file: edit the corpus._".format(corpus_label),
+            "file: edit the corpus._",
         ]
     )
     for book in data.get("books", []):
@@ -1240,7 +1204,7 @@ def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> s
                 else "domain `{}`".format(book["domain"])
             )
         if register:
-            lines.extend(["*{}*".format(register), ""])
+            lines.extend([f"*{register}*", ""])
         introduction = book.get("introduction")
         if isinstance(introduction, dict):
             lines.append("")
@@ -1252,7 +1216,7 @@ def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> s
                 lines.append("")
         for chapter in book.get("chapters", []):
             number = chapter.get("number")
-            lines.extend(["", "#### %s %d" % (book.get("name", ""), number), ""])
+            lines.extend(["", "#### {} {:d}".format(book.get("name", ""), number), ""])
             headings = {
                 section.get("before_verse"): section.get("heading")
                 for section in chapter.get("sections", []) or []
@@ -1260,7 +1224,7 @@ def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> s
             for verse in chapter.get("verses", []):
                 verse_number = verse.get("number")
                 if verse_number in headings:
-                    lines.extend(["##### {}".format(headings[verse_number]), ""])
+                    lines.extend([f"##### {headings[verse_number]}", ""])
                 trailing = []
                 if verse.get("cites"):
                     trailing.append("see " + ", ".join(verse["cites"]))
@@ -1284,7 +1248,7 @@ def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> s
                         "> **{}** — {}{}".format(
                             annotation.get("kind"),
                             annotation.get("note"),
-                            (" (`{}`)".format(source)) if source else "",
+                            (f" (`{source}`)") if source else "",
                         )
                     )
                 for variant in verse.get("variants", []) or []:
@@ -1317,7 +1281,8 @@ def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> s
                     (
                         (ref, refs)
                         for ref, refs in cited_by.items()
-                        if ref.startswith("%s %d:" % (book.get("id"), number)) and refs
+                        if ref.startswith("{} {:d}:".format(book.get("id"), number))
+                        and refs
                     ),
                     key=lambda pair: int(pair[0].split(":")[1]),
                 )
@@ -1349,8 +1314,9 @@ def render_index(data: dict) -> str:
         if not refs and not cites:
             continue
         lines.append(
-            "%-18s %s"
-            % (ref, ("cited by " + ", ".join(refs)) if refs else "cited by nothing")
+            "{:<18} {}".format(
+                ref, ("cited by " + ", ".join(refs)) if refs else "cited by nothing"
+            )
         )
     orphans = [
         ref
@@ -1362,7 +1328,7 @@ def render_index(data: dict) -> str:
         and not _verse.get("variants")
     ]
     lines.extend(["", "## Verses that do no work", ""])
-    lines.extend(["- {}".format(ref) for ref in orphans] or ["none"])
+    lines.extend([f"- {ref}" for ref in orphans] or ["none"])
     lines.append("")
     return "\n".join(lines)
 
@@ -1433,24 +1399,25 @@ def render_genealogy(
         "python tools/bible_check.py --genealogy --write",
         "```",
         "",
-        "{:d} houses, {:d} edges between them.".format(houses, total_edges),
+        f"{houses:d} houses, {total_edges:d} edges between them.",
         "",
     ]
     for house in sorted(edges, key=lambda name: (-len(edges[name]), name)):
         children = edges[house]
         if not children:
-            lines.append("And **{}** begat no other house.".format(house))
+            lines.append(f"And **{house}** begat no other house.")
             continue
         ordered = sorted(children, key=lambda name: (-children[name], name))
-        named = ["**{}**".format(child) for child in ordered[:3]]
+        named = [f"**{child}**" for child in ordered[:3]]
         if len(ordered) > 3:
             rest = len(ordered) - 3
             lines.append(
-                "And **%s** begat %s, and of the rest there were %d."
-                % (house, ", ".join(named), rest)
+                "And **{}** begat {}, and of the rest there were {:d}.".format(
+                    house, ", ".join(named), rest
+                )
             )
         elif len(ordered) == 1:
-            lines.append("And **{}** begat {}.".format(house, named[0]))
+            lines.append(f"And **{house}** begat {named[0]}.")
         else:
             lines.append(
                 "And **{}** begat {} and {}.".format(
@@ -1465,9 +1432,7 @@ def render_genealogy(
             )
             or "--"
         )
-        lines.append(
-            "| {} | {} | {:d} |".format(house, children, sum(edges[house].values()))
-        )
+        lines.append(f"| {house} | {children} | {sum(edges[house].values()):d} |")
     if unreadable:
         lines.extend(
             [
@@ -1488,13 +1453,11 @@ def render_genealogy(
 
 def _drift(path: Path, expected: str) -> str | None:
     if not path.exists():
-        return "{} is absent; run the command in its header to create it".format(
-            path.name
-        )
+        return f"{path.name} is absent; run the command in its header to create it"
     if path.read_text(encoding="utf-8", errors="replace") != expected:
         return (
-            "{} is stale relative to this run; regenerate it (the file is "
-            "generated, so editing it is not a fix)".format(path.name)
+            f"{path.name} is stale relative to this run; regenerate it (the file is "
+            "generated, so editing it is not a fix)"
         )
     return None
 
@@ -1586,22 +1549,21 @@ def check(root: Path = REPO, corpus_path: Path = CORPUS) -> tuple[bool, list[str
         problems.extend("harvest: " + message for message in stale_paths)
         if newer:
             messages.append(
-                "harvest: %d observation(s) recorded since the snapshot "
-                "(re-run tools/bible_harvest.py --write to fold them in)" % newer
+                f"harvest: {newer:d} observation(s) recorded since the snapshot "
+                "(re-run tools/bible_harvest.py --write to fold them in)"
             )
     except ImportError as exc:  # pragma: no cover - wiring
-        messages.append("harvest: ledger not checked ({})".format(exc))
+        messages.append(f"harvest: ledger not checked ({exc})")
     for warning in diagnostics["warnings"]:
         messages.append("warning: " + warning)
     if problems:
         return False, problems + messages
     messages.insert(
         0,
-        "%s -- %s: %d book(s), %d chapter(s), %d verse(s), %d "
-        "citation(s), %d statute(s), %d variant(s), %d annotation(s), "
-        "%d section(s), %d gloss(es), %d introduction(s), %d "
-        "config(s); generated files current"
-        % (
+        "{} -- {}: {:d} book(s), {:d} chapter(s), {:d} verse(s), {:d} "
+        "citation(s), {:d} statute(s), {:d} variant(s), {:d} annotation(s), "
+        "{:d} section(s), {:d} gloss(es), {:d} introduction(s), {:d} "
+        "config(s); generated files current".format(
             data.get("title"),
             data.get("status"),
             diagnostics["books"],
@@ -1656,12 +1618,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             GENEALOGY.parent.mkdir(parents=True, exist_ok=True)
             GENEALOGY.write_text(text, encoding="utf-8", newline="\n")
             print(
-                "wrote %s (%d houses, %d edges)"
-                % (
-                    GENEALOGY.relative_to(REPO),
-                    len(edges),
-                    sum(sum(level.values()) for level in edges.values()),
-                )
+                f"wrote {GENEALOGY.relative_to(REPO)} ({len(edges):d} houses, {sum(sum(level.values()) for level in edges.values()):d} edges)"
             )
             return 0
         sys.stdout.write(text)
@@ -1687,8 +1644,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8", newline="\n")
             print(
-                "wrote %s (%d lines)"
-                % (target.relative_to(REPO), len(text.splitlines()))
+                f"wrote {target.relative_to(REPO)} ({len(text.splitlines()):d} lines)"
             )
             return 0
         sys.stdout.write(text)
@@ -1710,10 +1666,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     print(
-        "%s -- %s, %d book(s), %d chapter(s), %d verse(s), %d citation(s), "
-        "%d statute(s), %d variant(s), %d annotation(s), %d section(s), "
-        "%d gloss(es), %d introduction(s)"
-        % (
+        "{} -- {}, {:d} book(s), {:d} chapter(s), {:d} verse(s), {:d} citation(s), "
+        "{:d} statute(s), {:d} variant(s), {:d} annotation(s), {:d} section(s), "
+        "{:d} gloss(es), {:d} introduction(s)".format(
             data.get("title"),
             data.get("status"),
             diagnostics["books"],

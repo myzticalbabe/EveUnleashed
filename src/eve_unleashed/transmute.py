@@ -37,7 +37,7 @@ from .swarm_oracle import swarm
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -70,7 +70,7 @@ def lead_into_gold(claim):
             "rebuttal": rb,
             "verdict": f["verdict"],
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("transmute:lead", e)
         stages.append({"stage": "ERROR", "error": str(e)[:200]})
         return {
@@ -98,7 +98,7 @@ def scroll_into_school(doc_path, out_path, audience="general"):
             "stages": stages,
             "steps": len(tut["steps"]),
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("transmute:scroll", e)
         stages.append({"stage": "ERROR", "error": str(e)[:200]})
         return {"recipe": "scroll_into_school", "stages": stages, "steps": 0}
@@ -123,7 +123,7 @@ def grievance_into_dossier(grievance_id, claim=None, locker_ids=None):
             "bundle": bundle,
             "dossier": dos,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("transmute:grievance", e)
         stages.append({"stage": "ERROR", "error": str(e)[:200]})
         return {"recipe": "grievance_into_dossier", "stages": stages}
@@ -144,7 +144,7 @@ def swarm_into_digest(claims, live=False, workers=4):
                 {"verdict": r["verdict"], "claim": r["claim"][:100]} for r in ordered
             ],
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("transmute:swarm", e)
         return {
             "recipe": "swarm_into_digest",

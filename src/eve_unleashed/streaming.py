@@ -72,7 +72,7 @@ async def stream_gguf(
     model,
     prompt: str,
     max_tokens: int = 256,
-) -> AsyncGenerator[StreamToken, None]:
+) -> AsyncGenerator[StreamToken]:
     """Stream tokens from a GGUF (llama.cpp) model."""
     import asyncio
 
@@ -119,7 +119,7 @@ async def stream_transformers(
     tokenizer,
     prompt: str,
     max_tokens: int = 256,
-) -> AsyncGenerator[StreamToken, None]:
+) -> AsyncGenerator[StreamToken]:
     """Stream tokens from a HuggingFace model using TextIteratorStreamer.
 
     Uses model.generate() with TextIteratorStreamer for true token-by-token
@@ -165,7 +165,7 @@ async def stream_transformers(
                 temperature=0.7,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("streaming:L148", exc)
         finally:
             # Ensure the async generator always unblocks, even on error
@@ -205,7 +205,7 @@ async def stream_transformers(
 
 async def stream_native(
     result,  # already-computed InferenceResult or similar
-) -> AsyncGenerator[StreamToken, None]:
+) -> AsyncGenerator[StreamToken]:
     """Yield a pre-computed result as a single streamed chunk."""
     yield StreamToken(
         text=str(result.predictions) if hasattr(result, "predictions") else str(result),

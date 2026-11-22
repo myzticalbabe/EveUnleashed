@@ -26,7 +26,7 @@ from pathlib import Path
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -81,14 +81,14 @@ def _scan_raw():
                         "kind": "test_failure",
                     }
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("mend:cache", exc)
     try:
         lane = _bake_lane()
         for line in lane.read_text(encoding="utf-8").splitlines():
             try:
                 row = json.loads(line)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("mend:lane-parse", exc)
                 continue
             # Recorded fixes are HISTORY, not open issues: counting them
@@ -96,7 +96,7 @@ def _scan_raw():
             # live failures. Only a fix row whose item names a test that
             # currently fails is open, and pytest already reports those.
             continue
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         note_failure("mend:lane", exc)
     return issues
 
@@ -169,7 +169,7 @@ def verify():
                     "tail": tail,
                 }
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("mend:verify", e)
             results.append({"file": name, "state": "error", "tail": str(e)[:120]})
     return {

@@ -313,7 +313,7 @@ class EvolutionaryWormManager:
 
             self._bridge = InferenceBridge()
             return self._bridge
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evo_worms:bridge", exc)
             return None
 
@@ -325,7 +325,7 @@ class EvolutionaryWormManager:
 
             self._governor = CurativePool()
             return self._governor
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evo_worms:governor", exc)
             return None
 
@@ -337,7 +337,7 @@ class EvolutionaryWormManager:
 
             self._recorder = get_recorder()
             return self._recorder
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evo_worms:recorder", exc)
             return None
 
@@ -349,7 +349,7 @@ class EvolutionaryWormManager:
 
             self.spawner = MetaWormSpawner()
             return self.spawner
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evo_worms:spawner", exc)
             return None
 
@@ -373,7 +373,7 @@ class EvolutionaryWormManager:
                 decision = governor.evaluate_action(
                     {"context": f"spawn mutant {mutated.worm_type}"}, proposal, [], []
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("evo_worms:govern_eval", exc)
                 decision = {"decision": "allowed"}
 
@@ -401,7 +401,7 @@ class EvolutionaryWormManager:
                     decision = {
                         "decision": "allowed" if "APPROVE" in verdict else "rejected"
                     }
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("evo_worms:bridge_approve", exc)
                 decision = {"decision": "allowed"}  # fail-open
 
@@ -424,7 +424,7 @@ class EvolutionaryWormManager:
                     request={"context": "evolutionary spawn"},
                     _interactive=False,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("evo_worms:spawn", exc)
 
         result = {
@@ -464,7 +464,7 @@ class EvolutionaryWormManager:
                 source="evolutionary_worm_manager",
                 severity="info",
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evo_worms:record", exc)
 
     def snapshot(self) -> dict[str, Any]:

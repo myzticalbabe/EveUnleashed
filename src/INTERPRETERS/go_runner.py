@@ -159,7 +159,7 @@ class GoRunner:
                 stderr="Execution timed out (>60s)",
                 errors=[{"type": "timeout", "message": "Runtime exceeded 60 seconds"}],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L128", e)
             return GoResult(
                 success=False,
@@ -232,7 +232,7 @@ class GoRunner:
                 errors=self._parse_errors(stderr) if result.returncode != 0 else [],
                 stderr_bytes=result.stderr[:4000].decode("latin-1"),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L184", e)
             return GoResult(success=False, stderr=str(e))
 
@@ -285,7 +285,7 @@ class GoRunner:
                 stderr=result.stderr,
                 returncode=result.returncode,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L228", e)
             return GoResult(success=False, stderr=str(e))
 
@@ -307,7 +307,7 @@ class GoRunner:
                 success=result.returncode == 0,
                 stdout="Formatted" if result.returncode == 0 else result.stderr,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L245", e)
             return GoResult(success=False, stderr=str(e))
 
@@ -331,7 +331,7 @@ class GoRunner:
                 stdout=result.stdout,
                 stderr=result.stderr,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L263", e)
             return GoResult(success=False, stderr=str(e))
 
@@ -359,7 +359,7 @@ class GoRunner:
                 stderr=result.stderr,
                 binary_path=str(target / "go.mod"),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L285", e)
             return GoResult(success=False, stderr=str(e))
 

@@ -55,7 +55,7 @@ def _trace_ids():
         from AOA.core.delegation_tracer import new_span_id, new_trace_id
 
         return new_trace_id(), new_span_id()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- _trace_ids: best-effort import secrets
         import secrets
 
         return secrets.token_hex(16), secrets.token_hex(8)
@@ -88,10 +88,10 @@ def _record_span(prompt, *, capability, arm_id, trace_id, span_id):
         # writer unimportable, write failed). A True here once masked a dead
         # ledger for a whole session -- never again.
         return bool(got)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- best-effort emit: never raise
         try:
             pass
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- best-effort emit: never raise
             pass  # scanner:ignore silent_except_pass -- last-resort telemetry guard; record() must never raise
         return False
 

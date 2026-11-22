@@ -155,7 +155,7 @@ class RustRunner:
                     {"type": "timeout", "message": "Compilation exceeded 60 seconds"}
                 ],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L112", e)
             return RustResult(
                 success=False,
@@ -273,7 +273,7 @@ class RustRunner:
                 errors=self._parse_errors(stderr) if result.returncode != 0 else [],
                 stderr_bytes=result.stderr[:4000].decode("latin-1"),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L216", e)
             return RustResult(success=False, stderr=str(e))
 
@@ -311,7 +311,7 @@ class RustRunner:
         except subprocess.TimeoutExpired as exc:
             note_failure("rust_runner:L242", exc)
             return RustResult(success=False, stderr="Cargo build timed out (>120s)")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L244", e)
             return RustResult(success=False, stderr=str(e))
 
@@ -337,7 +337,7 @@ class RustRunner:
                 stderr=result.stderr,
                 returncode=result.returncode,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L263", e)
             return RustResult(success=False, stderr=str(e))
 
@@ -364,7 +364,7 @@ class RustRunner:
                 stderr=result.stderr,
                 binary_path=str(target / name),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L283", e)
             return RustResult(success=False, stderr=str(e))
 
@@ -386,7 +386,7 @@ class RustRunner:
                 success=result.returncode == 0,
                 stdout="Formatted" if result.returncode == 0 else result.stderr,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L299", e)
             return RustResult(success=False, stderr=str(e))
 

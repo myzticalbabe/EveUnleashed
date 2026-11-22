@@ -60,10 +60,10 @@ def eliza_reading(cues=None):
             "reason": "no person graph bound -- cues held, not judged",
             "cues": dict(cues),
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         return {
             "known": False,
-            "reason": "psyche unavailable ({})".format(e),
+            "reason": f"psyche unavailable ({e})",
         }  # scanner:ignore except_return_default -- a failed psyche read holds cues unjudged; unknown IS the honest answer
 
 
@@ -74,7 +74,7 @@ def therapy_prompt(mood, note):
         from eve_unleashed.therapy import build_prompt
 
         return build_prompt(mood, note)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- best-effort therapy_prompt
         mood = (mood or "stressed").strip()[:60]
         note = (note or "").strip()[:500]
         return (
@@ -91,7 +91,7 @@ def therapy_response(mood, note):
         from eve_unleashed.therapy import fallback_response
 
         return fallback_response(mood, note)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- therapy_response: best-effort return (
         return (
             "I hear you. Breathe in 4 counts, hold 4, out 6. "  # scanner:ignore except_return_default -- degraded-path grounding script; the safe default IS the therapy answer
             "Name 5 things you can see. I am here with you. "
@@ -176,9 +176,7 @@ def judge_paper(mood, note, text):
         "gate": _GATE_NAMES["paper"],
         "passed": ok,
         "reason": (
-            "no invented particulars"
-            if ok
-            else "ungrounded detail: {}".format(bad[0][:40])
+            "no invented particulars" if ok else f"ungrounded detail: {bad[0][:40]}"
         ),
     }
 
@@ -190,7 +188,7 @@ def judge_scissors(mood, note, text):
         "throw": "scissors",
         "gate": _GATE_NAMES["scissors"],
         "passed": n <= 60,
-        "reason": "{:d} words".format(n),
+        "reason": f"{n:d} words",
     }
 
 
@@ -222,9 +220,7 @@ def judge_spock(mood, note, text):
         "throw": "spock",
         "gate": _GATE_NAMES["spock"],
         "passed": ok,
-        "reason": (
-            "no clinician language" if ok else "clinician language: {}".format(bad[0])
-        ),
+        "reason": ("no clinician language" if ok else f"clinician language: {bad[0]}"),
     }
 
 
@@ -252,20 +248,20 @@ def candidates(mood, note=""):
     ground = therapy_response(mood, note)
     said = note if note else "You added nothing more, and that is fine."
     echo = (
-        "It sounds like {} is weighing on you. {} "
+        f"It sounds like {mood} is weighing on you. {said[:120]} "
         "Breathe in 4 counts, hold 4, out 6. "
-        "I am here with you -- what feels hardest right now?".format(mood, said[:120])
+        "I am here with you -- what feels hardest right now?"
     )
     short = (
-        "I hear you. This {} feeling makes sense. "
+        f"I hear you. This {mood} feeling makes sense. "
         "Breathe in 4 counts, hold 4, out 6 -- "
-        "what do you need next?".format(mood)
+        "what do you need next?"
     )
     steady = (
-        "Thank you for telling me. Feeling {} does not make you "
+        f"Thank you for telling me. Feeling {mood} does not make you "
         "fragile; it makes you honest. Breathe in 4 counts, hold 4, "
         "out 6, and name five things you can see. I am staying "
-        "with you -- shall we take the next minute together?".format(mood)
+        "with you -- shall we take the next minute together?"
     )
     return [ground, echo, short, steady]
 

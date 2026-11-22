@@ -35,7 +35,7 @@ def edit_metadata(
 
     try:
         reader = gguf.GGUFReader(path)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"ERROR: Failed to read GGUF file: {e}", file=sys.stderr)
         return 1
 
@@ -91,7 +91,7 @@ def edit_metadata(
         temp_path.replace(path)
         print(f"\nUpdated {path.name} successfully.")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"ERROR: Failed to write GGUF file: {e}", file=sys.stderr)
         return 1
 
@@ -116,7 +116,7 @@ def list_metadata(model_path: str) -> int:
 
     try:
         reader = gguf.GGUFReader(path)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"ERROR: Failed to read GGUF file: {e}", file=sys.stderr)
         return 1
 

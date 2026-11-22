@@ -132,7 +132,7 @@ def check_doc_shards() -> dict:
         repo = Path(__file__).resolve().parents[2]
         skill_roots = [repo / ".agents" / "skills", repo.parent / ".agents" / "skills"]
         candidates = skill_roots + [repo / "docs", Path(__file__).resolve().parents[1]]
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return {"ok": False, "checked": 0, "missing": ["repo-unresolvable"]}
     # Every doc shard is a list of SKILL NAMES, and the corpus they name is
     # INSTALLED rather than committed: `.agents/skills` arrives with the skills
@@ -206,7 +206,7 @@ def self_test() -> bool:
     agree = len(tokens) <= 1
     try:
         doc = check_doc_shards()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- best-effort self_test
         doc = {"ok": False, "checked": 0, "missing": ["check-crashed"]}
     ok_all = bool(ok and agree and doc.get("ok", False))
     report = {
@@ -233,7 +233,7 @@ def prune_build_dirs(max_age_days: int = 14) -> dict:
     kept = 0
     try:
         build_root = Path(__file__).resolve().parents[2] / "build"
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return {"removed": 0, "kept": 0}
     if not build_root.is_dir():
         return {"removed": 0, "kept": 0}
@@ -272,7 +272,7 @@ def sweep(n: int = 10) -> dict:
     t_start = time.time()
     try:
         prune_build_dirs()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("polyglot:prune-call", e)
     work_medians: dict = {}
     instant_medians: dict = {}

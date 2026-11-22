@@ -18,3 +18,19 @@ include = ["eve_unleashed*"]
 
 [tool.pytest.ini_options]
 testpaths = ["Project_GAMORA/tests", "tests"]
+
+# Lint policy: ruff defaults (stable set CI enforces) at the requires-python
+# floor; no preview rules (preview churn breaks CI on upgrades). Vendored and
+# generated trees are excluded: never reformat someone else’s code or build output.
+[tool.ruff]
+target-version = "py315"
+preview = false
+exclude = ["Project_GAMORA/_vendor", "graphify-out"]
+
+[tool.black]
+exclude = """
+/(
+    Project_GAMORA/_vendor
+  | graphify-out
+)/
+"""

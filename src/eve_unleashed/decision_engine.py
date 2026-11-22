@@ -149,7 +149,7 @@ class AutonomousDecisionEngine:
 
             self.recorder = get_recorder()
             return self.recorder
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("decision_engine:recorder", exc)
             return None
 
@@ -177,7 +177,7 @@ class AutonomousDecisionEngine:
         )
         try:
             _attach_utility(self, decision)
-        except Exception as exc:  # never break proposing
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("decision_engine:utility", exc)
         with self._lock:
             self._decisions[decision.id] = decision
@@ -322,7 +322,7 @@ class AutonomousDecisionEngine:
                     "info" if decision.status != DecisionStatus.VETOED else "warning"
                 ),
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("decision_engine:record", exc)
 
 

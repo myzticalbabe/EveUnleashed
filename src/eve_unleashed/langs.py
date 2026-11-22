@@ -32,7 +32,7 @@ def detect(path):
         return "go"
     if suf == ".py":
         return "python"
-    raise ValueError("eve langs handles .rs, .go and .py only: {}".format(path))
+    raise ValueError(f"eve langs handles .rs, .go and .py only: {path}")
 
 
 def have_tools(lang):
@@ -49,7 +49,7 @@ def _run(cmd, timeout=300):
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError as e:
-        return 127, "", "tool missing: {}".format(e)
+        return 127, "", f"tool missing: {e}"
     except subprocess.TimeoutExpired:
         note_failure("langs:timeout", Exception(str(cmd[:2])))
         return 124, "", "compiler timed out"
@@ -79,7 +79,7 @@ def check(path):
             return {
                 "lang": lang,
                 "ok": False,
-                "diagnostics": "unreadable: {}".format(e),
+                "diagnostics": f"unreadable: {e}",
             }
         return {"lang": lang, "ok": True, "diagnostics": ""}
     if lang == "rust":
@@ -130,7 +130,7 @@ def fmt(path):
     code, out, err = _run(tool)
     if code != 0:
         note_failure("langs:fmt", Exception((out + err)[:200]))
-        raise RuntimeError("formatter failed: {}".format((out + err).strip()[:300]))
+        raise RuntimeError(f"formatter failed: {(out + err).strip()[:300]}")
     return p.read_bytes() != before
 
 
@@ -195,7 +195,7 @@ def check_arch(name):
             try:
                 if Path(p).is_dir():
                     sys.path.insert(0, p)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 -- best-effort check_arch
                 pass  # scanner:ignore silent_except_pass -- best-effort path probe; a failed insert just skips that root
     try:
         if name == "gamora":
@@ -207,7 +207,7 @@ def check_arch(name):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 rc = _g.cmd_doctor(None)
-            return {"arch": name, "ok": rc == 0, "detail": "doctor rc={}".format(rc)}
+            return {"arch": name, "ok": rc == 0, "detail": f"doctor rc={rc}"}
         if name == "lucy":
             import lucy as _l
 
@@ -229,9 +229,9 @@ def check_arch(name):
                 out["span_id"][:8], out["recorded"]
             ),
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         try:
             note_failure("langs:arch", e)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 -- best-effort check_arch
             pass  # scanner:ignore silent_except_pass -- telemetry must never break the run; the error detail is already returned below
         return {"arch": name, "ok": False, "detail": str(e)[:300]}

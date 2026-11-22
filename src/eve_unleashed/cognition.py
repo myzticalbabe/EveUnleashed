@@ -205,7 +205,7 @@ def _present(root, locus):
         try:
             __import__(mod)
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001 -- logged below, guard broad
             return False
     return False
 

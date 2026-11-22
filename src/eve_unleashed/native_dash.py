@@ -103,7 +103,7 @@ class Dash:
         def run():
             try:
                 out = fn()
-            except Exception as e:  # never kill the UI thread
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 out = {"__error__": str(e)}
             self.q.put((done, out))
 
@@ -164,7 +164,7 @@ class Dash:
         if e is None:
             return
         _mp.save_selection(e)
-        self.msg.set("selected: {}".format(_mp.entry_id(e)))
+        self.msg.set(f"selected: {_mp.entry_id(e)}")
         self.refresh()
 
     def on_start(self):
@@ -196,7 +196,7 @@ class Dash:
         prompt = self.prompt.get().strip()
         if not prompt:
             return
-        self.say("you: {}\n".format(prompt))
+        self.say(f"you: {prompt}\n")
         self.prompt.set("")
         self.msg.set("thinking…")
         from eve_unleashed import cli as _cli
@@ -205,9 +205,7 @@ class Dash:
 
     def on_answered(self, out):
         text, reason = out
-        self.say(
-            ("eve: {}\n".format(text)) if text else ("(no answer: {})\n".format(reason))
-        )
+        self.say((f"eve: {text}\n") if text else (f"(no answer: {reason})\n"))
         self.msg.set("done")
 
     def say(self, s: str):

@@ -51,8 +51,8 @@ def _gil_state() -> str:
         return "unknown (no _is_gil_enabled -- pre-3.13 interpreter?)"
     try:
         return "disabled (316t free-threaded)" if not fn() else "ENABLED"
-    except Exception as e:  # never break the host
-        return "unknown ({})".format(e)
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        return f"unknown ({e})"
 
 
 def cmd_doctor(_args) -> int:
@@ -61,7 +61,7 @@ def cmd_doctor(_args) -> int:
 
     gil = _gil_state()
     gil_ok = "disabled" in gil
-    print("316t interpreter : {} {}".format(sys.version.split()[0], gil))
+    print(f"316t interpreter : {sys.version.split()[0]} {gil}")
     if REQUIRED_GIL_DISABLED and not gil_ok:
         print("  FAIL: Gamora requires a free-threaded (GIL-disabled) interpreter")
         ok = False
@@ -86,12 +86,12 @@ def cmd_doctor(_args) -> int:
             try:
                 m = __import__(mod, fromlist=["*"])
                 if attr is not None and not hasattr(m, attr):
-                    print("{:<16} : MISSING attr {}".format(label, attr))
+                    print(f"{label:<16} : MISSING attr {attr}")
                     ok = False
                 else:
-                    print("{:<16} : ok ({})".format(label, mod))
-            except Exception as e:
-                print("{:<16} : MISSING ({})".format(label, e))
+                    print(f"{label:<16} : ok ({mod})")
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+                print(f"{label:<16} : MISSING ({e})")
                 ok = False
     finally:
         sys.path[:] = saved
@@ -103,15 +103,15 @@ def cmd_doctor(_args) -> int:
         ("lucy file", lucy, "lucy"),
     ):
         if path.is_file():
-            print("{:<16} : ok ({})".format(label, path.name))
+            print(f"{label:<16} : ok ({path.name})")
             continue
         # Frozen exe has the modules compiled in but no repo checkout on
         # disk: importability is the real requirement, not the file.
         try:
             __import__(mod, fromlist=["*"])
-            print("{:<16} : ok ({}, frozen in)".format(label, mod))
-        except Exception:
-            print("{:<16} : MISSING ({})".format(label, path))
+            print(f"{label:<16} : ok ({mod}, frozen in)")
+        except Exception:  # noqa: BLE001 -- best-effort cmd_doctor
+            print(f"{label:<16} : MISSING ({path})")
             ok = False
 
     print("doctor: %s" % ("READY" if ok else "NOT READY"))
@@ -133,19 +133,19 @@ def cmd_lilith(args) -> int:
     db = Path.home() / ".azazael" / "memory_store.db"
     if not db.is_file():
         print("lilith: no memory_store.db yet -- hive unobserved, not failed.")
-        print("  expected at {}".format(db))
+        print(f"  expected at {db}")
         return 0
     try:
-        conn = sqlite3.connect("file:{}?mode=ro".format(db), uri=True, timeout=5)
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
         try:
             kind = conn.execute(
                 "select count(*) from sqlite_master where type='table'"
             ).fetchone()[0]
-            print("lilith: hive observed -- {} tables in {}".format(kind, db.name))
+            print(f"lilith: hive observed -- {kind} tables in {db.name}")
         finally:
             conn.close()
-    except Exception as e:
-        print("lilith: DB unreadable ({}) -- reported, not raised.".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"lilith: DB unreadable ({e}) -- reported, not raised.")
     if not args.once:
         print(
             "(pass --once to assert single-shot mode; live wallboard is "
@@ -160,8 +160,8 @@ def cmd_eve(args) -> int:
     sys.path.insert(0, str(repo_src))
     try:
         from eve_unleashed.cli import main as eve_main
-    except Exception as e:
-        print("eve: unavailable ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"eve: unavailable ({e})")
         return 1
     eve_args = list(args.eve_args or [])
     try:
@@ -182,8 +182,8 @@ def cmd_eve(args) -> int:
             ),
             file=sys.stderr,
         )
-    except Exception as e:
-        print("eve: untraced ({}) -- running anyway.".format(e), file=sys.stderr)
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"eve: untraced ({e}) -- running anyway.", file=sys.stderr)
     if eve_args[:1] == [
         "--"
     ]:  # argparse REMAINDER keeps the separator; eve chokes on it
@@ -201,13 +201,13 @@ def _cradle_selector() -> int:
     sys.path.insert(0, str(repo_src))
     try:
         from eve_unleashed.cradle import adopt_cradle, list_cradle_models
-    except Exception as e:
-        print("cradle: unavailable ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"cradle: unavailable ({e})")
         return 1
     try:
         models = list_cradle_models() or []
-    except Exception as e:
-        print("cradle: cannot list ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"cradle: cannot list ({e})")
         return 1
     if not models:
         print("cradle: empty -- drop a model file in ~/.azazael/cradle,")
@@ -216,7 +216,7 @@ def _cradle_selector() -> int:
     for i, m in enumerate(models, 1):
         print("  [{:d}] {} [{}]".format(i, m.get("name"), m.get("framework")))
     try:
-        raw = input("choose [1-%d] (0 adopts all): " % len(models)).strip()
+        raw = input(f"choose [1-{len(models):d}] (0 adopts all): ").strip()
     except (EOFError, KeyboardInterrupt):
         print("\ncradle: cancelled -- nothing adopted.")
         return 1
@@ -226,24 +226,25 @@ def _cradle_selector() -> int:
         try:
             want = models[int(raw) - 1].get("name")
         except (ValueError, IndexError):
-            print("cradle: choose 1-{:d} or 0 -- nothing adopted.".format(len(models)))
+            print(f"cradle: choose 1-{len(models):d} or 0 -- nothing adopted.")
             return 1
     try:
         summary = adopt_cradle()
-    except Exception as e:
-        print("cradle: adopt failed ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"cradle: adopt failed ({e})")
         return 1
     rows = (
-        [("ADOPTED", n, "{} via {}".format(f, r)) for n, f, r in summary["adopted"]]
+        [("ADOPTED", n, f"{f} via {r}") for n, f, r in summary["adopted"]]
         + [("FAILED", n, d) for n, d in summary["failed"]]
         + [("SKIPPED", n, w) for n, w in summary["skipped"]]
     )
     shown = [row for row in rows if want is None or row[1] == want]
     for state, name, detail in shown:
-        print("  {} {} ({})".format(state, name, detail))
+        print(f"  {state} {name} ({detail})")
     print(
-        "adopted=%d failed=%d skipped=%d"
-        % (len(summary["adopted"]), len(summary["failed"]), len(summary["skipped"]))
+        "adopted={:d} failed={:d} skipped={:d}".format(
+            len(summary["adopted"]), len(summary["failed"]), len(summary["skipped"])
+        )
     )
     return 0 if not summary["failed"] else 1
 
@@ -254,8 +255,8 @@ def cmd_cradle(args) -> int:
     sys.path.insert(0, str(repo_src))
     try:
         from eve_unleashed.cli import main as eve_main
-    except Exception as e:
-        print("cradle: unavailable ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"cradle: unavailable ({e})")
         return 1
     cradle_args = list(args.cradle_args or [])
     if cradle_args[:1] == ["--"]:  # argparse REMAINDER keeps the separator
@@ -267,8 +268,8 @@ def cmd_cradle(args) -> int:
         return int(eve_main() or 0)
     except SystemExit as s:
         return int(s.code or 0)
-    except Exception as e:
-        print("cradle: failed ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"cradle: failed ({e})")
         return 1
 
 
@@ -292,7 +293,7 @@ def _absorb(binary, capability, raw_args) -> int:
 
     exe = shutil.which(binary)
     if not exe:
-        print("{}: missing (not on PATH) -- nothing absorbed.".format(binary))
+        print(f"{binary}: missing (not on PATH) -- nothing absorbed.")
         return 1
     fwd = list(raw_args or [])
     if fwd[:1] == ["--"]:  # argparse REMAINDER keeps the separator
@@ -313,12 +314,12 @@ def _absorb(binary, capability, raw_args) -> int:
             ),
             file=sys.stderr,
         )
-    except Exception as e:
-        print("{}: untraced ({}) -- running anyway.".format(binary, e), file=sys.stderr)
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"{binary}: untraced ({e}) -- running anyway.", file=sys.stderr)
     try:
         return int(subprocess.run([exe] + fwd).returncode or 0)
-    except Exception as e:
-        print("{}: failed ({})".format(binary, e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"{binary}: failed ({e})")
         return 1
 
 
@@ -341,8 +342,8 @@ def cmd_lucy(args) -> int:
             sys.path.insert(0, p)
     try:
         import lucy as _lucy
-    except Exception as e:
-        print("lucy: unavailable ({}: {})".format(lucy_py, e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"lucy: unavailable ({lucy_py}: {e})")
         return 1
     out = _lucy.companion_response(args.mood, args.note or "")
     print(out["response"])
@@ -362,8 +363,8 @@ def cmd_swarm(args) -> int:
     sys.path.insert(0, str(repo_src))
     try:
         from eve_unleashed.swarm_oracle import swarm as _swarm
-    except Exception as e:
-        print("swarm: unavailable ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"swarm: unavailable ({e})")
         return 1
     claims = list(args.claims or [])
     if not claims:
@@ -374,8 +375,8 @@ def cmd_swarm(args) -> int:
     except TypeError:
         # older signature: swarm(claims) without live flag
         rep = _swarm(claims)
-    except Exception as e:
-        print("swarm: failed ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"swarm: failed ({e})")
         return 1
     print(json.dumps(rep, indent=2)[:4000])
     return 0
@@ -391,7 +392,7 @@ def _span(capability, rep) -> None:
 
         flat = rep if isinstance(rep, dict) else {"result": str(rep)}
         _emit(dict(flat), capability="gamora." + str(capability), arm_id="gamora-316t")
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 -- best-effort _span
         pass  # scanner:ignore silent_except_pass -- telemetry guard; the answer above already stands
 
 
@@ -401,8 +402,8 @@ def cmd_berzerker(args) -> int:
         sys.path.insert(0, str(GAMORA_ROOT))
     try:
         import berzerker as _b
-    except Exception as e:
-        print("berzerker: unavailable ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"berzerker: unavailable ({e})")
         return 1
     action = (args.action or "audit").lower()
     try:
@@ -428,12 +429,12 @@ def cmd_berzerker(args) -> int:
                 return 0
         else:
             print(
-                "berzerker: unknown action {!r}"
-                " (audit|mind|dream|inhibited|weird|code|done)".format(args.action)
+                f"berzerker: unknown action {args.action!r}"
+                " (audit|mind|dream|inhibited|weird|code|done)"
             )
             return 1
-    except Exception as e:
-        print("berzerker: failed ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"berzerker: failed ({e})")
         return 1
     _span("berzerker." + action, rep)
     if args.json or action in ("audit", "mind", "dream", "inhibited", "weird", "done"):
@@ -455,8 +456,8 @@ def cmd_inject(args) -> int:
         sys.path.insert(0, str(repo_src))
     try:
         from jaeger_inject import inject as _inject
-    except Exception as e:
-        print("inject: unavailable ({})".format(e))
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
+        print(f"inject: unavailable ({e})")
         return 1
     prompt = args.prompt
     if prompt == "-":
@@ -547,16 +548,16 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     try:
         return int(args.fn(args) or 0)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         try:
             from CORE.failure_ledger import note_failure
-        except Exception:
+        except Exception:  # noqa: BLE001 -- logged below, guard broad
 
             def note_failure(where, exc=None):
                 pass
 
         note_failure("gamora:main", e)
-        print("gamora: failed ({})".format(e))
+        print(f"gamora: failed ({e})")
         return 1
 
 

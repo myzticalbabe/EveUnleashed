@@ -81,7 +81,7 @@ def run_python(code: str, args: list[str] | None = None) -> RunResult:
                 sys.argv = _old_argv
         success = True
         returncode = 0
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("__init__:L55", e)
         stderr_capture.write(f"{type(e).__name__}: {e}\n")
         success = False
@@ -171,7 +171,7 @@ def run_shell_untrusted(command: str) -> RunResult:
             duration_ms=(time.time() - start) * 1000,
             stderr_bytes=result.stderr[:4000].decode("latin-1"),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("__init__:L128", e)
         return RunResult(
             language="bash",

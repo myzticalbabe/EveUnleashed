@@ -39,11 +39,11 @@ from eve_unleashed.soul_foundry import (
 
 try:  # Aether auditors live in tools/, on the path in tests and CI
     import reading_audit  # type: ignore
-except Exception:
+except Exception:  # noqa: BLE001 -- best-effort guard
     reading_audit = None  # type: ignore
 try:
     import leg_ledger  # type: ignore
-except Exception:
+except Exception:  # noqa: BLE001 -- best-effort guard
     leg_ledger = None  # type: ignore
 
 
@@ -56,7 +56,7 @@ def golden_tensor(seed: int = 7, rows: int = 8, cols: int = 8) -> list[float]:
 
 def golden_digest(vals: list[float]) -> str:
     """sha256 over packed f32 bytes -- the replica's identity proof."""
-    return hashlib.sha256(struct.pack("<%df" % len(vals), *vals)).hexdigest()
+    return hashlib.sha256(struct.pack(f"<{len(vals):d}f", *vals)).hexdigest()
 
 
 def replicate_golden(
@@ -105,7 +105,7 @@ def fix_neural_space(
     a measured max reconstruction error. within_bound is the verdict.
     """
     if dtype not in _BOUNDS:
-        raise ValueError("well dtypes: Q8_0, Q4_0, F32 (got {!r})".format(dtype))
+        raise ValueError(f"well dtypes: Q8_0, Q4_0, F32 (got {dtype!r})")
     if dtype == "Q8_0":
         back = dequantize_q80(quantize_q80(vals))[: len(vals)]
     elif dtype == "Q4_0":

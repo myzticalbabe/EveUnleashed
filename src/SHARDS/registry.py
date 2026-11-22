@@ -35,11 +35,11 @@ def _probe_toolchain_versions() -> dict:
         versions["bash"] = ShRunner().version
         versions["go"] = "go-present" if GoRunner().has_go else ""
         versions["rust"] = "rust-present" if RustRunner().has_rustc else ""
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("registry:version-probe", e)
     try:
         versions["python"] = sys.version.split()[0]
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("registry:version-probe-python", e)
     return versions
 

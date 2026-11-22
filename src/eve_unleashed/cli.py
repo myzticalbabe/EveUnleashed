@@ -67,14 +67,14 @@ def _local_answer(prompt, system=None):
     gate -- failure falls through to the swarm, and the reason names why."""
     try:
         from eve_unleashed.interpreter_bridge import EveInterpreterBridge
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:local-import", e)
-        return None, "local bridge unavailable ({})".format(e)
+        return None, f"local bridge unavailable ({e})"
     try:
         from eve_unleashed import model_picker as _mp
 
         sel = _mp.load_selection()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:local-selection", e)
         sel = None
     sel_error = None
@@ -131,19 +131,19 @@ def _local_answer(prompt, system=None):
                     )
             if isinstance(out, dict) and out.get("status") != "ok":
                 sel_error = out.get("error", "selected provider failed")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("cli:local-selected", e)
-            sel_error = "{}".format(e)
+            sel_error = f"{e}"
         # explicit selection failed: fall through to the automatic chain
     try:
         bridge = EveInterpreterBridge()
         out = bridge.run_local(prompt, system=system)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:local-run", e)
-        return None, "local run failed ({})".format(e)
+        return None, f"local run failed ({e})"
     if isinstance(out, dict) and out.get("status") == "ok" and out.get("result"):
         tag = out.get("provider") or out.get("model") or "local"
-        return str(out["result"]), "local:{}".format(tag)
+        return str(out["result"]), f"local:{tag}"
     err = (
         (out or {}).get("error", "no local generation path")
         if isinstance(out, dict)
@@ -156,7 +156,7 @@ def _local_answer(prompt, system=None):
             sel.get("model"),
             str(sel_error)[:200],
         )
-    return None, "local unavailable ({})".format(str(err)[:120])
+    return None, f"local unavailable ({str(err)[:120]})"
 
 
 SWARM_PER_PROVIDER_S = 60
@@ -188,12 +188,12 @@ def _swarm_fallback(prompt):
 
     try:
         from CORE.inference.parallel import ParallelInferenceEngine
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:swarm-import", e)
         return None, "swarm unavailable (parallel engine would not import)"
     try:
         engine = ParallelInferenceEngine()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:swarm-init", e)
         return None, "swarm unavailable (engine would not start)"
     targets = engine.get_all_providers_with_keys()
@@ -213,9 +213,9 @@ def _swarm_fallback(prompt):
             fut = pool.submit(worker, target)
             try:
                 res = fut.result(timeout=SWARM_PER_PROVIDER_S)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("cli:swarm-provider", e)
-                errs.append("{}: slice-timeout".format(pid))
+                errs.append(f"{pid}: slice-timeout")
                 if dead_idx < 0:
                     dead_idx = i
                 continue
@@ -254,8 +254,8 @@ def _swarm_fallback(prompt):
             }
         ]
         verdict, detail = verify_router_trace(events, SWARM_NSP_SPECS)
-        nsp_note = "nsp:{} [{}]".format(verdict, detail)
-    except Exception as e:
+        nsp_note = f"nsp:{verdict} [{detail}]"
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:swarm-nsp", e)
     win["nsp"] = nsp_note
     return win, ""
@@ -271,7 +271,7 @@ def cmd_ablate(args) -> int:
         from CORE.inference.parallel import ParallelInferenceEngine
 
         engine = ParallelInferenceEngine()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"ERROR: swarm unavailable ({e})", file=sys.stderr)
         return 1
     targets = engine.get_all_providers_with_keys()
@@ -291,7 +291,7 @@ def cmd_ablate(args) -> int:
         try:
             try:
                 res = pool.submit(worker, by_name[name]).result(timeout=timeout)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 return None, e
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
@@ -320,7 +320,7 @@ def cmd_wasm(args) -> int:
 
     try:
         state = _w.parse_ablation_log(args.from_log)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"ERROR: cannot read ablation log ({e})", file=sys.stderr)
         return 1
     if args.go:
@@ -669,7 +669,7 @@ def cmd_infer(args) -> int:
 
     try:
         handle = engine.load_model(args.model, framework, **load_kwargs)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         if "not installed" in str(e) and isinstance(inputs, str):
             print(
                 f"local framework missing ({e}) -- trying LLM swarm...", file=sys.stderr
@@ -692,7 +692,7 @@ def cmd_infer(args) -> int:
     # Run inference
     try:
         result = engine.infer(handle, inputs)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         print(f"ERROR during inference: {e}", file=sys.stderr)
         return 1
 
@@ -832,11 +832,9 @@ def cmd_models(args) -> int:
             return 0
     if args.remove:
         if _mp.remove_custom(args.remove):
-            print("removed custom provider: {}".format(args.remove))
+            print(f"removed custom provider: {args.remove}")
             return 0
-        print(
-            "ERROR: no custom provider named {!r}".format(args.remove), file=sys.stderr
-        )
+        print(f"ERROR: no custom provider named {args.remove!r}", file=sys.stderr)
         return 1
 
     entries = _mp.discover()
@@ -852,11 +850,11 @@ def cmd_models(args) -> int:
                 (e for e in entries if lowered in _mp.entry_id(e).lower()), None
             )
         if match is None:
-            print("ERROR: no provider matches {!r}".format(want), file=sys.stderr)
+            print(f"ERROR: no provider matches {want!r}", file=sys.stderr)
             _print_entries(entries, _mp.current_id())
             return 1
         _mp.save_selection(match)
-        print("selected: {}".format(_mp.entry_id(match)))
+        print(f"selected: {_mp.entry_id(match)}")
         return 0
 
     current = _mp.current_id()
@@ -873,36 +871,34 @@ def cmd_models(args) -> int:
         return 1
     try:
         raw = input(
-            "select [1-{:d}], text filters, Enter keeps current: ".format(len(entries))
+            f"select [1-{len(entries):d}], text filters, Enter keeps current: "
         ).strip()
     except (EOFError, KeyboardInterrupt):
         print()
         return 1
     if not raw:
         if current:
-            print("kept: {}".format(current))
+            print(f"kept: {current}")
             return 0
         print("ERROR: nothing selected", file=sys.stderr)
         return 1
     if raw.isdigit() and 1 <= int(raw) <= len(entries):
         _mp.save_selection(entries[int(raw) - 1])
-        print("selected: {}".format(_mp.entry_id(entries[int(raw) - 1])))
+        print(f"selected: {_mp.entry_id(entries[int(raw) - 1])}")
         return 0
     narrowed = [e for e in entries if raw.lower() in _mp.entry_id(e).lower()]
     if len(narrowed) == 1:
         _mp.save_selection(narrowed[0])
-        print("selected: {}".format(_mp.entry_id(narrowed[0])))
+        print(f"selected: {_mp.entry_id(narrowed[0])}")
         return 0
     if narrowed:
         _print_entries(narrowed, current)
         print(
-            "ERROR: {:d} match -- be specific (number or fuller text)".format(
-                len(narrowed)
-            ),
+            f"ERROR: {len(narrowed):d} match -- be specific (number or fuller text)",
             file=sys.stderr,
         )
         return 1
-    print("ERROR: no provider matches {!r}".format(raw), file=sys.stderr)
+    print(f"ERROR: no provider matches {raw!r}", file=sys.stderr)
     return 1
 
 
@@ -927,10 +923,7 @@ def _print_entries(entries, current) -> None:
                 e.get("agent", e.get("provider"))
             )
         note = (" [{}]".format(e["note"])) if e.get("note") else ""
-        print(
-            " %s %-3d %s  %s%s%s%s"
-            % (mark, i, _mp.entry_id(e), extra, down, auth, note)
-        )
+        print(f" {mark} {i:-3d} {_mp.entry_id(e)}  {extra}{down}{auth}{note}")
     print("current: %s" % (current or "(none)"))
 
 
@@ -962,7 +955,7 @@ def cmd_ask(args) -> int:
         text, tag = _local_answer(prompt, system=system)
         if text:
             return text
-        return "EVE_CALL_FAILED: {}".format(tag)
+        return f"EVE_CALL_FAILED: {tag}"
 
     out = _ev.eve_answer(args.prompt, generate)
     print(out["answer"])
@@ -1004,7 +997,7 @@ def cmd_explore(args) -> int:
         print("    {}: {}".format(lang, ", ".join(have) if have else "none"))
     print("  cradle files:")
     for name, size in rep.get("cradle_files", []):
-        print("    {} ({:d} bytes)".format(name, size))
+        print(f"    {name} ({size:d} bytes)")
     prov = rep.get("providers", {})
     print("  providers: {} {}".format(prov.get("total"), prov.get("by_kind", "")))
     return 0
@@ -1550,7 +1543,7 @@ def cmd_cognition(args) -> int:
         try:
             p = _c.paradigm(args.stratum)
         except ValueError as e:
-            print("ERROR: {}".format(e), file=sys.stderr)
+            print(f"ERROR: {e}", file=sys.stderr)
             return 1
         print("{}: {}".format(p["stratum"].upper(), p["paradigm"]))
         print("  members: {}".format(", ".join(p["members"])))
@@ -1580,8 +1573,9 @@ def cmd_cognition(args) -> int:
     for g in a["gaps"]:
         print("  GAP           {:<14} {}".format(g["name"], g["what"][:60]))
     print(
-        "cognition: used=%d/%d declared=%d absent=%d gaps=%d"
-        % (a["used"], a["total"], a["declared"], a["absent"], len(a["gaps"]))
+        "cognition: used={:d}/{:d} declared={:d} absent={:d} gaps={:d}".format(
+            a["used"], a["total"], a["declared"], a["absent"], len(a["gaps"])
+        )
     )
     _l.emit(
         "cognition",
@@ -1603,7 +1597,7 @@ def cmd_forge(args) -> int:
         try:
             out = _f.materialize(args.gap, root=args.root)
         except ValueError as e:
-            print("ERROR: {}".format(e), file=sys.stderr)
+            print(f"ERROR: {e}", file=sys.stderr)
             return 1
         print("forge: {} -> {}".format(out["gap"], out["state"]))
         print("  module: {}".format(out["module"]))
@@ -1748,7 +1742,7 @@ def cmd_e2e(args) -> int:
     except _sp.TimeoutExpired:
         tail, ok_t = "TIMEOUT 300s", False
     mark("tests", tail=tail, passed=ok_t)
-    print("e2e tests: {} (passed={})".format(tail, ok_t))
+    print(f"e2e tests: {tail} (passed={ok_t})")
     for line in lines[-4:-1]:
         print("e2e   " + line)
     if not ok_t:
@@ -1761,7 +1755,7 @@ def cmd_e2e(args) -> int:
             res = _w.fetch_visible(args.live_url)
             mark("live-fetch", url=args.live_url, rung=res["rung"], state=res["state"])
             print("e2e live-fetch: state={} rung={}".format(res["state"], res["rung"]))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             mark("live-fetch", url=args.live_url, error=str(e)[:120], passed=False)
             fails.append("live-fetch")
     else:
@@ -1839,8 +1833,9 @@ def cmd_train(args) -> int:
     if args.freeze_fixture:
         doc = freeze_fixture(TrainConfig().urls, args.freeze_fixture, cap_s=args.cap_s)
         print(
-            "fixture frozen: %d urls sha=%s path=%s"
-            % (len(doc["urls"]), doc["sha256"][:12], doc["path"])
+            "fixture frozen: {:d} urls sha={} path={}".format(
+                len(doc["urls"]), doc["sha256"][:12], doc["path"]
+            )
         )
         return 0
     cfg = TrainConfig(
@@ -1856,8 +1851,9 @@ def cmd_train(args) -> int:
     if args.null:
         res = null_control(cfg, args.null)
         print(
-            "null_control budget=%d best=%.4f mean=%.4f"
-            % (res["budget"], res["best"], res["mean"])
+            "null_control budget={:d} best={:.4f} mean={:.4f}".format(
+                res["budget"], res["best"], res["mean"]
+            )
         )
         return 0
     run(cfg)
@@ -1918,7 +1914,7 @@ def cmd_config(args) -> int:
                 )
             )
             return 0
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             print(f"ERROR restoring config: {e}", file=sys.stderr)
             return 1
 
@@ -2024,7 +2020,7 @@ def cmd_benchmark(args) -> int:
             print(
                 f"  {'xpu':8s}  avg: {avg:8.2f} ms  min: {min(times):8.2f} ms  max: {max(times):8.2f} ms"
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             print(f"  {'xpu':8s}  ERROR: {e}")
 
     # MPS benchmark
@@ -2074,7 +2070,7 @@ def cmd_benchmark(args) -> int:
                 print(f"  Model: {args.model}")
                 print("  No iterations run (--iterations must be >= 1)")
             engine.shutdown()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             print(f"  ERROR: {e}")
 
     return 0
@@ -2127,9 +2123,7 @@ def cmd_serve(args) -> int:
         action = req.get("decision", "")
         game = req.get("game", "")
         if action not in ("apply-best", "revert"):
-            raise HTTPException(
-                status_code=400, detail="unknown decision: {}".format(action)
-            )
+            raise HTTPException(status_code=400, detail=f"unknown decision: {action}")
         if not game:
             raise HTTPException(status_code=400, detail="'game' is required")
         try:
@@ -2155,7 +2149,7 @@ def cmd_serve(args) -> int:
             local_text, local_tag = await _aio.wait_for(
                 _to_thread(_local_answer, prompt), timeout=200
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("cli:therapy-local", e)
             local_text, local_tag = None, "local error"
         if local_text:
@@ -2169,7 +2163,7 @@ def cmd_serve(args) -> int:
             win, _reason = await _aio.wait_for(
                 _to_thread(_swarm_fallback, prompt), timeout=SWARM_TIMEOUT_S + 30
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("cli:therapy-swarm", e)
             win = None
         if win:
@@ -2210,7 +2204,7 @@ def cmd_serve(args) -> int:
         try:
             handle = engine.load_model(path, framework, **load_kwargs)
             return {"handle": handle, "status": "loaded"}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             raise HTTPException(status_code=400, detail=str(e))
 
     @app.delete("/models/{handle:path}")
@@ -2240,7 +2234,7 @@ def cmd_serve(args) -> int:
 
             try:
                 handle = engine.load_model(model_path, framework, **load_kwargs)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 if "not installed" in str(e) and isinstance(inputs, str):
                     import asyncio as _aio
 
@@ -2249,9 +2243,9 @@ def cmd_serve(args) -> int:
                             _to_thread(_swarm_fallback, inputs),
                             timeout=SWARM_TIMEOUT_S + 30,
                         )
-                    except Exception as te:
+                    except Exception as te:  # noqa: BLE001 -- logged below, guard broad
                         note_failure("cli:swarm-serve", te)
-                        win, reason = None, "swarm error: {}".format(te)
+                        win, reason = None, f"swarm error: {te}"
                     if win:
                         return {
                             "model": model_path,
@@ -2273,8 +2267,8 @@ def cmd_serve(args) -> int:
                     )
                     raise HTTPException(
                         status_code=503,
-                        detail="Framework '{}' is not installed; "
-                        "swarm fallback: {}".format(_label, reason),
+                        detail=f"Framework '{_label}' is not installed; "
+                        f"swarm fallback: {reason}",
                     )
                 raise HTTPException(status_code=400, detail=str(e))
         else:
@@ -2282,7 +2276,7 @@ def cmd_serve(args) -> int:
 
         try:
             result = engine.infer(handle, inputs, batch=batch)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             raise HTTPException(status_code=500, detail=str(e))
 
         # Handle both single InferenceResult and BatchResult
@@ -2322,7 +2316,7 @@ def cmd_serve(args) -> int:
         print(f"   Registry prune: {len(_gone)} stale entr(ies) removed")
         for _g in _gone[:5]:
             print(f"     pruned: {_g}")
-    except Exception as _pe:
+    except Exception as _pe:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cli:serve-prune", _pe)
         print("   Registry prune skipped (registry unreadable)")
     print(f"Eve Unleashed Inference API starting on http://{args.host}:{args.port}")

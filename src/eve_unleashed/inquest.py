@@ -19,7 +19,7 @@ import time
 
 try:
     from CORE.failure_ledger import note_failure
-except Exception:
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
 
     def note_failure(where, exc=None):
         pass
@@ -35,7 +35,7 @@ def open_inquest(grievance_id, locker_ids=None, factcheck_results=None):
     try:
         bundle = prove_case(grievance_id)
     except ValueError as e:
-        raise ValueError("inquest refused: {}".format(e))
+        raise ValueError(f"inquest refused: {e}")
     custody_states = []
     for lid in locker_ids:
         try:
@@ -44,7 +44,7 @@ def open_inquest(grievance_id, locker_ids=None, factcheck_results=None):
             custody_states.append(
                 {"id": lid, "state": v.get("state"), "touches": len(touches)}
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("inquest:custody", e)
             custody_states.append({"id": lid, "state": "ERROR", "touches": 0})
     receipts = []
@@ -79,8 +79,8 @@ def open_inquest(grievance_id, locker_ids=None, factcheck_results=None):
     return {
         "grievance": grievance_id,
         "opened_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "record_checks": "{:d}/{:d} passed".format(passed, len(checks)),
-        "custody": "{:d}/{:d} INTACT".format(intact, len(custody_states)),
+        "record_checks": f"{passed:d}/{len(checks):d} passed",
+        "custody": f"{intact:d}/{len(custody_states):d} INTACT",
         "custody_detail": custody_states,
         "live_receipts": len([r for r in receipts if r.get("status") == "ok"]),
         "timeline": [
