@@ -6,7 +6,7 @@ KV Cache Quantization (8-bit)
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
 class KVQuantizer:
@@ -40,17 +40,19 @@ class KVQuantizer:
         max_val = float(np.max(flat))
 
         if self.bits == 8:
-            qmin, qmax = -128, 127
+            qmin, qmax = 0, 255  # asymmetric range lives in uint8
         else:  # 4-bit
-            qmin, qmax = -8, 7
+            qmin, qmax = 0, 15  # asymmetric range; stored in int16 (see savings calc)
 
         scale = (max_val - min_val) / (qmax - qmin) if max_val != min_val else 1.0
-        zero_point = int(round(-min_val / scale)) if scale != 0 else 0
+        zero_point = round(-min_val / scale) if scale != 0 else 0
         zero_point = max(qmin, min(qmax, zero_point))
 
-        # Quantize
-        quantized = np.round(flat / scale + zero_point).astype(np.int8 if self.bits == 8 else np.int16)
+        # Quantize (clip BEFORE the cast: the zero point shifts 8-bit codes
+        # up to 255, which would wrap around signed int8)
+        quantized = np.round(flat / scale + zero_point)
         quantized = np.clip(quantized, qmin, qmax)
+        quantized = quantized.astype(np.uint8 if self.bits == 8 else np.int16)
 
         # Store metadata
         self._quantized_cache[key] = quantized.reshape(original_shape)
@@ -77,15 +79,14 @@ class KVQuantizer:
 
     def get_memory_savings(self) -> dict:
         """Calculate memory savings from quantization."""
-        import numpy as np
 
         original_bytes = 0
         quantized_bytes = 0
 
-        for key, quantized in self._quantized_cache.items():
+        for quantized in self._quantized_cache.values():
             original_bytes += quantized.size * 4  # float32 = 4 bytes
             if self.bits == 8:
-                quantized_bytes += quantized.size * 1  # int8 = 1 byte
+                quantized_bytes += quantized.size * 1  # uint8 = 1 byte
             else:
                 quantized_bytes += quantized.size * 2  # int16 = 2 bytes (packed 4-bit)
 

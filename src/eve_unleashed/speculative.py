@@ -7,7 +7,7 @@ Draft+verify with small draft model for faster GGUF inference.
 from __future__ import annotations
 
 import time
-from typing import Any, List, Optional
+from typing import Any
 
 try:
     from llama_cpp import Llama
@@ -49,7 +49,7 @@ class SpeculativeEngine:
         self.draft_time_ms = 0.0
         self.verify_time_ms = 0.0
 
-    def _sample_token(self, logits: List[float], temperature: float, top_p: float) -> int:
+    def _sample_token(self, logits: list[float], temperature: float, top_p: float) -> int:
         """Sample a token from logits with temperature and top-p."""
         import numpy as np
 
@@ -74,16 +74,12 @@ class SpeculativeEngine:
 
         return int(np.random.choice(len(probs), p=probs))
 
-    def generate_draft(self, prompt: str, num_tokens: int) -> List[int]:
+    def generate_draft(self, prompt: str, num_tokens: int) -> list[int]:
         """Generate draft tokens using the draft model."""
         start = time.perf_counter()
 
-        # Get initial logits from draft model
-        output = self.draft_model(prompt, max_tokens=0, echo=True)
-        # Extract logits from the last position
-        # Note: llama_cpp doesn't expose logits directly in simple API
-        # We'll use the generate approach instead
-
+        # Note: llama_cpp doesn't expose logits directly in simple API,
+        # so generate one token at a time instead.
         draft_tokens = []
         current_prompt = prompt
 
@@ -102,14 +98,12 @@ class SpeculativeEngine:
         self.draft_time_ms += (time.perf_counter() - start) * 1000
         return draft_tokens
 
-    def verify_draft(self, prompt: str, draft_tokens: List[str]) -> List[int]:
+    def verify_draft(self, prompt: str, draft_tokens: list[str]) -> list[int]:
         """Verify draft tokens using the target model."""
         start = time.perf_counter()
 
-        # Build full sequence with draft tokens
-        full_prompt = prompt + "".join(draft_tokens)
-
-        # Get logits from target model for each position
+        # Get target-model probabilities position by position
+        # (the full draft sequence is reconstructed incrementally below)
         # We need to run the target model and get probabilities
         accepted = []
 

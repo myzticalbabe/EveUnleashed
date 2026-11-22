@@ -17,23 +17,24 @@ import concurrent.futures
 import functools
 import os
 import time
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator, List, cast, Optional
+from typing import Any, cast
 
 import numpy as np
 
-from .core import InferenceResult, BatchResult, ModelLoader, timed_inference, HAS_PIL
-from .config import EveConfig
 from .cache import InferenceCache
+from .config import EveConfig
+from .core import HAS_PIL, BatchResult, InferenceResult, ModelLoader, timed_inference
 from .streaming import (
     StreamToken,
     stream_gguf,
-    stream_transformers,
     stream_native,
+    stream_transformers,
 )
 from .utils import (
-    prepare_input_tensor,
     postprocess_output,
+    prepare_input_tensor,
 )
 
 # Optional imports for advanced features
@@ -48,10 +49,6 @@ try:
     HAS_KV_QUANT = True
 except ImportError:
     HAS_KV_QUANT = False
-from .utils import (
-    prepare_input_tensor,
-    postprocess_output,
-)
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
@@ -63,7 +60,7 @@ except ImportError:                               # never break the host
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
 if HAS_PIL:
-    from PIL import Image  # noqa: F811
+    from PIL import Image
 
 
 class GGUFEngine:
@@ -107,9 +104,9 @@ class GGUFEngine:
         model_path: str,
         n_ctx: int = 2048,
         speculative: bool = False,
-        draft_model_path: Optional[str] = None,
+        draft_model_path: str | None = None,
         num_draft_tokens: int = 4,
-        kv_quant_bits: Optional[int] = None,
+        kv_quant_bits: int | None = None,
         **kwargs
     ) -> str:
         """Load a GGUF model with optional advanced features.
@@ -342,7 +339,7 @@ class GGUFEngine:
             if output and "choices" in output:
                 return output["choices"][0]["message"].get("content", "")
             return ""
-        except Exception as e:
+        except Exception:  # noqa: BLE001 -- chat-completion shape varies by backend; fall back to text-only call
             # Fall back to text-only
             output = model(text, max_tokens=max_tokens, temperature=temperature, top_p=top_p, echo=False)
             choices = output.get("choices", [])
@@ -371,20 +368,20 @@ class GGUFEngine:
         stream = model(text, max_tokens=max_tokens, temperature=temperature, top_p=top_p, stream=True, echo=False)
         
         for chunk in stream:
-            if "choices" in chunk and chunk["choices"]:
+            if chunk.get("choices"):
                 delta = chunk["choices"][0].get("delta", {})
                 if "content" in delta:
                     yield StreamToken(text=delta["content"])
                 elif "text" in chunk["choices"][0]:
                     yield StreamToken(text=chunk["choices"][0]["text"])
 
-    def get_speculative_stats(self, handle: str) -> Optional[dict]:
+    def get_speculative_stats(self, handle: str) -> dict | None:
         """Get speculative decoding statistics for a model."""
         if handle in self.speculative_engines:
             return self.speculative_engines[handle].get_stats()
         return None
 
-    def get_kv_quant_stats(self, handle: str) -> Optional[dict]:
+    def get_kv_quant_stats(self, handle: str) -> dict | None:
         """Get KV quantization statistics for a model."""
         model_path = handle.replace("gguf:", "").replace("gguf-mm:", "")
         if model_path in self.kv_quantizers:
@@ -414,7 +411,7 @@ class GGUFEngine:
         for _ in range(self.config.warmup_iterations):
             try:
                 model("warmup", max_tokens=1, echo=False)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- warmup is best-effort; failure is logged, never raised
                 note_failure("gguf_engine:warmup", exc)
 
     def shutdown(self):
@@ -427,7 +424,7 @@ class GGUFEngine:
     def __del__(self):
         try:
             self._executor.shutdown(wait=False)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- __del__ must never raise; failure is logged
             note_failure("gguf_engine:del", exc)
 
 
@@ -596,7 +593,7 @@ class InferenceEngine:
             else:
                 _lat = float(result.total_time_ms) / max(1, len(result.results))
             get_registry().record_inference(_mpath, _lat, framework)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- evolution telemetry is best-effort; logged, never raised
             note_failure("engine:L202", exc)
 
         # Store in cache
@@ -608,8 +605,6 @@ class InferenceEngine:
     @timed_inference
     def _single_infer(self, model, framework: str, inputs) -> InferenceResult:
         """Run a single inference pass."""
-        start = time.perf_counter()
-
         if framework == "torch":
             import torch
 
@@ -739,7 +734,7 @@ class InferenceEngine:
                         output_text = output["choices"][0]["message"].get("content", "")
                     else:
                         output_text = ""
-                except Exception:
+                except Exception:  # noqa: BLE001 -- multimodal shape varies by backend; fall back to text-only
                     # Fall back to text-only
                     output = mm_model(text, max_tokens=128, echo=False)
                     choices = output.get("choices", [])
@@ -852,7 +847,7 @@ class InferenceEngine:
             raise FileNotFoundError(f"Torch model not found: {path}")
         except RuntimeError as e:
             raise RuntimeError(f"Failed to load torch model '{path}': {e}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- loader boundary: coerce arbitrary backend errors with path context
             raise RuntimeError(f"Unexpected error loading torch model '{path}': {e}")
 
     def _load_sklearn_model(self, path: str, **kwargs):
@@ -862,7 +857,7 @@ class InferenceEngine:
             return joblib.load(path)
         except FileNotFoundError:
             raise FileNotFoundError(f"Sklearn model not found: {path}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- loader boundary: coerce arbitrary backend errors with path context
             raise RuntimeError(f"Failed to load sklearn model '{path}': {e}")
 
     def _load_transformers_model(self, path: str, **kwargs):
@@ -875,7 +870,7 @@ class InferenceEngine:
             raise FileNotFoundError(f"Transformers model not found: {path}")
         except OSError as e:
             raise OSError(f"Failed to load transformers model '{path}' (network/disk error): {e}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- loader boundary: coerce arbitrary backend errors with path context
             raise RuntimeError(f"Failed to load transformers model '{path}': {e}")
 
     def _load_onnx_model(self, path: str, **kwargs):
@@ -896,7 +891,7 @@ class InferenceEngine:
             return ort.InferenceSession(path, providers=providers)
         except FileNotFoundError:
             raise FileNotFoundError(f"ONNX model not found: {path}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- loader boundary: coerce arbitrary backend errors with path context
             raise RuntimeError(f"Failed to load ONNX model '{path}': {e}")
 
     def _load_gguf_model(self, path: str, **kwargs):
@@ -912,7 +907,7 @@ class InferenceEngine:
             return Llama(model_path=path, n_ctx=n_ctx, verbose=False)
         except FileNotFoundError:
             raise FileNotFoundError(f"GGUF model not found: {path}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- loader boundary: coerce arbitrary backend errors with path context
             raise RuntimeError(f"Failed to load GGUF model '{path}': {e}")
 
     def _load_gguf_speculative_model(self, path: str, **kwargs):
@@ -1111,7 +1106,7 @@ class InferenceEngine:
                     self._single_infer(model, framework, warmup_input)
                 elif framework in ("gguf", "gguf-speculative", "gguf-kv-quant", "gguf-multimodal", "transformers", "vl"):
                     self._single_infer(model, framework, "warmup")
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- warmup is best-effort; failure is logged, never raised
                 note_failure("engine:L534", exc) # Warmup failures are non-fatal
 
     def batch_infer(self, handle: str, inputs_list: list) -> BatchResult:
@@ -1129,7 +1124,7 @@ class InferenceEngine:
         """Ensure executor is shut down on garbage collection."""
         try:
             self._executor.shutdown(wait=False)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- __del__ must never raise; failure is logged
             note_failure("engine:L550", exc)
 
 
