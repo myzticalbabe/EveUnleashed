@@ -17,14 +17,12 @@ of being asserted in prose.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 from .dodeca_recall import SHAPES
 
 SOLIDS = sorted(SHAPES)
 
 # solid -> connective roles it can play (direction decides fan vs funnel)
-ROLES: Dict[str, List[str]] = {
+ROLES: dict[str, list[str]] = {
     "complete-20": ["fan", "funnel"],
     "cycle-20": ["ring", "chain"],
     "dodecahedron": ["mesh"],
@@ -39,57 +37,66 @@ class ShapeGraph:
     """Directed edges, each citing a registered solid. Refuses the untyped."""
 
     def __init__(self) -> None:
-        self.edges: List[Dict[str, str]] = []
+        self.edges: list[dict[str, str]] = []
 
     def declare(self, src: str, dst: str, solid: str, note: str = "") -> None:
         if solid not in SHAPES:
-            raise ValueError("unknown solid %r; registered: %s"
-                             % (solid, SOLIDS))
-        self.edges.append({"src": src, "dst": dst,
-                           "solid": solid, "note": note})
+            raise ValueError("unknown solid {!r}; registered: {}".format(solid, SOLIDS))
+        self.edges.append({"src": src, "dst": dst, "solid": solid, "note": note})
 
-    def audit(self) -> Dict:
+    def audit(self) -> dict:
         """Geometry from degrees: fan/funnel points, hub, isolates."""
-        out_deg: Dict[str, int] = {}
-        in_deg: Dict[str, int] = {}
+        out_deg: dict[str, int] = {}
+        in_deg: dict[str, int] = {}
         for e in self.edges:
             out_deg[e["src"]] = out_deg.get(e["src"], 0) + 1
             in_deg[e["dst"]] = in_deg.get(e["dst"], 0) + 1
         nodes = set(out_deg) | set(in_deg)
         fans = sorted(n for n, d in out_deg.items() if d >= 2)
         funnels = sorted(n for n, d in in_deg.items() if d >= 2)
-        hubs = sorted(n for n in nodes
-                      if any(e["dst"] == n and e["solid"] == "icosahedron"
-                             for e in self.edges))
-        isolated = sorted(n for n in nodes
-                          if out_deg.get(n, 0) + in_deg.get(n, 0) == 0)
-        by_solid: Dict[str, int] = {}
+        hubs = sorted(
+            n
+            for n in nodes
+            if any(e["dst"] == n and e["solid"] == "icosahedron" for e in self.edges)
+        )
+        isolated = sorted(n for n in nodes if out_deg.get(n, 0) + in_deg.get(n, 0) == 0)
+        by_solid: dict[str, int] = {}
         for e in self.edges:
             by_solid[e["solid"]] = by_solid.get(e["solid"], 0) + 1
         ok = not isolated
-        return {"verdict": "PASS" if ok else "FAIL", "clean": True,
-                "n_edges": len(self.edges), "n_nodes": len(nodes),
-                "fans": fans, "funnels": funnels, "hubs": hubs,
-                "isolated": isolated, "by_solid": by_solid}
+        return {
+            "verdict": "PASS" if ok else "FAIL",
+            "clean": True,
+            "n_edges": len(self.edges),
+            "n_nodes": len(nodes),
+            "fans": fans,
+            "funnels": funnels,
+            "hubs": hubs,
+            "isolated": isolated,
+            "by_solid": by_solid,
+        }
 
-    def to_manifest(self) -> Dict:
+    def to_manifest(self) -> dict:
         return {"solids": SOLIDS, "edges": list(self.edges)}
 
 
-def regime_histogram(graph: "ShapeGraph") -> Dict[str, int]:
+def regime_histogram(graph: ShapeGraph) -> dict[str, int]:
     """Edge count per connectance regime. Complete-20 splits by
     direction: out-degree >= 2 is fan, in-degree >= 2 is funnel."""
-    out_deg: Dict[str, int] = {}
-    in_deg: Dict[str, int] = {}
+    out_deg: dict[str, int] = {}
+    in_deg: dict[str, int] = {}
     for e in graph.edges:
         out_deg[e["src"]] = out_deg.get(e["src"], 0) + 1
         in_deg[e["dst"]] = in_deg.get(e["dst"], 0) + 1
-    hist: Dict[str, int] = {}
+    hist: dict[str, int] = {}
     for e in graph.edges:
         s = e["solid"]
         if s == "complete-20":
-            role = ("funnel" if in_deg[e["dst"]] >= 2
-                    else "fan" if out_deg[e["src"]] >= 2 else "fan")
+            role = (
+                "funnel"
+                if in_deg[e["dst"]] >= 2
+                else "fan" if out_deg[e["src"]] >= 2 else "fan"
+            )
         elif s == "cycle-20":
             role = "ring"
         elif s == "hypercube-32":

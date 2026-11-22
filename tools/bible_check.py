@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 """Check a canon corpus written in biblical form; render it, index it, generate it.
 
 WHY A CHECKER AT ALL
@@ -65,6 +64,7 @@ Usage:
   python tools/bible_check.py --genealogy           # print the generations
   python tools/bible_check.py --genealogy --write   # regenerate GENEALOGY.md
 """
+
 from __future__ import annotations
 
 import argparse
@@ -72,14 +72,14 @@ import ast
 import json
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
 
 #: The rule-resolution predicate is shared with `bible_theme.py`, so the two
 #: gates cannot disagree about whether a rule exists. A tool loaded by path has
 #: no sibling on `sys.path` unless it puts its own directory there.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import canon_rules  # noqa: E402  (after the path insertion, by necessity)
+import canon_rules
 
 REPO = Path(__file__).resolve().parents[1]
 BIBLE_DIR = REPO / "docs" / "bible"
@@ -95,8 +95,18 @@ STATUSES = ("seed", "drafting", "complete")
 #: A genre per book, because the Bible is an anthology and a single register for
 #: twelve books is pastiche. Each name here is a job, not a mood.
 GENRES = (
-    "etiology", "law", "history", "chronicle", "wisdom", "lament", "prophecy",
-    "gospel", "epistle", "apocalypse", "genealogy", "domain",
+    "etiology",
+    "law",
+    "history",
+    "chronicle",
+    "wisdom",
+    "lament",
+    "prophecy",
+    "gospel",
+    "epistle",
+    "apocalypse",
+    "genealogy",
+    "domain",
 )
 #: Placement of a verse inside a domain book: the ``practice`` block is rendered
 #: as a titled apparatus under the verse, never inline, so a reader can read the
@@ -129,8 +139,12 @@ CEILINGS = {
 
 #: The disclosure line, in the same terms the package's manifest refuses.
 REFUSED_SUBSTRINGS = (
-    "bcc_audit", "REINVESTIGATION", "FETCH_LOG", "edge_proof_ledger",
-    "identity_tiebreak", "new_sources_log",
+    "bcc_audit",
+    "REINVESTIGATION",
+    "FETCH_LOG",
+    "edge_proof_ledger",
+    "identity_tiebreak",
+    "new_sources_log",
 )
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?<![\d-])\d{3}[-.\s]\d{3}[-.\s]\d{4}(?![\d-])")
@@ -140,8 +154,10 @@ DIGIT_RE = re.compile(r"[0-9]")
 #: defect recorded in that package, and a checker that could not name it would
 #: push the author to cite the wrong file instead. The lookbehind refuses to
 #: begin inside a URL, so `https://host/x.md` cannot masquerade as a local path.
-PATH_RE = re.compile(r"(?<![\w/:.-])(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+"
-                     r"\.(?:py|json|md|js|ps1|sh|yml|yaml)")
+PATH_RE = re.compile(
+    r"(?<![\w/:.-])(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+"
+    r"\.(?:py|json|md|js|ps1|sh|yml|yaml)"
+)
 REF_RE = re.compile(r"^([a-z][a-z0-9_]*)\s+([0-9]+):([0-9]+)$")
 RULE_RE = re.compile(r"\bRULE\s+[0-9][0-9A-Za-z-]*")
 
@@ -152,10 +168,19 @@ RULE_RE = re.compile(r"\bRULE\s+[0-9][0-9A-Za-z-]*")
 #: reader is entitled to know which they are reading.
 ANNOTATION_KINDS = ("textual", "historical", "translation", "editorial", "cross")
 
-TOP_KEYS = {"schema", "title", "status", "updated", "limits", "note", "books",
-            "glossary", "edition", "configs"}
-BOOK_KEYS = {"id", "name", "subtitle", "genre", "domain", "introduction",
-             "chapters"}
+TOP_KEYS = {
+    "schema",
+    "title",
+    "status",
+    "updated",
+    "limits",
+    "note",
+    "books",
+    "glossary",
+    "edition",
+    "configs",
+}
+BOOK_KEYS = {"id", "name", "subtitle", "genre", "domain", "introduction", "chapters"}
 #: A book may be *about* a declared domain, and then it must name one that
 #: exists: a guide organised by domain is only organised if every book's subject
 #: is a real, measurable tree rather than a heading someone liked.
@@ -166,8 +191,17 @@ DOMAINS_MODULE = "tools/domain_trees.py"
 PRACTICE_KEYS = {"symptom", "cause", "detection", "remedy", "evidence"}
 MIN_EVIDENCE = 3
 CHAPTER_KEYS = {"number", "sections", "verses"}
-VERSE_KEYS = {"number", "text", "cites", "source", "statute", "practice", "variants",
-              "annotations", "note"}
+VERSE_KEYS = {
+    "number",
+    "text",
+    "cites",
+    "source",
+    "statute",
+    "practice",
+    "variants",
+    "annotations",
+    "note",
+}
 STATUTE_KEYS = {"rule", "check", "why"}
 VARIANT_KEYS = {"reading", "text", "source"}
 ANNOTATION_KEYS = {"kind", "note", "source"}
@@ -181,20 +215,20 @@ class CorpusError(Exception):
     """Malformed corpus. Never downgraded to a warning."""
 
 
-def load(path: Path = CORPUS) -> Dict:
+def load(path: Path = CORPUS) -> dict:
     if not path.exists():
-        raise CorpusError("%s is absent; there is no corpus to check" % path)
+        raise CorpusError("{} is absent; there is no corpus to check".format(path))
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise CorpusError("%s is not valid JSON: %s" % (path.name, exc)) from exc
+        raise CorpusError("{} is not valid JSON: {}".format(path.name, exc)) from exc
 
 
-def _paths_in(text: str) -> List[str]:
+def _paths_in(text: str) -> list[str]:
     return PATH_RE.findall(text or "")
 
 
-def _provenance_problems(source, where: str, repo: Path) -> List[str]:
+def _provenance_problems(source, where: str, repo: Path) -> list[str]:
     """A figure must name a command that exists. Verbs alone do not count.
 
     `python some_tool.py` with no path is a memory of a command; a path that
@@ -203,121 +237,150 @@ def _provenance_problems(source, where: str, repo: Path) -> List[str]:
     since been replaced -- but the token must still be written down.
     """
     if not isinstance(source, str) or not source.strip():
-        return ["%s: a number needs `source`: the command or path that produced it"
-                % where]
+        return [
+            "{}: a number needs `source`: the command or path that produced it".format(
+                where
+            )
+        ]
     tokens = _paths_in(source)
     if not tokens:
-        return ["%s: source names no repository path (%r); a figure with no "
-                "re-runnable command is a claim, not evidence" % (where, source)]
+        return [
+            "{}: source names no repository path ({!r}); a figure with no "
+            "re-runnable command is a claim, not evidence".format(where, source)
+        ]
     problems = []
     for token in tokens:
         head = token.split("/", 1)[0]
         if head == "logs":
             continue
         if not (Path(repo) / token.split("#", 1)[0]).exists():
-            problems.append("%s: source path does not exist here: %s" % (where, token))
+            problems.append(
+                "{}: source path does not exist here: {}".format(where, token)
+            )
     return problems
 
 
-def _text_problems(text, where: str) -> List[str]:
-    problems: List[str] = []
+def _text_problems(text, where: str) -> list[str]:
+    problems: list[str] = []
     if not isinstance(text, str) or not text.strip():
-        return ["%s: text is empty" % where]
+        return ["{}: text is empty".format(where)]
     if not re.search(r"[A-Za-z]", text):
-        problems.append("%s: text carries no words" % where)
+        problems.append("{}: text carries no words".format(where))
     lowered = text.lower()
     for token in REFUSED_SUBSTRINGS:
         if token.lower() in lowered:
-            problems.append("%s: refused substring %r -- methodology ships, people "
-                            "do not" % (where, token))
+            problems.append(
+                "{}: refused substring {!r} -- methodology ships, people "
+                "do not".format(where, token)
+            )
     if EMAIL_RE.search(text):
-        problems.append("%s: an email address is refused" % where)
+        problems.append("{}: an email address is refused".format(where))
     if PHONE_RE.search(text):
-        problems.append("%s: a phone number is refused" % where)
+        problems.append("{}: a phone number is refused".format(where))
     return problems
 
 
-def _prose_block_problems(paragraphs, sources, where: str, repo: Path) -> List[str]:
+def _prose_block_problems(paragraphs, sources, where: str, repo: Path) -> list[str]:
     """An introduction or a gloss is prose, but it still may not assert a figure
     for free: the moment it carries a digit, the block must name its sources."""
-    problems: List[str] = []
+    problems: list[str] = []
     if not isinstance(paragraphs, list) or not paragraphs:
-        return ["%s: paragraphs must be a non-empty list" % where]
+        return ["{}: paragraphs must be a non-empty list".format(where)]
     carries_digit = False
     for index, paragraph in enumerate(paragraphs):
-        problems.extend(_text_problems(paragraph, "%s paragraph %d" % (where, index + 1)))
+        problems.extend(
+            _text_problems(paragraph, "{} paragraph {:d}".format(where, index + 1))
+        )
         if isinstance(paragraph, str) and DIGIT_RE.search(paragraph):
             carries_digit = True
     if sources is not None and not isinstance(sources, list):
-        problems.append("%s: sources must be a list" % where)
+        problems.append("{}: sources must be a list".format(where))
         sources = []
     if carries_digit:
         if not sources:
-            problems.append("%s: a paragraph carries a figure, so the block must name "
-                            "`sources` -- or spell the number out" % where)
+            problems.append(
+                "{}: a paragraph carries a figure, so the block must name "
+                "`sources` -- or spell the number out".format(where)
+            )
         for source in sources or []:
             problems.extend(_provenance_problems(source, where, repo))
     return problems
 
 
-def _statute_problems(statute, where: str, repo: Path, canon: Optional[Dict[str, Dict]],
-                      canon_text: Optional[str] = None) -> List[str]:
+def _statute_problems(
+    statute,
+    where: str,
+    repo: Path,
+    canon: dict[str, dict] | None,
+    canon_text: str | None = None,
+) -> list[str]:
     if not isinstance(statute, dict):
-        return ["%s: statute must be an object with `rule` and `check`" % where]
-    problems: List[str] = []
+        return ["{}: statute must be an object with `rule` and `check`".format(where)]
+    problems: list[str] = []
     unknown = set(statute) - STATUTE_KEYS
     if unknown:
-        problems.append("%s: unknown statute key(s) %s" % (where, sorted(unknown)))
+        problems.append("{}: unknown statute key(s) {}".format(where, sorted(unknown)))
     rule = statute.get("rule")
     if not isinstance(rule, str) or not RULE_RE.search(rule):
-        problems.append("%s: statute.rule must name a RULE (e.g. \"RULE 0B\")" % where)
+        problems.append(
+            '{}: statute.rule must name a RULE (e.g. "RULE 0B")'.format(where)
+        )
     elif canon is None:
-        problems.append("%s: MANDATES.md is unreadable -- the rule %r cannot be "
-                        "verified against canon" % (where, rule))
+        problems.append(
+            "{}: MANDATES.md is unreadable -- the rule {!r} cannot be "
+            "verified against canon".format(where, rule)
+        )
     else:
         # A heading with a body, not a mention anywhere in the file: `RULE 0B-D`
         # appears in two `Related:` lines, and that is what the substring test
         # was reading as a law.
         defect = canon_rules.rule_problem(rule, canon, canon_text)
         if defect:
-            problems.append("%s: %s" % (where, defect))
+            problems.append("{}: {}".format(where, defect))
     check = statute.get("check")
     if not isinstance(check, str) or not check.strip():
-        problems.append("%s: statute.check is empty -- a law with nothing executing "
-                        "it is a proverb, not a statute" % where)
+        problems.append(
+            "{}: statute.check is empty -- a law with nothing executing "
+            "it is a proverb, not a statute".format(where)
+        )
     else:
         tokens = _paths_in(check)
         if not tokens:
-            problems.append("%s: statute.check names no repository path (%r)"
-                            % (where, check))
+            problems.append(
+                "{}: statute.check names no repository path ({!r})".format(where, check)
+            )
         for token in tokens:
             if not (Path(repo) / token.split("#", 1)[0]).exists():
-                problems.append("%s: statute.check does not exist here: %s"
-                                % (where, token))
+                problems.append(
+                    "{}: statute.check does not exist here: {}".format(where, token)
+                )
     return problems
 
 
-def _resolve_citation(citation: str, index: Dict[str, Dict[int, Dict[int, Dict]]],
-                      repo: Path) -> Optional[str]:
+def _resolve_citation(
+    citation: str, index: dict[str, dict[int, dict[int, dict]]], repo: Path
+) -> str | None:
     """Return a problem string, or None when the citation lands."""
     match = REF_RE.match(citation)
     if match:
         book_id, chapter_text, verse_text = match.groups()
         chapter, verse = int(chapter_text), int(verse_text)
         if book_id not in index:
-            return "cites unknown book %r" % book_id
+            return "cites unknown book {!r}".format(book_id)
         if chapter not in index[book_id] or verse not in index[book_id][chapter]:
-            return "cites %s, which does not exist" % citation
+            return "cites {}, which does not exist".format(citation)
         return None
     if PATH_RE.fullmatch(citation):
         if (repo / citation).exists():
             return None
-        return "cites %s, which does not exist in this repository" % citation
-    return ("citation %r must read \"<book> <chapter>:<verse>\" or name a "
-            "repository path" % citation)
+        return "cites {}, which does not exist in this repository".format(citation)
+    return (
+        'citation {!r} must read "<book> <chapter>:<verse>" or name a '
+        "repository path".format(citation)
+    )
 
 
-def declared_domains(repo: Path = REPO) -> Optional[set]:
+def declared_domains(repo: Path = REPO) -> set | None:
     """The domain ids declared in `tools/domain_trees.py`, read by AST.
 
     Read, not imported: importing the atlas tool drags its whole census in, and a
@@ -334,7 +397,9 @@ def declared_domains(repo: Path = REPO) -> Optional[set]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
     except SyntaxError as exc:
-        raise CorpusError("%s could not be parsed: %s" % (DOMAINS_MODULE, exc)) from exc
+        raise CorpusError(
+            "{} could not be parsed: {}".format(DOMAINS_MODULE, exc)
+        ) from exc
     for node in tree.body:
         # Both forms are in use in this tree: a bare assignment and an annotated
         # one (`DOMAINS: Dict[str, ...] = {`). Reading only the first reported
@@ -349,13 +414,16 @@ def declared_domains(repo: Path = REPO) -> Optional[set]:
         if not isinstance(target, ast.Name) or target.id != "DOMAINS":
             continue
         if isinstance(value, ast.Dict):
-            keys = [key.value for key in value.keys
-                    if isinstance(key, ast.Constant) and isinstance(key.value, str)]
+            keys = [
+                key.value
+                for key in value.keys
+                if isinstance(key, ast.Constant) and isinstance(key.value, str)
+            ]
             return set(keys)
     return None
 
 
-def harvest_ids(repo: Path = REPO) -> Optional[set]:
+def harvest_ids(repo: Path = REPO) -> set | None:
     """Ids available to cite. None when the ledger is absent, which is a defect."""
     path = Path(repo) / "docs" / "bible" / "harvest.json"
     if not path.exists():
@@ -363,11 +431,13 @@ def harvest_ids(repo: Path = REPO) -> Optional[set]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise CorpusError("docs/bible/harvest.json could not be read: %s" % exc) from exc
+        raise CorpusError(
+            "docs/bible/harvest.json could not be read: {}".format(exc)
+        ) from exc
     return {record.get("id") for record in data.get("records", []) if record.get("id")}
 
 
-def _practice_problems(practice, where: str, repo: Path, ids: Optional[set]) -> List[str]:
+def _practice_problems(practice, where: str, repo: Path, ids: set | None) -> list[str]:
     """A practice is instruction: an observation, its cause, its detection, its fix.
 
     The evidence rule is the one that makes the corpus a guide rather than a
@@ -375,42 +445,54 @@ def _practice_problems(practice, where: str, repo: Path, ids: Optional[set]) -> 
     is somebody's impression, and it belongs in a footnote, not in a canon.
     """
     if not isinstance(practice, dict):
-        return ["%s: practice must be an object" % where]
-    problems: List[str] = []
+        return ["{}: practice must be an object".format(where)]
+    problems: list[str] = []
     unknown = set(practice) - PRACTICE_KEYS
     if unknown:
-        problems.append("%s: unknown practice key(s) %s" % (where, sorted(unknown)))
+        problems.append("{}: unknown practice key(s) {}".format(where, sorted(unknown)))
     for key in ("symptom", "cause", "detection", "remedy"):
         value = practice.get(key)
-        problems.extend(_text_problems(value, "%s practice.%s" % (where, key)))
+        problems.extend(_text_problems(value, "{} practice.{}".format(where, key)))
         if isinstance(value, str) and DIGIT_RE.search(value):
-            problems.append("%s: practice.%s carries a figure; a practice states the "
-                            "shape of a failure, and the record that measured it is "
-                            "cited in `evidence`" % (where, key))
+            problems.append(
+                "{}: practice.{} carries a figure; a practice states the "
+                "shape of a failure, and the record that measured it is "
+                "cited in `evidence`".format(where, key)
+            )
     detection = practice.get("detection")
     if isinstance(detection, str) and detection.strip():
         tokens = _paths_in(detection)
         if not tokens:
-            problems.append("%s: practice.detection names no repository path -- "
-                            "what command would show this is happening?" % where)
+            problems.append(
+                "{}: practice.detection names no repository path -- "
+                "what command would show this is happening?".format(where)
+            )
         for token in tokens:
             if not (Path(repo) / token.split("#", 1)[0]).exists():
-                problems.append("%s: practice.detection does not exist here: %s"
-                                % (where, token))
+                problems.append(
+                    "{}: practice.detection does not exist here: {}".format(
+                        where, token
+                    )
+                )
     evidence = practice.get("evidence")
     if not isinstance(evidence, list) or len(set(evidence)) < MIN_EVIDENCE:
-        problems.append("%s: practice.evidence must cite at least %d harvest records; "
-                        "a rule distilled from fewer is an anecdote"
-                        % (where, MIN_EVIDENCE))
+        problems.append(
+            "%s: practice.evidence must cite at least %d harvest records; "
+            "a rule distilled from fewer is an anecdote" % (where, MIN_EVIDENCE)
+        )
         evidence = evidence if isinstance(evidence, list) else []
     if ids is None:
-        problems.append("%s: docs/bible/harvest.json is absent, so no citation can "
-                        "be checked -- run tools/bible_harvest.py --write" % where)
+        problems.append(
+            "{}: docs/bible/harvest.json is absent, so no citation can "
+            "be checked -- run tools/bible_harvest.py --write".format(where)
+        )
     else:
         for record_id in evidence:
             if record_id not in ids:
-                problems.append("%s: practice.evidence cites %r, which the harvest "
-                                "ledger does not contain" % (where, record_id))
+                problems.append(
+                    "{}: practice.evidence cites {!r}, which the harvest "
+                    "ledger does not contain".format(where, record_id)
+                )
     return problems
 
 
@@ -418,7 +500,7 @@ CONFIG_KINDS = ("text", "json", "path")
 CONFIG_SCOPES = ("repo", "host")
 
 
-def _config_problems(configs, repo: Path) -> Tuple[List[str], List[str]]:
+def _config_problems(configs, repo: Path) -> tuple[list[str], list[str]]:
     """The `configs` layer: the settings the corpus's instructions depend on.
 
     A canon of instruction with no configuration is a sermon. Every rule in this
@@ -437,42 +519,50 @@ def _config_problems(configs, repo: Path) -> Tuple[List[str], List[str]]:
     reported as warnings elsewhere, the same distinction `box_profile.py` and
     `tools/platform_claims.py` make between unknown and absent.
     """
-    problems: List[str] = []
-    warnings: List[str] = []
+    problems: list[str] = []
+    warnings: list[str] = []
     seen = set()
     for index, config in enumerate(configs):
-        where = "configs[%d]" % index
+        where = "configs[{:d}]".format(index)
         if not isinstance(config, dict):
-            problems.append("%s: must be an object" % where)
+            problems.append("{}: must be an object".format(where))
             continue
         cid = config.get("id")
         if not isinstance(cid, str) or not re.match(r"^[a-z0-9][a-z0-9-]*$", cid or ""):
-            problems.append("%s: id must be a lowercase slug" % where)
+            problems.append("{}: id must be a lowercase slug".format(where))
         elif cid in seen:
-            problems.append("%s: duplicate id %r" % (where, cid))
+            problems.append("{}: duplicate id {!r}".format(where, cid))
         else:
             seen.add(cid)
         if isinstance(cid, str) and cid:
-            where = "configs[%s]" % cid
+            where = "configs[{}]".format(cid)
 
-        if not isinstance(config.get("name"), str) or not config.get("name", "").strip():
-            problems.append("%s: name is empty -- say what the setting is for" % where)
+        if (
+            not isinstance(config.get("name"), str)
+            or not config.get("name", "").strip()
+        ):
+            problems.append(
+                "{}: name is empty -- say what the setting is for".format(where)
+            )
         scope = config.get("scope", "repo")
         if scope not in CONFIG_SCOPES:
-            problems.append("%s: scope must be one of %s" % (where, CONFIG_SCOPES))
+            problems.append("{}: scope must be one of {}".format(where, CONFIG_SCOPES))
         kind = config.get("kind")
         if kind not in CONFIG_KINDS:
-            problems.append("%s: kind must be one of %s" % (where, CONFIG_KINDS))
+            problems.append("{}: kind must be one of {}".format(where, CONFIG_KINDS))
             continue
 
         detail = config.get("detail", "")
         for text in (config.get("governs"), config.get("remedy")):
             if not isinstance(text, str) or not text.strip():
-                problems.append("%s: `governs` and `remedy` are both required -- a "
-                                "setting with no consequence and no repair is trivia"
-                                % where)
+                problems.append(
+                    "{}: `governs` and `remedy` are both required -- a "
+                    "setting with no consequence and no repair is trivia".format(where)
+                )
                 break
-        remedy_problems = _provenance_problems(config.get("remedy"), where + ".remedy", repo)
+        remedy_problems = _provenance_problems(
+            config.get("remedy"), where + ".remedy", repo
+        )
         problems.extend(p for p in remedy_problems if "does not exist" in p)
 
         files = []
@@ -481,18 +571,20 @@ def _config_problems(configs, repo: Path) -> Tuple[List[str], List[str]]:
         for mirror in config.get("mirrors") or []:
             files.append((mirror, True))
         if not files and kind != "path":
-            problems.append("%s: names no `file`" % where)
+            problems.append("{}: names no `file`".format(where))
 
         value = config.get("value")
         if kind in ("text", "json") and value is None:
-            problems.append("%s: a %s config needs `value`" % (where, kind))
+            problems.append("{}: a {} config needs `value`".format(where, kind))
 
         if kind == "path":
             # A path config names a thing, not a line in a file: the interpreter,
             # a directory, a store. Checked once, outside the file loop.
             text = str(value)
             if not ((Path(repo) / text).exists() or Path(text).exists()):
-                message = "%s: declared path does not exist here: %s" % (where, text)
+                message = "{}: declared path does not exist here: {}".format(
+                    where, text
+                )
                 if scope == "host":
                     warnings.append("HOST-DIFFERS " + message)
                 else:
@@ -502,31 +594,34 @@ def _config_problems(configs, repo: Path) -> Tuple[List[str], List[str]]:
         for rel, is_mirror in files:
             rel = str(rel)
             path = Path(repo) / rel
-            label = "%s.mirrors[%s]" % (where, rel) if is_mirror else where
+            label = "{}.mirrors[{}]".format(where, rel) if is_mirror else where
             if not path.exists():
-                problems.append("%s: file does not exist: %s" % (label, rel))
+                problems.append("{}: file does not exist: {}".format(label, rel))
                 continue
             try:
                 raw = path.read_text(encoding="utf-8", errors="replace")
             except OSError as exc:
-                problems.append("%s: unreadable: %s (%s)" % (label, rel, exc))
+                problems.append("{}: unreadable: {} ({})".format(label, rel, exc))
                 continue
 
             if kind == "text":
                 anchor = config.get("anchor")
                 needle = str(value)
                 if anchor:
-                    hit = any(needle in line and anchor in line
-                              for line in raw.splitlines())
+                    hit = any(
+                        needle in line and anchor in line for line in raw.splitlines()
+                    )
                     if not hit:
-                        message = ("%s: no line in %s carries %r with %r -- the value "
-                                   "drifted from the corpus" % (label, rel, needle, anchor))
+                        message = (
+                            "{}: no line in {} carries {!r} with {!r} -- the value "
+                            "drifted from the corpus".format(label, rel, needle, anchor)
+                        )
                     else:
                         continue
                 elif needle in raw:
                     continue
                 else:
-                    message = "%s: %r not found in %s" % (label, needle, rel)
+                    message = "{}: {!r} not found in {}".format(label, needle, rel)
                 if scope == "host":
                     warnings.append("HOST-DIFFERS " + message)
                 else:
@@ -535,11 +630,11 @@ def _config_problems(configs, repo: Path) -> Tuple[List[str], List[str]]:
                 try:
                     document = json.loads(raw)
                 except json.JSONDecodeError as exc:
-                    problems.append("%s: %s is not JSON (%s)" % (label, rel, exc))
+                    problems.append("{}: {} is not JSON ({})".format(label, rel, exc))
                     continue
                 key = config.get("key")
                 if not isinstance(key, str) or not key.strip():
-                    problems.append("%s: a json config needs `key`" % label)
+                    problems.append("{}: a json config needs `key`".format(label))
                     continue
                 node = document
                 for part in key.split("."):
@@ -549,10 +644,13 @@ def _config_problems(configs, repo: Path) -> Tuple[List[str], List[str]]:
                         node = None
                         break
                 if node is None:
-                    problems.append("%s: %s has no key %r" % (label, rel, key))
+                    problems.append("{}: {} has no key {!r}".format(label, rel, key))
                 elif not _same_scalar(node, value):
-                    problems.append("%s: %s[%s] is %r, the corpus says %r"
-                                    % (label, rel, key, node, value))
+                    problems.append(
+                        "{}: {}[{}] is {!r}, the corpus says {!r}".format(
+                            label, rel, key, node, value
+                        )
+                    )
 
         if detail:
             _text_problems(detail, where + ".detail")
@@ -564,22 +662,25 @@ def _same_scalar(left, right) -> bool:
     sides are numbers so that 20 and "20" are the same setting and 0.70 vs 0.7 is
     the same threshold."""
     try:
-        return float(left) == float(right)          # type: ignore[arg-type]
+        return float(left) == float(right)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return str(left).strip() == str(right).strip()
 
 
-def validate(data: Dict, repo: Path = REPO) -> Dict:
+def validate(data: dict, repo: Path = REPO) -> dict:
     """Validate, and RETURN the diagnostics. Never mutate the corpus.
 
     A validator with a side effect is not a predicate: two runs over the same
     dict would disagree about what it says, and a test that reuses a fixture
     would inherit the first reading's counts.
     """
-    problems: List[str] = []
-    warnings: List[str] = []
-    canon_text = MANDATES.read_text(encoding="utf-8", errors="replace") \
-        if MANDATES.exists() else None
+    problems: list[str] = []
+    warnings: list[str] = []
+    canon_text = (
+        MANDATES.read_text(encoding="utf-8", errors="replace")
+        if MANDATES.exists()
+        else None
+    )
     canon = canon_rules.rule_blocks(canon_text) if canon_text is not None else None
     try:
         domains = declared_domains(repo)
@@ -594,14 +695,16 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
 
     unknown = set(data) - TOP_KEYS
     if unknown:
-        problems.append("unknown top-level key(s) %s" % sorted(unknown))
+        problems.append("unknown top-level key(s) {}".format(sorted(unknown)))
     if data.get("schema") != SCHEMA:
-        problems.append("schema must be %r, found %r" % (SCHEMA, data.get("schema")))
+        problems.append(
+            "schema must be {!r}, found {!r}".format(SCHEMA, data.get("schema"))
+        )
     if not isinstance(data.get("title"), str) or not data.get("title", "").strip():
         problems.append("title is empty")
     status = data.get("status")
     if status not in STATUSES:
-        problems.append("status must be one of %s" % (STATUSES,))
+        problems.append("status must be one of {}".format(STATUSES))
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(data.get("updated", ""))):
         problems.append("updated must be YYYY-MM-DD")
 
@@ -611,15 +714,17 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
         problems.append("limits must be an object")
     unknown = set(limits) - set(CEILINGS)
     if unknown:
-        problems.append("unknown limits key(s) %s" % sorted(unknown))
+        problems.append("unknown limits key(s) {}".format(sorted(unknown)))
     for name, ceiling in sorted(CEILINGS.items()):
         value = limits.get(name, DEFAULT_LIMITS[name])
         if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-            problems.append("limits.%s must be a positive integer" % name)
+            problems.append("limits.{} must be a positive integer".format(name))
             limits[name] = DEFAULT_LIMITS[name]
         elif value > ceiling:
-            problems.append("limits.%s may not exceed %d; a cap the author can raise "
-                            "is not a cap" % (name, ceiling))
+            problems.append(
+                "limits.%s may not exceed %d; a cap the author can raise "
+                "is not a cap" % (name, ceiling)
+            )
             limits[name] = ceiling
 
     # The configuration layer. Absent is a warning rather than a failure, because
@@ -628,8 +733,10 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
     # that does not exist.
     configs = data.get("configs")
     if configs is None:
-        warnings.append("no `configs` section: this corpus states rules without "
-                        "pinning the settings that make them true")
+        warnings.append(
+            "no `configs` section: this corpus states rules without "
+            "pinning the settings that make them true"
+        )
         configs = []
     elif not isinstance(configs, list):
         problems.append("configs must be a list")
@@ -646,27 +753,30 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
         else:
             unknown = set(edition) - EDITION_KEYS
             if unknown:
-                problems.append("unknown edition key(s) %s" % sorted(unknown))
+                problems.append("unknown edition key(s) {}".format(sorted(unknown)))
             for key in sorted(EDITION_KEYS):
-                if not isinstance(edition.get(key), str) or not edition.get(key, "").strip():
-                    problems.append("edition.%s is empty" % key)
+                if (
+                    not isinstance(edition.get(key), str)
+                    or not edition.get(key, "").strip()
+                ):
+                    problems.append("edition.{} is empty".format(key))
 
     glossary = data.get("glossary", [])
     if not isinstance(glossary, list):
         problems.append("glossary must be a list")
         glossary = []
     for index, entry in enumerate(glossary):
-        where = "glossary[%d]" % index
+        where = "glossary[{:d}]".format(index)
         if not isinstance(entry, dict):
-            problems.append("%s: must be an object" % where)
+            problems.append("{}: must be an object".format(where))
             continue
         unknown = set(entry) - GLOSSARY_KEYS
         if unknown:
-            problems.append("%s: unknown key(s) %s" % (where, sorted(unknown)))
+            problems.append("{}: unknown key(s) {}".format(where, sorted(unknown)))
         for key in ("term", "gloss"):
             if not isinstance(entry.get(key), str) or not entry.get(key, "").strip():
-                problems.append("%s: %s is empty" % (where, key))
-        problems.extend(_text_problems(entry.get("gloss"), "%s gloss" % where))
+                problems.append("{}: {} is empty".format(where, key))
+        problems.extend(_text_problems(entry.get("gloss"), "{} gloss".format(where)))
         if isinstance(entry.get("gloss"), str) and DIGIT_RE.search(entry["gloss"]):
             problems.extend(_provenance_problems(entry.get("source"), where, repo))
 
@@ -675,135 +785,180 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
         problems.append("books must be a non-empty list")
         books = []
     if isinstance(limits.get("max_books"), int) and len(books) > limits["max_books"]:
-        problems.append("%d books declared, limit is %d -- retire one to add one"
-                        % (len(books), limits["max_books"]))
+        problems.append(
+            "%d books declared, limit is %d -- retire one to add one"
+            % (len(books), limits["max_books"])
+        )
 
-    index: Dict[str, Dict[int, Dict[int, Dict]]] = {}
-    citations: List[Tuple[str, str]] = []          # (verse ref, citation)
-    seen_text: Dict[str, List[str]] = {}
+    index: dict[str, dict[int, dict[int, dict]]] = {}
+    citations: list[tuple[str, str]] = []  # (verse ref, citation)
+    seen_text: dict[str, list[str]] = {}
 
     for position, book in enumerate(books):
-        where = "books[%d]" % position
+        where = "books[{:d}]".format(position)
         if not isinstance(book, dict):
-            problems.append("%s: must be an object" % where)
+            problems.append("{}: must be an object".format(where))
             continue
         unknown = set(book) - BOOK_KEYS
         if unknown:
-            problems.append("%s: unknown key(s) %s" % (where, sorted(unknown)))
+            problems.append("{}: unknown key(s) {}".format(where, sorted(unknown)))
         identifier = book.get("id")
-        if not isinstance(identifier, str) or not re.match(r"^[a-z][a-z0-9_]*$", identifier):
-            problems.append("%s: id must be lower_snake_case" % where)
+        if not isinstance(identifier, str) or not re.match(
+            r"^[a-z][a-z0-9_]*$", identifier
+        ):
+            problems.append("{}: id must be lower_snake_case".format(where))
             continue
-        where = "book %r" % identifier
+        where = "book {!r}".format(identifier)
         if identifier in index:
-            problems.append("%s: duplicate book id" % where)
+            problems.append("{}: duplicate book id".format(where))
             continue
         for key in ("name", "subtitle"):
             if not isinstance(book.get(key), str) or not book.get(key, "").strip():
-                problems.append("%s: %s is empty" % (where, key))
+                problems.append("{}: {} is empty".format(where, key))
         if book.get("genre") not in GENRES:
-            problems.append("%s: genre must be one of %s" % (where, GENRES))
+            problems.append("{}: genre must be one of {}".format(where, GENRES))
         if "domain" in book:
             domain = book["domain"]
             if domains is None:
-                problems.append("%s: %s is unreadable, so the declared domain %r "
-                                "cannot be verified"
-                                % (where, DOMAINS_MODULE, domain))
+                problems.append(
+                    "{}: {} is unreadable, so the declared domain {!r} "
+                    "cannot be verified".format(where, DOMAINS_MODULE, domain)
+                )
             elif domain not in domains:
-                problems.append("%s: domain %r is not declared in %s (declared: %s)"
-                                % (where, domain, DOMAINS_MODULE,
-                                   ", ".join(sorted(domains))))
+                problems.append(
+                    "{}: domain {!r} is not declared in {} (declared: {})".format(
+                        where, domain, DOMAINS_MODULE, ", ".join(sorted(domains))
+                    )
+                )
         if status == "complete" and "introduction" not in book:
-            problems.append("%s: a complete canon gives every book an introduction"
-                            % where)
+            problems.append(
+                "{}: a complete canon gives every book an introduction".format(where)
+            )
         introduction = book.get("introduction")
         if introduction is not None:
             if not isinstance(introduction, dict):
-                problems.append("%s: introduction must be an object" % where)
+                problems.append("{}: introduction must be an object".format(where))
             else:
                 unknown = set(introduction) - INTRODUCTION_KEYS
                 if unknown:
-                    problems.append("%s: unknown introduction key(s) %s"
-                                    % (where, sorted(unknown)))
-                problems.extend(_prose_block_problems(introduction.get("paragraphs"),
-                                                     introduction.get("sources", []),
-                                                     "%s introduction" % where, repo))
+                    problems.append(
+                        "{}: unknown introduction key(s) {}".format(
+                            where, sorted(unknown)
+                        )
+                    )
+                problems.extend(
+                    _prose_block_problems(
+                        introduction.get("paragraphs"),
+                        introduction.get("sources", []),
+                        "{} introduction".format(where),
+                        repo,
+                    )
+                )
         chapters = book.get("chapters")
         if not isinstance(chapters, list) or not chapters:
-            problems.append("%s: chapters must be a non-empty list" % where)
+            problems.append("{}: chapters must be a non-empty list".format(where))
             continue
-        if isinstance(limits.get("max_chapters_per_book"), int) and \
-                len(chapters) > limits["max_chapters_per_book"]:
-            problems.append("%s: %d chapters, limit is %d"
-                            % (where, len(chapters), limits["max_chapters_per_book"]))
+        if (
+            isinstance(limits.get("max_chapters_per_book"), int)
+            and len(chapters) > limits["max_chapters_per_book"]
+        ):
+            problems.append(
+                "%s: %d chapters, limit is %d"
+                % (where, len(chapters), limits["max_chapters_per_book"])
+            )
         index[identifier] = {}
         for chapter_position, chapter in enumerate(chapters):
-            cwhere = "%s chapter %d" % (where, chapter_position + 1)
+            cwhere = "{} chapter {:d}".format(where, chapter_position + 1)
             if not isinstance(chapter, dict):
-                problems.append("%s: must be an object" % cwhere)
+                problems.append("{}: must be an object".format(cwhere))
                 continue
             unknown = set(chapter) - CHAPTER_KEYS
             if unknown:
-                problems.append("%s: unknown key(s) %s" % (cwhere, sorted(unknown)))
+                problems.append("{}: unknown key(s) {}".format(cwhere, sorted(unknown)))
             number = chapter.get("number")
             if number != chapter_position + 1:
-                problems.append("%s: chapter numbering must be contiguous from 1; "
-                                "found %r at position %d"
-                                % (cwhere, number, chapter_position + 1))
+                problems.append(
+                    "%s: chapter numbering must be contiguous from 1; "
+                    "found %r at position %d" % (cwhere, number, chapter_position + 1)
+                )
                 continue
             verses = chapter.get("verses")
             if not isinstance(verses, list) or not verses:
-                problems.append("%s: verses must be a non-empty list" % cwhere)
+                problems.append("{}: verses must be a non-empty list".format(cwhere))
                 continue
-            if isinstance(limits.get("max_verses_per_chapter"), int) and \
-                    len(verses) > limits["max_verses_per_chapter"]:
-                problems.append("%s: %d verses, limit is %d"
-                                % (cwhere, len(verses), limits["max_verses_per_chapter"]))
+            if (
+                isinstance(limits.get("max_verses_per_chapter"), int)
+                and len(verses) > limits["max_verses_per_chapter"]
+            ):
+                problems.append(
+                    "%s: %d verses, limit is %d"
+                    % (cwhere, len(verses), limits["max_verses_per_chapter"])
+                )
             sections = chapter.get("sections", [])
             if not isinstance(sections, list):
-                problems.append("%s: sections must be a list" % cwhere)
+                problems.append("{}: sections must be a list".format(cwhere))
                 sections = []
             previous = 0
             for section_position, section in enumerate(sections):
-                swhere = "%s section %d" % (cwhere, section_position + 1)
+                swhere = "{} section {:d}".format(cwhere, section_position + 1)
                 if not isinstance(section, dict):
-                    problems.append("%s: must be an object" % swhere)
+                    problems.append("{}: must be an object".format(swhere))
                     continue
                 unknown = set(section) - SECTION_KEYS
                 if unknown:
-                    problems.append("%s: unknown key(s) %s" % (swhere, sorted(unknown)))
+                    problems.append(
+                        "{}: unknown key(s) {}".format(swhere, sorted(unknown))
+                    )
                 start = section.get("before_verse")
-                if not isinstance(start, int) or isinstance(start, bool) or \
-                        not 1 <= start <= len(verses):
-                    problems.append("%s: before_verse must name a verse in this chapter "
-                                    "(1..%d)" % (swhere, len(verses)))
+                if (
+                    not isinstance(start, int)
+                    or isinstance(start, bool)
+                    or not 1 <= start <= len(verses)
+                ):
+                    problems.append(
+                        "%s: before_verse must name a verse in this chapter "
+                        "(1..%d)" % (swhere, len(verses))
+                    )
                 elif start <= previous:
-                    problems.append("%s: sections must ascend; %d follows %d"
-                                    % (swhere, start, previous))
+                    problems.append(
+                        "%s: sections must ascend; %d follows %d"
+                        % (swhere, start, previous)
+                    )
                 else:
                     previous = start
                 heading = section.get("heading")
-                problems.extend(_text_problems(heading, "%s heading" % swhere))
+                problems.extend(_text_problems(heading, "{} heading".format(swhere)))
                 if isinstance(heading, str) and DIGIT_RE.search(heading):
-                    problems.append("%s: a heading is a label, not a claim -- a figure "
-                                    "belongs in a verse, where it must name its "
-                                    "command" % swhere)
-            if status == "complete" and (not sections or
-                                         sections[0].get("before_verse") != 1):
-                problems.append("%s: a complete canon opens every chapter with a "
-                                "section heading at verse 1" % cwhere)
+                    problems.append(
+                        "{}: a heading is a label, not a claim -- a figure "
+                        "belongs in a verse, where it must name its "
+                        "command".format(swhere)
+                    )
+            if status == "complete" and (
+                not sections or sections[0].get("before_verse") != 1
+            ):
+                problems.append(
+                    "{}: a complete canon opens every chapter with a "
+                    "section heading at verse 1".format(cwhere)
+                )
             index[identifier][number] = {}
             for verse_position, verse in enumerate(verses):
-                vwhere = "%s chapter %d verse %d" % (where, number, verse_position + 1)
+                vwhere = "{} chapter {:d} verse {:d}".format(
+                    where, number, verse_position + 1
+                )
                 if not isinstance(verse, dict):
-                    problems.append("%s: must be an object" % vwhere)
+                    problems.append("{}: must be an object".format(vwhere))
                     continue
                 unknown = set(verse) - VERSE_KEYS
                 if unknown:
-                    problems.append("%s: unknown key(s) %s" % (vwhere, sorted(unknown)))
+                    problems.append(
+                        "{}: unknown key(s) {}".format(vwhere, sorted(unknown))
+                    )
                 if verse.get("number") != verse_position + 1:
-                    problems.append("%s: verse numbering must be contiguous from 1; "
-                                    "found %r" % (vwhere, verse.get("number")))
+                    problems.append(
+                        "{}: verse numbering must be contiguous from 1; "
+                        "found {!r}".format(vwhere, verse.get("number"))
+                    )
                     continue
                 text = verse.get("text")
                 problems.extend(_text_problems(text, vwhere))
@@ -811,118 +966,175 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
                 if isinstance(text, str):
                     key = " ".join(text.split()).lower()
                     seen_text.setdefault(key, []).append(
-                        "%s %d:%d" % (identifier, number, verse_position + 1))
+                        "{} {:d}:{:d}".format(identifier, number, verse_position + 1)
+                    )
                 if isinstance(text, str) and DIGIT_RE.search(text):
-                    problems.extend(_provenance_problems(verse.get("source"),
-                                                         vwhere, repo))
+                    problems.extend(
+                        _provenance_problems(verse.get("source"), vwhere, repo)
+                    )
                 citations_list = verse.get("cites", [])
                 if not isinstance(citations_list, list):
-                    problems.append("%s: cites must be a list" % vwhere)
+                    problems.append("{}: cites must be a list".format(vwhere))
                     citations_list = []
                 for citation in citations_list:
                     if not isinstance(citation, str):
-                        problems.append("%s: citation %r is not a string"
-                                        % (vwhere, citation))
+                        problems.append(
+                            "{}: citation {!r} is not a string".format(vwhere, citation)
+                        )
                         continue
-                    citations.append(("%s %d:%d" % (identifier, number,
-                                                    verse_position + 1), citation))
+                    citations.append(
+                        (
+                            "{} {:d}:{:d}".format(
+                                identifier, number, verse_position + 1
+                            ),
+                            citation,
+                        )
+                    )
                 if "statute" in verse:
-                    problems.extend(_statute_problems(verse["statute"], vwhere, repo,
-                                                      canon, canon_text))
+                    problems.extend(
+                        _statute_problems(
+                            verse["statute"], vwhere, repo, canon, canon_text
+                        )
+                    )
                 if "practice" in verse:
-                    problems.extend(_practice_problems(verse["practice"], vwhere, repo,
-                                                       evidence_ids))
+                    problems.extend(
+                        _practice_problems(
+                            verse["practice"], vwhere, repo, evidence_ids
+                        )
+                    )
                 variants = verse.get("variants", [])
                 if not isinstance(variants, list):
-                    problems.append("%s: variants must be a list" % vwhere)
+                    problems.append("{}: variants must be a list".format(vwhere))
                     variants = []
                 for variant_position, variant in enumerate(variants):
-                    xwhere = "%s variant %d" % (vwhere, variant_position + 1)
+                    xwhere = "{} variant {:d}".format(vwhere, variant_position + 1)
                     if not isinstance(variant, dict):
-                        problems.append("%s: must be an object" % xwhere)
+                        problems.append("{}: must be an object".format(xwhere))
                         continue
                     unknown = set(variant) - VARIANT_KEYS
                     if unknown:
-                        problems.append("%s: unknown key(s) %s" % (xwhere, sorted(unknown)))
-                    if not isinstance(variant.get("reading"), str) or \
-                            not variant.get("reading", "").strip():
-                        problems.append("%s: reading is empty (name the manuscript "
-                                        "or the source of the variant)" % xwhere)
+                        problems.append(
+                            "{}: unknown key(s) {}".format(xwhere, sorted(unknown))
+                        )
+                    if (
+                        not isinstance(variant.get("reading"), str)
+                        or not variant.get("reading", "").strip()
+                    ):
+                        problems.append(
+                            "{}: reading is empty (name the manuscript "
+                            "or the source of the variant)".format(xwhere)
+                        )
                     problems.extend(_text_problems(variant.get("text"), xwhere))
-                    if not isinstance(variant.get("source"), str) or \
-                            not variant.get("source", "").strip():
-                        problems.append("%s: a variant must say where its reading comes "
-                                        "from; that is the whole point of an apparatus"
-                                        % xwhere)
+                    if (
+                        not isinstance(variant.get("source"), str)
+                        or not variant.get("source", "").strip()
+                    ):
+                        problems.append(
+                            "{}: a variant must say where its reading comes "
+                            "from; that is the whole point of an apparatus".format(
+                                xwhere
+                            )
+                        )
                 annotations = verse.get("annotations", [])
                 if not isinstance(annotations, list):
-                    problems.append("%s: annotations must be a list" % vwhere)
+                    problems.append("{}: annotations must be a list".format(vwhere))
                     annotations = []
-                if isinstance(limits.get("max_annotations_per_verse"), int) and \
-                        len(annotations) > limits["max_annotations_per_verse"]:
-                    problems.append("%s: %d annotations, limit is %d -- a verse with a "
-                                    "page of notes has stopped being annotated"
-                                    % (vwhere, len(annotations),
-                                       limits["max_annotations_per_verse"]))
+                if (
+                    isinstance(limits.get("max_annotations_per_verse"), int)
+                    and len(annotations) > limits["max_annotations_per_verse"]
+                ):
+                    problems.append(
+                        "%s: %d annotations, limit is %d -- a verse with a "
+                        "page of notes has stopped being annotated"
+                        % (
+                            vwhere,
+                            len(annotations),
+                            limits["max_annotations_per_verse"],
+                        )
+                    )
                 for note_position, annotation in enumerate(annotations):
-                    nwhere = "%s annotation %d" % (vwhere, note_position + 1)
+                    nwhere = "{} annotation {:d}".format(vwhere, note_position + 1)
                     if not isinstance(annotation, dict):
-                        problems.append("%s: must be an object" % nwhere)
+                        problems.append("{}: must be an object".format(nwhere))
                         continue
                     unknown = set(annotation) - ANNOTATION_KEYS
                     if unknown:
-                        problems.append("%s: unknown key(s) %s"
-                                        % (nwhere, sorted(unknown)))
+                        problems.append(
+                            "{}: unknown key(s) {}".format(nwhere, sorted(unknown))
+                        )
                     if annotation.get("kind") not in ANNOTATION_KINDS:
-                        problems.append("%s: kind must be one of %s -- a reader is "
-                                        "entitled to know whether a note is a reading "
-                                        "or a claim" % (nwhere, ANNOTATION_KINDS))
-                    problems.extend(_text_problems(annotation.get("note"),
-                                                  "%s note" % nwhere))
-                    if isinstance(annotation.get("note"), str) and \
-                            DIGIT_RE.search(annotation["note"]):
-                        problems.extend(_provenance_problems(annotation.get("source"),
-                                                             nwhere, repo))
+                        problems.append(
+                            "{}: kind must be one of {} -- a reader is "
+                            "entitled to know whether a note is a reading "
+                            "or a claim".format(nwhere, ANNOTATION_KINDS)
+                        )
+                    problems.extend(
+                        _text_problems(annotation.get("note"), "{} note".format(nwhere))
+                    )
+                    if isinstance(annotation.get("note"), str) and DIGIT_RE.search(
+                        annotation["note"]
+                    ):
+                        problems.extend(
+                            _provenance_problems(annotation.get("source"), nwhere, repo)
+                        )
 
     # Citations and glossary pointers resolve after the whole index exists, so a
     # verse may cite forward: the canon is read as a whole, not streamed.
     for source_ref, citation in citations:
         problem = _resolve_citation(citation, index, repo)
         if problem:
-            problems.append("%s %s" % (source_ref, problem))
+            problems.append("{} {}".format(source_ref, problem))
     for position, entry in enumerate(glossary):
         reference = entry.get("see") if isinstance(entry, dict) else None
         if not isinstance(reference, str):
             continue
         problem = _resolve_citation(reference, index, repo)
         if problem:
-            problems.append("glossary[%d]: see %s"
-                            % (position, problem.replace("cites ", "", 1)))
+            problems.append(
+                "glossary[{:d}]: see {}".format(
+                    position, problem.replace("cites ", "", 1)
+                )
+            )
 
     for key, refs in seen_text.items():
         if len(refs) > 1:
-            warnings.append("the same verse text appears %d times (%s) -- usually a "
-                            "paste, occasionally a refrain" % (len(refs), ", ".join(refs)))
+            warnings.append(
+                "the same verse text appears %d times (%s) -- usually a "
+                "paste, occasionally a refrain" % (len(refs), ", ".join(refs))
+            )
 
     cited_by = reference_index(books)
     if status == "complete":
         for identifier, chapters in index.items():
             for number, verses in chapters.items():
                 for verse_number, verse in verses.items():
-                    ref = "%s %d:%d" % (identifier, number, verse_number)
-                    if cited_by.get(ref) or verse.get("cites") or "statute" in verse \
-                            or verse.get("annotations") or verse.get("variants"):
+                    ref = "{} {:d}:{:d}".format(identifier, number, verse_number)
+                    if (
+                        cited_by.get(ref)
+                        or verse.get("cites")
+                        or "statute" in verse
+                        or verse.get("annotations")
+                        or verse.get("variants")
+                    ):
                         continue
-                    problems.append("%s: a complete canon has no verse that does no "
-                                    "work -- cite it, or give it a note, a statute or "
-                                    "an apparatus" % ref)
+                    problems.append(
+                        "{}: a complete canon has no verse that does no "
+                        "work -- cite it, or give it a note, a statute or "
+                        "an apparatus".format(ref)
+                    )
 
     if problems:
-        raise CorpusError("%s failed %d check(s):\n  - %s"
-                          % (CORPUS.name, len(problems), "\n  - ".join(problems)))
+        raise CorpusError(
+            "%s failed %d check(s):\n  - %s"
+            % (CORPUS.name, len(problems), "\n  - ".join(problems))
+        )
 
-    verses_flat = [verse for book in books for chapter in book.get("chapters", [])
-                   for verse in chapter.get("verses", [])]
+    verses_flat = [
+        verse
+        for book in books
+        for chapter in book.get("chapters", [])
+        for verse in chapter.get("verses", [])
+    ]
     return {
         "books": len(books),
         "chapters": sum(len(book.get("chapters", [])) for book in books),
@@ -930,10 +1142,14 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
         "citations": len(citations),
         "statutes": sum(1 for verse in verses_flat if "statute" in verse),
         "variants": sum(len(verse.get("variants", []) or []) for verse in verses_flat),
-        "annotations": sum(len(verse.get("annotations", []) or [])
-                           for verse in verses_flat),
-        "sections": sum(len(chapter.get("sections", []) or [])
-                        for book in books for chapter in book.get("chapters", [])),
+        "annotations": sum(
+            len(verse.get("annotations", []) or []) for verse in verses_flat
+        ),
+        "sections": sum(
+            len(chapter.get("sections", []) or [])
+            for book in books
+            for chapter in book.get("chapters", [])
+        ),
         "glossary": len(glossary),
         "introductions": sum(1 for book in books if "introduction" in book),
         "configs": len(configs),
@@ -942,22 +1158,26 @@ def validate(data: Dict, repo: Path = REPO) -> Dict:
     }
 
 
-def iter_verses(books: Sequence[Dict]):
+def iter_verses(books: Sequence[dict]):
     """Yield (ref, verse) in corpus order."""
     for book in books:
         for chapter in book.get("chapters", []):
             for verse in chapter.get("verses", []):
-                yield ("%s %d:%d" % (book["id"], chapter["number"], verse["number"]),
-                       verse)
+                yield (
+                    "{} {:d}:{:d}".format(
+                        book["id"], chapter["number"], verse["number"]
+                    ),
+                    verse,
+                )
 
 
-def reference_index(books: Sequence[Dict]) -> Dict[str, List[str]]:
+def reference_index(books: Sequence[dict]) -> dict[str, list[str]]:
     """Who cites each verse: the marginal column of a study Bible.
 
     Also the honest source for the orphan question -- a verse nothing points at
     is doing no work in a canon whose whole purpose is to be cited.
     """
-    cited_by: Dict[str, List[str]] = {}
+    cited_by: dict[str, list[str]] = {}
     for ref, verse in iter_verses(books):
         cited_by.setdefault(ref, [])
         for citation in verse.get("cites", []) or []:
@@ -972,7 +1192,8 @@ def reference_index(books: Sequence[Dict]) -> Dict[str, List[str]]:
 # The readable edition                                                        #
 # --------------------------------------------------------------------------- #
 
-def render_edition(data: Dict, corpus_label: str = "docs/bible/bible.json") -> str:
+
+def render_edition(data: dict, corpus_label: str = "docs/bible/bible.json") -> str:
     """Deterministic markdown: headings in place, notes beside their verse.
 
     Inline notes rather than markdown footnote ids, because ids collide across
@@ -987,29 +1208,39 @@ def render_edition(data: Dict, corpus_label: str = "docs/bible/bible.json") -> s
     file itself.
     """
     cited_by = reference_index(data.get("books", []))
-    lines = ["# %s" % data.get("title", "Untitled")]
+    lines = ["# {}".format(data.get("title", "Untitled"))]
     edition = data.get("edition")
     if isinstance(edition, dict):
-        lines.extend(["", "*%s*" % edition.get("name", ""), "",
-                      edition.get("basis", "")])
-    lines.extend(["", "Status: **%s** · updated %s." % (data.get("status"),
-                                                       data.get("updated")),
-                  "",
-                  "_Generated from `%s` by "
-                  "`python tools/bible_check.py --render --write`. Do not edit this "
-                  "file: edit the corpus._" % corpus_label])
+        lines.extend(
+            ["", "*{}*".format(edition.get("name", "")), "", edition.get("basis", "")]
+        )
+    lines.extend(
+        [
+            "",
+            "Status: **{}** · updated {}.".format(
+                data.get("status"), data.get("updated")
+            ),
+            "",
+            "_Generated from `{}` by "
+            "`python tools/bible_check.py --render --write`. Do not edit this "
+            "file: edit the corpus._".format(corpus_label),
+        ]
+    )
     for book in data.get("books", []):
-        lines.extend(["", "## %s" % book.get("name", book.get("id")), ""])
+        lines.extend(["", "## {}".format(book.get("name", book.get("id"))), ""])
         # An unset subtitle would print a bare "### ", which reads as a defect
         # in the edition rather than as an omission in the corpus.
         if book.get("subtitle"):
-            lines.extend(["### %s" % book["subtitle"], ""])
+            lines.extend(["### {}".format(book["subtitle"]), ""])
         register = book.get("genre") or ""
         if book.get("domain"):
-            register = "%s · domain `%s`" % (register, book["domain"]) \
-                if register else "domain `%s`" % book["domain"]
+            register = (
+                "{} · domain `{}`".format(register, book["domain"])
+                if register
+                else "domain `{}`".format(book["domain"])
+            )
         if register:
-            lines.extend(["*%s*" % register, ""])
+            lines.extend(["*{}*".format(register), ""])
         introduction = book.get("introduction")
         if isinstance(introduction, dict):
             lines.append("")
@@ -1017,71 +1248,97 @@ def render_edition(data: Dict, corpus_label: str = "docs/bible/bible.json") -> s
                 lines.extend([paragraph, ""])
             sources = introduction.get("sources") or []
             if sources:
-                lines.append("*Sources: %s*" % "; ".join(sources))
+                lines.append("*Sources: {}*".format("; ".join(sources)))
                 lines.append("")
         for chapter in book.get("chapters", []):
             number = chapter.get("number")
             lines.extend(["", "#### %s %d" % (book.get("name", ""), number), ""])
-            headings = {section.get("before_verse"): section.get("heading")
-                        for section in chapter.get("sections", []) or []}
+            headings = {
+                section.get("before_verse"): section.get("heading")
+                for section in chapter.get("sections", []) or []
+            }
             for verse in chapter.get("verses", []):
                 verse_number = verse.get("number")
                 if verse_number in headings:
-                    lines.extend(["##### %s" % headings[verse_number], ""])
+                    lines.extend(["##### {}".format(headings[verse_number]), ""])
                 trailing = []
                 if verse.get("cites"):
                     trailing.append("see " + ", ".join(verse["cites"]))
                 if isinstance(verse.get("statute"), dict):
                     statute = verse["statute"]
-                    trailing.append("statute %s → `%s`" % (statute.get("rule"),
-                                                           statute.get("check")))
-                suffix = (" *(%s)*" % "; ".join(trailing)) if trailing else ""
-                lines.append("**%d** %s%s" % (verse_number, verse.get("text", ""),
-                                              suffix))
+                    trailing.append(
+                        "statute {} → `{}`".format(
+                            statute.get("rule"), statute.get("check")
+                        )
+                    )
+                suffix = (" *({})*".format("; ".join(trailing))) if trailing else ""
+                lines.append(
+                    "**{:d}** {}{}".format(verse_number, verse.get("text", ""), suffix)
+                )
                 notes = (verse.get("annotations") or []) + (verse.get("variants") or [])
                 if notes:
-                    lines.append("")       # a blockquote after a bare line is a trap
+                    lines.append("")  # a blockquote after a bare line is a trap
                 for annotation in verse.get("annotations", []) or []:
                     source = annotation.get("source")
-                    lines.append("> **%s** — %s%s"
-                                 % (annotation.get("kind"), annotation.get("note"),
-                                    (" (`%s`)" % source) if source else ""))
+                    lines.append(
+                        "> **{}** — {}{}".format(
+                            annotation.get("kind"),
+                            annotation.get("note"),
+                            (" (`{}`)".format(source)) if source else "",
+                        )
+                    )
                 for variant in verse.get("variants", []) or []:
-                    lines.append("> **Apparatus** — *%s*: %s (%s)"
-                                 % (variant.get("reading"), variant.get("text"),
-                                    variant.get("source")))
+                    lines.append(
+                        "> **Apparatus** — *{}*: {} ({})".format(
+                            variant.get("reading"),
+                            variant.get("text"),
+                            variant.get("source"),
+                        )
+                    )
                 practice = verse.get("practice")
                 if isinstance(practice, dict):
-                    lines.extend([
-                        "",
-                        "**Practice** — *%s*" % practice.get("symptom"),
-                        "",
-                        "- *cause*: %s" % practice.get("cause"),
-                        "- *detect*: `%s`" % practice.get("detection"),
-                        "- *remedy*: %s" % practice.get("remedy"),
-                        "- *evidence*: %s" % ", ".join(practice.get("evidence", [])),
-                    ])
+                    lines.extend(
+                        [
+                            "",
+                            "**Practice** — *{}*".format(practice.get("symptom")),
+                            "",
+                            "- *cause*: {}".format(practice.get("cause")),
+                            "- *detect*: `{}`".format(practice.get("detection")),
+                            "- *remedy*: {}".format(practice.get("remedy")),
+                            "- *evidence*: {}".format(
+                                ", ".join(practice.get("evidence", []))
+                            ),
+                        ]
+                    )
                 lines.append("")
-            marginal = ["%d — cited by %s" % (int(ref.split(":")[1]), ", ".join(refs))
-                        for ref, refs in sorted(
-                            ((ref, refs) for ref, refs in cited_by.items()
-                             if ref.startswith("%s %d:" % (book.get("id"), number))
-                             and refs), key=lambda pair: int(pair[0].split(":")[1]))]
+            marginal = [
+                "{:d} — cited by {}".format(int(ref.split(":")[1]), ", ".join(refs))
+                for ref, refs in sorted(
+                    (
+                        (ref, refs)
+                        for ref, refs in cited_by.items()
+                        if ref.startswith("%s %d:" % (book.get("id"), number)) and refs
+                    ),
+                    key=lambda pair: int(pair[0].split(":")[1]),
+                )
+            ]
             if marginal:
-                lines.extend(["_Marginal: %s._" % "; ".join(marginal), ""])
+                lines.extend(["_Marginal: {}._".format("; ".join(marginal)), ""])
     glossary = data.get("glossary") or []
     if glossary:
         lines.extend(["", "## Glossary", ""])
         for entry in glossary:
-            see = (" (see %s)" % entry["see"]) if entry.get("see") else ""
-            lines.append("- **%s** — %s%s" % (entry.get("term"), entry.get("gloss"), see))
+            see = (" (see {})".format(entry["see"])) if entry.get("see") else ""
+            lines.append(
+                "- **{}** — {}{}".format(entry.get("term"), entry.get("gloss"), see)
+            )
     lines.append("")
     # One blank line between blocks, never three: the gap is generated by
     # composition, so it must not depend on which branch wrote the last line.
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines))
 
 
-def render_index(data: Dict) -> str:
+def render_index(data: dict) -> str:
     """Who cites whom, and which verses nothing points at."""
     books = data.get("books", [])
     cited_by = reference_index(books)
@@ -1091,14 +1348,21 @@ def render_index(data: Dict) -> str:
         cites = verse.get("cites", []) or []
         if not refs and not cites:
             continue
-        lines.append("%-18s %s" % (ref, ("cited by " + ", ".join(refs)) if refs
-                                   else "cited by nothing"))
-    orphans = [ref for ref, _verse in iter_verses(books)
-               if not cited_by.get(ref) and not _verse.get("cites")
-               and "statute" not in _verse and not _verse.get("annotations")
-               and not _verse.get("variants")]
+        lines.append(
+            "%-18s %s"
+            % (ref, ("cited by " + ", ".join(refs)) if refs else "cited by nothing")
+        )
+    orphans = [
+        ref
+        for ref, _verse in iter_verses(books)
+        if not cited_by.get(ref)
+        and not _verse.get("cites")
+        and "statute" not in _verse
+        and not _verse.get("annotations")
+        and not _verse.get("variants")
+    ]
     lines.extend(["", "## Verses that do no work", ""])
-    lines.extend(["- %s" % ref for ref in orphans] or ["none"])
+    lines.extend(["- {}".format(ref) for ref in orphans] or ["none"])
     lines.append("")
     return "\n".join(lines)
 
@@ -1107,17 +1371,25 @@ def render_index(data: Dict) -> str:
 # Generations: the import graph, which cannot be embellished                   #
 # --------------------------------------------------------------------------- #
 
-def import_graph(root: Path = SRC) -> Tuple[Dict[str, Dict[str, int]], List[str]]:
+
+def import_graph(root: Path = SRC) -> tuple[dict[str, dict[str, int]], list[str]]:
     """Top-level packages under `root`, and how often one imports another."""
     if not root.is_dir():
         return {}, []
-    packages = sorted({path.parts[0] for path in
-                       (p.relative_to(root) for p in root.rglob("*.py")
-                        if "__pycache__" not in p.parts)
-                       if len(path.parts) > 1})
+    packages = sorted(
+        {
+            path.parts[0]
+            for path in (
+                p.relative_to(root)
+                for p in root.rglob("*.py")
+                if "__pycache__" not in p.parts
+            )
+            if len(path.parts) > 1
+        }
+    )
     known = set(packages)
-    edges: Dict[str, Dict[str, int]] = {package: {} for package in packages}
-    unreadable: List[str] = []
+    edges: dict[str, dict[str, int]] = {package: {} for package in packages}
+    unreadable: list[str] = []
     for path in sorted(root.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
@@ -1130,12 +1402,12 @@ def import_graph(root: Path = SRC) -> Tuple[Dict[str, Dict[str, int]], List[str]
         except SyntaxError:
             unreadable.append(str(relative).replace("\\", "/"))
             continue
-        targets: List[str] = []
+        targets: list[str] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 targets.extend(alias.name for alias in node.names)
             elif isinstance(node, ast.ImportFrom):
-                if node.level:              # relative: stays inside the package
+                if node.level:  # relative: stays inside the package
                     continue
                 if node.module:
                     targets.append(node.module)
@@ -1146,47 +1418,65 @@ def import_graph(root: Path = SRC) -> Tuple[Dict[str, Dict[str, int]], List[str]
     return edges, unreadable
 
 
-def render_genealogy(edges: Dict[str, Dict[str, int]], unreadable: Sequence[str]) -> str:
+def render_genealogy(
+    edges: dict[str, dict[str, int]], unreadable: Sequence[str]
+) -> str:
     total_edges = sum(sum(level.values()) for level in edges.values())
     houses = len(edges)
     lines = [
         "# The generations of the tree",
         "",
-        "Generated, never composed: each \"begat\" below is an import edge found by",
+        'Generated, never composed: each "begat" below is an import edge found by',
         "reading `src/` with `ast`. Re-run it and the numbers must be the same.",
         "",
         "```bash",
         "python tools/bible_check.py --genealogy --write",
         "```",
         "",
-        "%d houses, %d edges between them." % (houses, total_edges),
+        "{:d} houses, {:d} edges between them.".format(houses, total_edges),
         "",
     ]
     for house in sorted(edges, key=lambda name: (-len(edges[name]), name)):
         children = edges[house]
         if not children:
-            lines.append("And **%s** begat no other house." % house)
+            lines.append("And **{}** begat no other house.".format(house))
             continue
         ordered = sorted(children, key=lambda name: (-children[name], name))
-        named = ["**%s**" % child for child in ordered[:3]]
+        named = ["**{}**".format(child) for child in ordered[:3]]
         if len(ordered) > 3:
             rest = len(ordered) - 3
-            lines.append("And **%s** begat %s, and of the rest there were %d."
-                         % (house, ", ".join(named), rest))
+            lines.append(
+                "And **%s** begat %s, and of the rest there were %d."
+                % (house, ", ".join(named), rest)
+            )
         elif len(ordered) == 1:
-            lines.append("And **%s** begat %s." % (house, named[0]))
+            lines.append("And **{}** begat {}.".format(house, named[0]))
         else:
-            lines.append("And **%s** begat %s and %s."
-                         % (house, ", ".join(named[:-1]), named[-1]))
+            lines.append(
+                "And **{}** begat {} and {}.".format(
+                    house, ", ".join(named[:-1]), named[-1]
+                )
+            )
     lines.extend(["", "| house | begat | edges out |", "|---|---|---|"])
     for house in sorted(edges):
-        children = ", ".join(sorted(edges[house], key=lambda name: (-edges[house][name],
-                                                                   name))) or "--"
-        lines.append("| %s | %s | %d |"
-                     % (house, children, sum(edges[house].values())))
+        children = (
+            ", ".join(
+                sorted(edges[house], key=lambda name: (-edges[house][name], name))
+            )
+            or "--"
+        )
+        lines.append(
+            "| {} | {} | {:d} |".format(house, children, sum(edges[house].values()))
+        )
     if unreadable:
-        lines.extend(["", "Unreadable on this run (not counted): %s."
-                      % ", ".join(unreadable)])
+        lines.extend(
+            [
+                "",
+                "Unreadable on this run (not counted): {}.".format(
+                    ", ".join(unreadable)
+                ),
+            ]
+        )
     lines.append("")
     return "\n".join(lines)
 
@@ -1195,13 +1485,17 @@ def render_genealogy(edges: Dict[str, Dict[str, int]], unreadable: Sequence[str]
 # The gate                                                                    #
 # --------------------------------------------------------------------------- #
 
-def _drift(path: Path, expected: str) -> Optional[str]:
+
+def _drift(path: Path, expected: str) -> str | None:
     if not path.exists():
-        return ("%s is absent; run the command in its header to create it"
-                % path.name)
+        return "{} is absent; run the command in its header to create it".format(
+            path.name
+        )
     if path.read_text(encoding="utf-8", errors="replace") != expected:
-        return ("%s is stale relative to this run; regenerate it (the file is "
-                "generated, so editing it is not a fix)" % path.name)
+        return (
+            "{} is stale relative to this run; regenerate it (the file is "
+            "generated, so editing it is not a fix)".format(path.name)
+        )
     return None
 
 
@@ -1228,8 +1522,9 @@ def edition_path(corpus_path: Path) -> Path:
     return corpus_path.parent / (corpus_path.stem.upper() + "_BIBLE.md")
 
 
-def generated_drift(root: Path, data: Dict,
-                    corpus_path: Optional[Path] = None) -> List[str]:
+def generated_drift(
+    root: Path, data: dict, corpus_path: Path | None = None
+) -> list[str]:
     """Every generated file compared against what this run would write now.
 
     Split out of check() so the comparison can be exercised without a real
@@ -1242,18 +1537,28 @@ def generated_drift(root: Path, data: Dict,
     the canon's generated file compares two different documents and calls the
     difference staleness.
     """
-    problems: List[str] = []
-    canonical = corpus_path is None or \
-        Path(corpus_path).resolve() == Path(CORPUS).resolve()
-    expected_files = [(Path(root) / "docs" / "bible" / "GENEALOGY.md",
-                       render_genealogy(*import_graph(Path(root) / "src")))]
+    problems: list[str] = []
+    canonical = (
+        corpus_path is None or Path(corpus_path).resolve() == Path(CORPUS).resolve()
+    )
+    expected_files = [
+        (
+            Path(root) / "docs" / "bible" / "GENEALOGY.md",
+            render_genealogy(*import_graph(Path(root) / "src")),
+        )
+    ]
     if canonical:
-        expected_files.append((Path(root) / "docs" / "bible" / "BOOK_OF_THE_TREE.md",
-                               render_edition(data)))
+        expected_files.append(
+            (
+                Path(root) / "docs" / "bible" / "BOOK_OF_THE_TREE.md",
+                render_edition(data),
+            )
+        )
     else:
         label = _label(Path(corpus_path))
-        expected_files.append((edition_path(Path(corpus_path)),
-                               render_edition(data, label)))
+        expected_files.append(
+            (edition_path(Path(corpus_path)), render_edition(data, label))
+        )
     for path, expected in expected_files:
         problem = _drift(path, expected)
         if problem:
@@ -1261,60 +1566,84 @@ def generated_drift(root: Path, data: Dict,
     return problems
 
 
-def check(root: Path = REPO, corpus_path: Path = CORPUS) -> Tuple[bool, List[str]]:
+def check(root: Path = REPO, corpus_path: Path = CORPUS) -> tuple[bool, list[str]]:
     """Validate the corpus AND both generated files. Messages, not a bare bool."""
     try:
         data = load(corpus_path)
         diagnostics = validate(data, root)
     except CorpusError as exc:
         return False, [str(exc)]
-    messages: List[str] = []
+    messages: list[str] = []
     problems = generated_drift(root, data, corpus_path)
     # The harvest ledger is generated too. A corpus that cites evidence from a
     # ledger nobody regenerated is the same defect as a stale genealogy: the
     # citations still parse and no longer describe the sources.
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import bible_harvest                       # noqa: PLC0415 (lazy: cycle)
+        import bible_harvest
+
         stale_paths, newer = bible_harvest.stale(root)
         problems.extend("harvest: " + message for message in stale_paths)
         if newer:
-            messages.append("harvest: %d observation(s) recorded since the snapshot "
-                            "(re-run tools/bible_harvest.py --write to fold them in)"
-                            % newer)
-    except ImportError as exc:                     # pragma: no cover - wiring
-        messages.append("harvest: ledger not checked (%s)" % exc)
+            messages.append(
+                "harvest: %d observation(s) recorded since the snapshot "
+                "(re-run tools/bible_harvest.py --write to fold them in)" % newer
+            )
+    except ImportError as exc:  # pragma: no cover - wiring
+        messages.append("harvest: ledger not checked ({})".format(exc))
     for warning in diagnostics["warnings"]:
         messages.append("warning: " + warning)
     if problems:
         return False, problems + messages
-    messages.insert(0, "%s -- %s: %d book(s), %d chapter(s), %d verse(s), %d "
-                       "citation(s), %d statute(s), %d variant(s), %d annotation(s), "
-                       "%d section(s), %d gloss(es), %d introduction(s), %d "
-                       "config(s); generated files current"
-                       % (data.get("title"), data.get("status"),
-                          diagnostics["books"], diagnostics["chapters"],
-                          diagnostics["verses"], diagnostics["citations"],
-                          diagnostics["statutes"], diagnostics["variants"],
-                          diagnostics["annotations"], diagnostics["sections"],
-                          diagnostics["glossary"], diagnostics["introductions"],
-                          diagnostics["configs"]))
+    messages.insert(
+        0,
+        "%s -- %s: %d book(s), %d chapter(s), %d verse(s), %d "
+        "citation(s), %d statute(s), %d variant(s), %d annotation(s), "
+        "%d section(s), %d gloss(es), %d introduction(s), %d "
+        "config(s); generated files current"
+        % (
+            data.get("title"),
+            data.get("status"),
+            diagnostics["books"],
+            diagnostics["chapters"],
+            diagnostics["verses"],
+            diagnostics["citations"],
+            diagnostics["statutes"],
+            diagnostics["variants"],
+            diagnostics["annotations"],
+            diagnostics["sections"],
+            diagnostics["glossary"],
+            diagnostics["introductions"],
+            diagnostics["configs"],
+        ),
+    )
     return True, messages
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--check", action="store_true",
-                       help="exit 1 on any defect (the gate)")
-    group.add_argument("--genealogy", action="store_true",
-                       help="derive the generations from the import graph")
-    group.add_argument("--render", action="store_true",
-                       help="print the readable edition")
-    group.add_argument("--index", action="store_true",
-                       help="who cites whom, and the verses that do no work")
-    parser.add_argument("--write", action="store_true",
-                        help="write the generated file instead of printing it")
+    group.add_argument(
+        "--check", action="store_true", help="exit 1 on any defect (the gate)"
+    )
+    group.add_argument(
+        "--genealogy",
+        action="store_true",
+        help="derive the generations from the import graph",
+    )
+    group.add_argument(
+        "--render", action="store_true", help="print the readable edition"
+    )
+    group.add_argument(
+        "--index",
+        action="store_true",
+        help="who cites whom, and the verses that do no work",
+    )
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="write the generated file instead of printing it",
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--corpus", default=str(CORPUS))
     args = parser.parse_args(argv)
@@ -1326,9 +1655,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.write:
             GENEALOGY.parent.mkdir(parents=True, exist_ok=True)
             GENEALOGY.write_text(text, encoding="utf-8", newline="\n")
-            print("wrote %s (%d houses, %d edges)"
-                  % (GENEALOGY.relative_to(REPO), len(edges),
-                     sum(sum(level.values()) for level in edges.values())))
+            print(
+                "wrote %s (%d houses, %d edges)"
+                % (
+                    GENEALOGY.relative_to(REPO),
+                    len(edges),
+                    sum(sum(level.values()) for level in edges.values()),
+                )
+            )
             return 0
         sys.stdout.write(text)
         return 0
@@ -1352,8 +1686,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             target = edition_path(corpus_path)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8", newline="\n")
-            print("wrote %s (%d lines)" % (target.relative_to(REPO),
-                                           len(text.splitlines())))
+            print(
+                "wrote %s (%d lines)"
+                % (target.relative_to(REPO), len(text.splitlines()))
+            )
             return 0
         sys.stdout.write(text)
         return 0
@@ -1361,19 +1697,37 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         sys.stdout.write(render_index(data))
         return 0
     if args.json:
-        print(json.dumps({"title": data.get("title"), "status": data.get("status"),
-                          "summary": diagnostics}, indent=1))
+        print(
+            json.dumps(
+                {
+                    "title": data.get("title"),
+                    "status": data.get("status"),
+                    "summary": diagnostics,
+                },
+                indent=1,
+            )
+        )
         return 0
 
-    print("%s -- %s, %d book(s), %d chapter(s), %d verse(s), %d citation(s), "
-          "%d statute(s), %d variant(s), %d annotation(s), %d section(s), "
-          "%d gloss(es), %d introduction(s)"
-          % (data.get("title"), data.get("status"), diagnostics["books"],
-             diagnostics["chapters"], diagnostics["verses"],
-             diagnostics["citations"], diagnostics["statutes"],
-             diagnostics["variants"], diagnostics["annotations"],
-             diagnostics["sections"], diagnostics["glossary"],
-             diagnostics["introductions"]))
+    print(
+        "%s -- %s, %d book(s), %d chapter(s), %d verse(s), %d citation(s), "
+        "%d statute(s), %d variant(s), %d annotation(s), %d section(s), "
+        "%d gloss(es), %d introduction(s)"
+        % (
+            data.get("title"),
+            data.get("status"),
+            diagnostics["books"],
+            diagnostics["chapters"],
+            diagnostics["verses"],
+            diagnostics["citations"],
+            diagnostics["statutes"],
+            diagnostics["variants"],
+            diagnostics["annotations"],
+            diagnostics["sections"],
+            diagnostics["glossary"],
+            diagnostics["introductions"],
+        )
+    )
     for warning in diagnostics["warnings"]:
         print("warning: " + warning)
     return 0

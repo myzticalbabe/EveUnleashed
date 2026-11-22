@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 """Pre-commit staged-scanner gate: fail only on anti-patterns a commit ADDS.
 
 Why this replaces the old check 2
@@ -35,6 +34,7 @@ index-scoped run can refuse a push over files the commit never touched (measured
 2026-11-03). With a base, each changed `.py` is compared `REV:path` -> `HEAD:path`
 and the index is not read at all.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -58,8 +58,9 @@ def _git(*args: str) -> bytes:
     legacy source is not a gate. Decode UTF-8 with errors="replace" at the call
     site instead.
     """
-    return subprocess.run(["git", *args], cwd=str(ROOT), capture_output=True,
-                          timeout=60).stdout
+    return subprocess.run(
+        ["git", *args], cwd=str(ROOT), capture_output=True, timeout=60
+    ).stdout
 
 
 def _staged_py_files(base: str | None = None) -> list[str]:
@@ -68,8 +69,11 @@ def _staged_py_files(base: str | None = None) -> list[str]:
         out = _git("diff", "--name-only", "--diff-filter=ACMR", base, "HEAD")
     else:
         out = _git("diff", "--cached", "--name-only", "--diff-filter=ACMR")
-    return [ln.strip() for ln in out.decode("utf-8", errors="replace").splitlines()
-            if ln.strip().endswith(".py")]
+    return [
+        ln.strip()
+        for ln in out.decode("utf-8", errors="replace").splitlines()
+        if ln.strip().endswith(".py")
+    ]
 
 
 def _show(rev: str) -> str:
@@ -78,7 +82,7 @@ def _show(rev: str) -> str:
 
 
 def _counts(source: str, path: str, min_severity: str) -> Counter:
-    from CORE.compliance.scanner import ASTAntiPatternScanner, FINDING_SEVERITIES
+    from CORE.compliance.scanner import FINDING_SEVERITIES, ASTAntiPatternScanner
 
     result = ASTAntiPatternScanner().scan_source(path, source)
     floor = SEVERITY_ORDER[min_severity]
@@ -92,22 +96,32 @@ def _counts(source: str, path: str, min_severity: str) -> Counter:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--verbose", action="store_true")
-    ap.add_argument("--severity", default="warning",
-                    choices=["error", "warning", "info"])
-    ap.add_argument("--base", default=None, metavar="REV",
-                    help="scan REV..HEAD instead of the git index")
+    ap.add_argument(
+        "--severity", default="warning", choices=["error", "warning", "info"]
+    )
+    ap.add_argument(
+        "--base",
+        default=None,
+        metavar="REV",
+        help="scan REV..HEAD instead of the git index",
+    )
     args = ap.parse_args()
 
     if args.base:
         # An unresolvable base makes `git diff BASE HEAD` print nothing, which
         # reads exactly like "no files changed". Refuse instead: exit 2 is
         # "could not judge", and the gate must never answer that with a pass.
-        probe = subprocess.run(["git", "rev-parse", "--verify", "--quiet",
-                                f"{args.base}^{{commit}}"],
-                               cwd=str(ROOT), capture_output=True, timeout=60)
+        probe = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{args.base}^{{commit}}"],
+            cwd=str(ROOT),
+            capture_output=True,
+            timeout=60,
+        )
         if probe.returncode != 0:
-            print(f"[StagedScanner] --base {args.base!r} does not resolve to a "
-                  f"commit here - refusing to scan an empty range")
+            print(
+                f"[StagedScanner] --base {args.base!r} does not resolve to a "
+                f"commit here - refusing to scan an empty range"
+            )
             return 2
 
     try:
@@ -143,23 +157,25 @@ def main() -> int:
             if delta > 0:
                 regressions.append(
                     f"  {path}: {category} {before.get(category, 0)} -> {n_after}"
-                    f"  (+{delta})")
+                    f"  (+{delta})"
+                )
         if args.verbose:
             print(f"  scanned {path}: {sum(after.values())} finding(s)")
 
     if regressions:
-        print("")
+        print()
         print("[StagedScanner] Anti-pattern(s) ADDED by this commit:")
         for r in regressions:
             print(r)
-        print("")
-        print("[StagedScanner] Fix the new finding(s), or -- for a reviewed, "
-              "deliberate increase -- re-run tools/anti_pattern_gate.py "
-              "--baseline and explain it in the commit message.")
+        print()
+        print(
+            "[StagedScanner] Fix the new finding(s), or -- for a reviewed, "
+            "deliberate increase -- re-run tools/anti_pattern_gate.py "
+            "--baseline and explain it in the commit message."
+        )
         return 1
 
-    print(f"[StagedScanner] {len(files)} .py file(s): no new "
-          f"anti-patterns.")
+    print(f"[StagedScanner] {len(files)} .py file(s): no new " f"anti-patterns.")
     return 0
 
 

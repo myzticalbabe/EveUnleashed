@@ -41,16 +41,37 @@ GGUF_ROOTS = (
 #: intentionally absent (different protocol -- no silent half-support).
 CLOUDS = {
     "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY", "gpt-4o-mini"),
-    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "openai/gpt-oss-120b"),
+    "openrouter": (
+        "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY",
+        "openai/gpt-oss-120b",
+    ),
     "deepseek": ("https://api.deepseek.com/v1", "DEEPSEEK_API_KEY", "deepseek-chat"),
-    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "llama-3.3-70b-versatile"),
-    "together": ("https://api.together.xyz/v1", "TOGETHER_API_KEY", "meta-llama/Llama-3.3-70B-Instruct-Turbo"),
+    "groq": (
+        "https://api.groq.com/openai/v1",
+        "GROQ_API_KEY",
+        "llama-3.3-70b-versatile",
+    ),
+    "together": (
+        "https://api.together.xyz/v1",
+        "TOGETHER_API_KEY",
+        "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    ),
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY", "grok-3-mini"),
     "mistral": ("https://api.mistral.ai/v1", "MISTRAL_API_KEY", "mistral-small-latest"),
 }
 
-EMBED_HINTS = ("embed", "e5-", "bge-", "gte-", "minilm", "nomic",
-               "mpnet", "roberta", "clip-")
+EMBED_HINTS = (
+    "embed",
+    "e5-",
+    "bge-",
+    "gte-",
+    "minilm",
+    "nomic",
+    "mpnet",
+    "roberta",
+    "clip-",
+)
 
 #: Agent CLIs that can serve as inference providers when logged in.
 #: Harnessed by this interpreter only (subprocess, absolute exe, no shell).
@@ -77,7 +98,7 @@ def _fetch_ids(base: str, api_key: str | None = None, timeout: float = 2.0):
         except Exception:
             continue
         ids = []
-        for item in (payload.get("data") or payload.get("models") or []):
+        for item in payload.get("data") or payload.get("models") or []:
             if isinstance(item, dict):
                 mid = item.get("id") or item.get("model") or item.get("name")
             else:
@@ -108,13 +129,14 @@ def discover(timeout: float = 2.0) -> list:
     for c in customs:
         try:
             from urllib.parse import urlsplit
+
             port = urlsplit(c.get("base", "")).port
             if port and port not in ports:
                 ports.append(port)
         except Exception:
             pass
     for port in ports:
-        base = "http://localhost:%d" % port
+        base = "http://localhost:{:d}".format(port)
         ids = _fetch_ids(base, timeout=timeout)
         if not ids:
             continue
@@ -122,8 +144,14 @@ def discover(timeout: float = 2.0) -> list:
         if not gen:
             continue
         for mid in gen:
-            entries.append({"provider": _provider_label(port), "model": mid,
-                            "kind": "server", "base": base + "/v1"})
+            entries.append(
+                {
+                    "provider": _provider_label(port),
+                    "model": mid,
+                    "kind": "server",
+                    "base": base + "/v1",
+                }
+            )
 
     # custom endpoints (probed live; kept even when down, flagged)
     for c in customs:
@@ -134,13 +162,21 @@ def discover(timeout: float = 2.0) -> list:
         if ids:
             gen = [m for m in ids if not _is_embed(m)]
             model = model or (gen[0] if gen else "")
-        entries.append({"provider": c.get("name", "custom"), "model": model,
-                        "kind": "server", "base": base + "/v1" if base else "",
-                        "key_env": c.get("key_env", ""), "down": not ids})
+        entries.append(
+            {
+                "provider": c.get("name", "custom"),
+                "model": model,
+                "kind": "server",
+                "base": base + "/v1" if base else "",
+                "key_env": c.get("key_env", ""),
+                "down": not ids,
+            }
+        )
 
     # local GGUF files
     seen = set()
     import shutil as _sh
+
     gguf_runner = bool(_sh.which("llama-server"))
     for root in GGUF_ROOTS:
         try:
@@ -153,25 +189,38 @@ def discover(timeout: float = 2.0) -> list:
                 name = p.stem
                 if any(h in name.lower() for h in ("mmproj",) + EMBED_HINTS):
                     continue
-                entries.append({"provider": "gguf", "model": name,
-                                "kind": "gguf", "path": str(p),
-                                "note": "" if gguf_runner else "needs llama-server"})
+                entries.append(
+                    {
+                        "provider": "gguf",
+                        "model": name,
+                        "kind": "gguf",
+                        "path": str(p),
+                        "note": "" if gguf_runner else "needs llama-server",
+                    }
+                )
         except Exception:
             continue
 
     # cradle registry
     try:
-        from eve_unleashed.cradle import list_cradle_models
         import shutil as _sh2
+
+        from eve_unleashed.cradle import list_cradle_models
+
         runner_ok = bool(_sh2.which("llama-server"))
         for m in list_cradle_models() or []:
             if m.get("framework") != "gguf":
                 continue
             if m.get("bytes", 0) < 1024 * 1024:
                 continue  # spec/vessel containers are not runnable weights
-            entries.append({"provider": "cradle", "model": m.get("name", ""),
-                            "kind": "cradle",
-                            "note": "" if runner_ok else "needs llama-server"})
+            entries.append(
+                {
+                    "provider": "cradle",
+                    "model": m.get("name", ""),
+                    "kind": "cradle",
+                    "note": "" if runner_ok else "needs llama-server",
+                }
+            )
     except Exception:
         pass
 
@@ -185,8 +234,15 @@ def discover(timeout: float = 2.0) -> list:
             gen = [m for m in ids if not _is_embed(m)]
             if gen and default_model not in gen:
                 model = gen[0]
-        entries.append({"provider": provider, "model": model,
-                        "kind": "cloud", "base": base, "key_env": key_env})
+        entries.append(
+            {
+                "provider": provider,
+                "model": model,
+                "kind": "cloud",
+                "base": base,
+                "key_env": key_env,
+            }
+        )
 
     # Agent CLIs (node spin-up) get their own budget, not the 2 s probe budget.
     entries.extend(discover_agents(timeout=max(timeout, 45.0)))
@@ -202,11 +258,12 @@ def discover(timeout: float = 2.0) -> list:
 
 
 def entry_id(e: dict) -> str:
-    return "%s/%s" % (e["provider"], e["model"])
+    return "{}/{}".format(e["provider"], e["model"])
 
 
 def _which(exe: str):
     import shutil
+
     return shutil.which(exe)
 
 
@@ -225,6 +282,7 @@ def discover_agents(timeout: float = 30.0) -> list:
     Listed always when the binary exists; usable after their own login
     (``kilo auth login``). Never spends quota without an explicit selection."""
     import subprocess
+
     entries: list = []
     for agent in AGENT_CLIS:
         exe = _which(agent)
@@ -232,32 +290,48 @@ def discover_agents(timeout: float = 30.0) -> list:
             continue
         models: list = []
         try:
-            proc = subprocess.run([exe, "models"], capture_output=True, text=True,
-                                  timeout=timeout)
+            proc = subprocess.run(
+                [exe, "models"], capture_output=True, text=True, timeout=timeout
+            )
             for line in (proc.stdout or "").splitlines():
                 line = line.strip().strip("`")
                 if "/" in line and " " not in line and line.startswith(agent + "/"):
-                    models.append(line[len(agent) + 1:])
+                    models.append(line[len(agent) + 1 :])
         except Exception:
             pass
         authed = _kilo_credentials() > 0 if agent == "kilo" else True
         if not models:
-            entries.append({"provider": agent, "model": "", "kind": "agent",
-                            "agent": agent, "authed": authed})
+            entries.append(
+                {
+                    "provider": agent,
+                    "model": "",
+                    "kind": "agent",
+                    "agent": agent,
+                    "authed": authed,
+                }
+            )
         for m in models:
             # run_model keeps the full CLI id (e.g. kilo/...); model is display.
-            entries.append({"provider": agent, "model": m,
-                            "run_model": "%s/%s" % (agent, m),
-                            "kind": "agent", "agent": agent, "authed": authed})
+            entries.append(
+                {
+                    "provider": agent,
+                    "model": m,
+                    "run_model": "{}/{}".format(agent, m),
+                    "kind": "agent",
+                    "agent": agent,
+                    "authed": authed,
+                }
+            )
     return entries
 
 
 def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> dict:
     """One non-interactive inference via an agent CLI. No shell, absolute exe."""
     import subprocess
+
     exe = _which(agent)
     if not exe:
-        return {"status": "error", "error": "%s: not on PATH" % agent}
+        return {"status": "error", "error": "{}: not on PATH".format(agent)}
     argv = [exe, "run"]
     if model:
         argv += ["-m", model]
@@ -265,7 +339,7 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
     except Exception as exc:
-        return {"status": "error", "error": "%s: %s" % (agent, exc)}
+        return {"status": "error", "error": "{}: {}".format(agent, exc)}
     out = (proc.stdout or "").strip()
     texts: list = []
     for line in out.splitlines():
@@ -277,24 +351,36 @@ def run_agent(agent: str, model: str, prompt: str, timeout: float = 180.0) -> di
         except Exception:
             continue
         if obj.get("type") == "error":
-            err = (obj.get("error") or {})
+            err = obj.get("error") or {}
             msg = err.get("data", {}).get("message") or err.get("message")
             if not msg:
                 try:
                     body = json.loads(err.get("responseBody", "") or "{}")
-                    msg = ((body.get("error") or {}).get("message"))
+                    msg = (body.get("error") or {}).get("message")
                 except Exception:
                     msg = None
-            return {"status": "error", "error": "%s: %s" % (agent, msg or "agent error")}
+            return {
+                "status": "error",
+                "error": "{}: {}".format(agent, msg or "agent error"),
+            }
         texts.extend(_collect_text(obj))
     text = "\n".join(t for t in texts if t).strip()
     if text:
         return {"status": "ok", "result": text, "provider": agent, "model": model}
     if proc.returncode != 0:
         tail = ((proc.stderr or "").strip().splitlines() or [""])[-1]
-        hint = " (run `%s auth login` first?)" % agent if "sign in" in tail.lower() else ""
-        return {"status": "error", "error": "%s exit %d: %s%s" % (agent, proc.returncode, tail[:200], hint)}
-    return {"status": "error", "error": "%s returned no text" % agent}
+        hint = (
+            " (run `{} auth login` first?)".format(agent)
+            if "sign in" in tail.lower()
+            else ""
+        )
+        return {
+            "status": "error",
+            "error": "{} exit {:d}: {}{}".format(
+                agent, proc.returncode, tail[:200], hint
+            ),
+        }
+    return {"status": "error", "error": "{} returned no text".format(agent)}
 
 
 def _collect_text(obj) -> list:
@@ -363,14 +449,20 @@ def load_selection() -> dict | None:
 
 def save_selection(entry: dict) -> dict:
     STORE_DIR.mkdir(parents=True, exist_ok=True)
-    sel = {"provider": entry.get("provider"), "model": entry.get("model"),
-           "kind": entry.get("kind"), "base": entry.get("base", ""),
-           "path": entry.get("path", ""), "key_env": entry.get("key_env", ""),
-           "agent": entry.get("agent", ""), "run_model": entry.get("run_model", "")}
+    sel = {
+        "provider": entry.get("provider"),
+        "model": entry.get("model"),
+        "kind": entry.get("kind"),
+        "base": entry.get("base", ""),
+        "path": entry.get("path", ""),
+        "key_env": entry.get("key_env", ""),
+        "agent": entry.get("agent", ""),
+        "run_model": entry.get("run_model", ""),
+    }
     SELECTION_FILE.write_text(json.dumps(sel, indent=2))
     return sel
 
 
 def current_id() -> str | None:
     sel = load_selection()
-    return "%s/%s" % (sel["provider"], sel["model"]) if sel else None
+    return "{}/{}".format(sel["provider"], sel["model"]) if sel else None

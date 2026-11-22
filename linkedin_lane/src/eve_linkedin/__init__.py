@@ -16,8 +16,8 @@ names and lengths are ever printed.
 
 import json
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 
 VOYAGER_SHARES = "https://www.linkedin.com/voyager/api/contentcreation/normShares"
 VOYAGER_ME = "https://www.linkedin.com/voyager/api/me"
@@ -47,7 +47,7 @@ def base_headers(jar):
         "X-RestLi-Protocol-Version": "2.0.0",
         "X-Li-Track": '{"clientVersion":"1.0"}',
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Cookie": "; ".join("%s=%s" % (k, v) for k, v in sorted(jar.items())),
+        "Cookie": "; ".join("{}={}".format(k, v) for k, v in sorted(jar.items())),
     }
 
 
@@ -60,7 +60,9 @@ def fetch_owner_urn(jar, timeout=30):
     obj = mp.get("objectUrn", "")  # urn:li:member:<id>
     mid = obj.rsplit(":", 1)[-1] if obj else str(me.get("plainId", ""))
     if not mid:
-        raise ValueError("no member id in /me response keys=%s" % sorted(me.keys()))
+        raise ValueError(
+            "no member id in /me response keys={}".format(sorted(me.keys()))
+        )
     return "urn:li:person:" + mid
 
 
@@ -85,7 +87,7 @@ def redact(headers):
     out = {}
     for k, v in headers.items():
         if k.lower() in ("cookie", "csrf-token"):
-            out[k] = "<redacted len=%d>" % len(v)
+            out[k] = "<redacted len={:d}>".format(len(v))
         else:
             out[k] = v
     return out
@@ -99,7 +101,7 @@ def post_live(url, headers, body, timeout=30):
     except urllib.error.HTTPError as e:
         return e.code, e.read(2000).decode("utf-8", "replace")
     except OSError as e:
-        return -1, "network: %s" % e
+        return -1, "network: {}".format(e)
 
 
 def main(argv=None):
@@ -116,34 +118,44 @@ def main(argv=None):
         else:
             i += 1
     if not md_path:
-        print("usage: eve-linkedin-paste <markdown-file> [--state PATH] [--dry-run|--live]")
+        print(
+            "usage: eve-linkedin-paste <markdown-file> [--state PATH] [--dry-run|--live]"
+        )
         return 2
     try:
         with open(md_path, "r", encoding="utf-8") as f:
             text = f.read().strip()
     except OSError as e:
-        print("cannot read %s: %s" % (md_path, e))
+        print("cannot read {}: {}".format(md_path, e))
         return 2
     jar, missing = load_session(state_path)
-    print("session: %d linkedin cookies" % len(jar))
+    print("session: {:d} linkedin cookies".format(len(jar)))
     if missing:
-        print("BLOCKED: session missing %s; re-login and refresh %s" % (missing, state_path))
+        print(
+            "BLOCKED: session missing {}; re-login and refresh {}".format(
+                missing, state_path
+            )
+        )
         return 1
     try:
         owner = fetch_owner_urn(jar)
     except Exception as e:
-        print("BLOCKED: owner lookup failed: %s" % str(e)[:200])
+        print("BLOCKED: owner lookup failed: {}".format(str(e)[:200]))
         return 1
     url, headers, body = build_request(text, jar, owner)
-    shape = {"url": url, "owner": owner, "headers": redact(headers),
-             "payload_keys": sorted(json.loads(body.decode()).keys()),
-             "text_chars": len(text)}
-    print("request shape: %s" % json.dumps(shape))
+    shape = {
+        "url": url,
+        "owner": owner,
+        "headers": redact(headers),
+        "payload_keys": sorted(json.loads(body.decode()).keys()),
+        "text_chars": len(text),
+    }
+    print("request shape: {}".format(json.dumps(shape)))
     if not live:
         print("DRY-RUN: nothing posted. Re-run with --live to paste.")
         return 0
     status, resp = post_live(url, headers, body)
-    print("live POST status=%s resp=%s" % (status, resp[:500]))
+    print("live POST status={} resp={}".format(status, resp[:500]))
     return 0 if status in (200, 201) else 1
 
 

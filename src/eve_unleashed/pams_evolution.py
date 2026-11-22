@@ -13,11 +13,12 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: Any = None) -> None:
         pass
 
@@ -28,12 +29,13 @@ _WORD_RE = re.compile(r"[a-z0-9_]{3,}")
 @dataclass
 class MemoryImportance:
     """Scored importance for a single memory/event."""
+
     event_id: str
     source: str
     event_type: str
     severity: str
-    importance: float          # 0.0 (routine) -> 1.0 (critical)
-    factors: Dict[str, float] = field(default_factory=dict)
+    importance: float  # 0.0 (routine) -> 1.0 (critical)
+    factors: dict[str, float] = field(default_factory=dict)
 
 
 class PamSEvolution:
@@ -50,9 +52,13 @@ class PamSEvolution:
 
     #: Event types that are always high-signal.
     SIGNAL_EVENT_TYPES = {
-        "anomaly_detected", "worm_execution", "morph_event",
-        "inference_bridge_intelligence", "autonomous_action",
-        "model_swap", "service_restart",
+        "anomaly_detected",
+        "worm_execution",
+        "morph_event",
+        "inference_bridge_intelligence",
+        "autonomous_action",
+        "model_swap",
+        "service_restart",
     }
 
     def __init__(self, recorder=None, distillz=None):
@@ -67,6 +73,7 @@ class PamSEvolution:
             return self.recorder
         try:
             from CORE.PamsRecorder import get_recorder
+
             self.recorder = get_recorder()
             return self.recorder
         except Exception as exc:
@@ -82,8 +89,9 @@ class PamSEvolution:
             return 0.0
         return len(q & t) / len(q | t)
 
-    def semantic_search(self, query: str, limit: int = 50,
-                        source: Optional[str] = None) -> List[Dict[str, Any]]:
+    def semantic_search(
+        self, query: str, limit: int = 50, source: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         Semantic (token-overlap) memory search over PAMS events.
 
@@ -95,14 +103,18 @@ class PamSEvolution:
         if rec is None:
             return []
         try:
-            candidates = rec.search_memories(query=query, source=source, limit=limit * 4)
+            candidates = rec.search_memories(
+                query=query, source=source, limit=limit * 4
+            )
         except Exception as exc:
             note_failure("pams_evolution:search_memories", exc)
             return []
         scored = []
         for evt in candidates:
-            blob = " ".join(str(evt.get(k, "")) for k in
-                            ("event_type", "source", "severity", "data"))
+            blob = " ".join(
+                str(evt.get(k, ""))
+                for k in ("event_type", "source", "severity", "data")
+            )
             score = self._token_overlap(query, blob)
             if score > 0:
                 scored.append((score, evt))
@@ -111,7 +123,7 @@ class PamSEvolution:
 
     # -- Importance scoring ---------------------------------------------------
 
-    def score_importance(self, evt: Dict[str, Any]) -> MemoryImportance:
+    def score_importance(self, evt: dict[str, Any]) -> MemoryImportance:
         """Score a single event's importance (0.0->1.0) from severity/type."""
         sev = str(evt.get("severity", "info")).lower()
         etype = str(evt.get("event_type", "")).lower()
@@ -128,7 +140,7 @@ class PamSEvolution:
             factors=factors,
         )
 
-    def tag_importance(self, limit: int = 200) -> List[MemoryImportance]:
+    def tag_importance(self, limit: int = 200) -> list[MemoryImportance]:
         """Score recent memories and return importance-ranked list."""
         rec = self._get_recorder()
         if rec is None:
@@ -147,7 +159,7 @@ class PamSEvolution:
     def set_retention_days(self, days: int):
         self._retention_days = max(1, int(days))
 
-    def prune(self, older_than_days: Optional[int] = None) -> int:
+    def prune(self, older_than_days: int | None = None) -> int:
         """
         Auto-prune memories older than the retention window.
 
@@ -178,7 +190,8 @@ class PamSEvolution:
             # fallback buffer trim
             before = len(rec._fallback_buffer)
             rec._fallback_buffer = [
-                e for e in rec._fallback_buffer
+                e
+                for e in rec._fallback_buffer
                 if _parse_ts(e.get("timestamp", "")) >= cutoff
             ]
             rec._save_fallback()
@@ -196,7 +209,8 @@ def _parse_ts(ts: str) -> float:
 
 # -- Memory-to-insight pipeline (PAMS -> DistillZ -> recommendations) -------
 
-def distill_to_insights(use_llm: bool = False) -> Dict[str, Any]:
+
+def distill_to_insights(use_llm: bool = False) -> dict[str, Any]:
     """
     Run the full memory-to-insight pipeline.
 
@@ -205,6 +219,7 @@ def distill_to_insights(use_llm: bool = False) -> Dict[str, Any]:
     """
     try:
         from META.DistillZ import DistillZ
+
         dz = DistillZ()
         report = dz.distill(use_llm=use_llm)
         return {
@@ -212,17 +227,23 @@ def distill_to_insights(use_llm: bool = False) -> Dict[str, Any]:
             "total_insights": report.total_insights,
             "total_sources": report.total_sources,
             "insights": [
-                {"source": i.source, "insight": i.insight,
-                 "importance": i.importance} for i in report.insights
+                {"source": i.source, "insight": i.insight, "importance": i.importance}
+                for i in report.insights
             ],
             "recommendations": list(report.recommendations),
             "source_stats": dict(report.source_stats),
         }
     except Exception as exc:
         note_failure("pams_evolution:distill_to_insights", exc)
-        return {"version": "", "total_insights": 0, "total_sources": 0,
-                "insights": [], "recommendations": [],
-                "source_stats": {}, "error": str(exc)}
+        return {
+            "version": "",
+            "total_insights": 0,
+            "total_sources": 0,
+            "insights": [],
+            "recommendations": [],
+            "source_stats": {},
+            "error": str(exc),
+        }
 
 
-__all__ = ["PamSEvolution", "MemoryImportance", "distill_to_insights"]
+__all__ = ["MemoryImportance", "PamSEvolution", "distill_to_insights"]

@@ -3,16 +3,15 @@
 Stdlib only. No external assets, no CDN, no auth (binds 127.0.0.1).
 `eve dashboard [--port 8899]` -- Gamora is the harness, this is its face.
 """
+
 import json
 import os
 import platform
 import shutil
 import signal
 import subprocess
-import sys
 import time
 import urllib.request
-from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -22,10 +21,11 @@ CRADLE_DIR = AZ / "cradle"
 PID_FILE = AZ / "cradle-server.pid"
 LOG_FILE = AZ / "log" / "cradle-server.log"
 CRADLE_PORT = 8080
-CRADLE_BASE = "http://127.0.0.1:%d" % CRADLE_PORT
+CRADLE_BASE = "http://127.0.0.1:{:d}".format(CRADLE_PORT)
 
 
 # ---------------------------------------------------------------- probes
+
 
 def _http_json(url, timeout=3.0):
     try:
@@ -48,6 +48,7 @@ def _pid_alive(pid: int) -> bool:
 def _mem() -> dict:
     try:
         import psutil  # type: ignore
+
         m = psutil.virtual_memory()
         return {"total_gb": round(m.total / 1e9, 1), "pct": m.percent}
     except Exception:
@@ -68,6 +69,7 @@ def _mem() -> dict:
 def _disk() -> dict:
     try:
         import psutil  # type: ignore
+
         d = psutil.disk_usage(str(HOME))
         return {"total_gb": round(d.total / 1e9, 1), "pct": d.percent}
     except Exception:
@@ -85,6 +87,7 @@ def _disk() -> dict:
 def build_status() -> dict:
     """Everything the header needs. JSON-serializable, no exceptions."""
     from eve_unleashed import model_picker as _mp
+
     sel = _mp.current_id()
     health = _http_json(CRADLE_BASE + "/health", timeout=2.0)
     mods = _http_json(CRADLE_BASE + "/v1/models", timeout=2.0)
@@ -110,7 +113,11 @@ def build_status() -> dict:
             "running": health == {"status": "ok"},
             "pid": pid if (pid and _pid_alive(pid)) else None,
             "models": names,
-            "ggufs": sorted(p.name for p in CRADLE_DIR.glob("*.gguf")) if CRADLE_DIR.is_dir() else [],
+            "ggufs": (
+                sorted(p.name for p in CRADLE_DIR.glob("*.gguf"))
+                if CRADLE_DIR.is_dir()
+                else []
+            ),
         },
         "selection": sel,
         "ready": True,
@@ -119,11 +126,13 @@ def build_status() -> dict:
 
 def build_models() -> dict:
     from eve_unleashed import model_picker as _mp
+
     entries = _mp.discover()
     return {"current": _mp.current_id(), "entries": entries}
 
 
 # ------------------------------------------------------------ control
+
 
 def cradle_start() -> dict:
     if not CRADLE_DIR.is_dir():
@@ -140,10 +149,22 @@ def cradle_start() -> dict:
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     log = open(LOG_FILE, "a")
     proc = subprocess.Popen(
-        [exe, "-m", str(gguf), "--port", str(CRADLE_PORT),
-         "--ctx-size", "2048", "--alias", "cradle-" + gguf.stem],
-        stdout=log, stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL, start_new_session=True)
+        [
+            exe,
+            "-m",
+            str(gguf),
+            "--port",
+            str(CRADLE_PORT),
+            "--ctx-size",
+            "2048",
+            "--alias",
+            "cradle-" + gguf.stem,
+        ],
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+    )
     PID_FILE.write_text(str(proc.pid))
     for _ in range(60):
         if _http_json(CRADLE_BASE + "/health", timeout=2.0) == {"status": "ok"}:
@@ -151,8 +172,12 @@ def cradle_start() -> dict:
         if proc.poll() is not None:
             return {"ok": False, "error": "llama-server exited during load (see log)"}
         time.sleep(5)
-    return {"ok": True, "pid": proc.pid, "model": gguf.name,
-            "note": "still loading (large model); health not ok yet"}
+    return {
+        "ok": True,
+        "pid": proc.pid,
+        "model": gguf.name,
+        "note": "still loading (large model); health not ok yet",
+    }
 
 
 def cradle_stop() -> dict:
@@ -178,7 +203,7 @@ def cradle_stop() -> dict:
                 pass
             return {"ok": True, "stopped": pid}
         time.sleep(0.5)
-    return {"ok": False, "error": "pid %d did not exit" % pid}
+    return {"ok": False, "error": "pid {:d} did not exit".format(pid)}
 
 
 def log_tail(name: str = "cradle", lines: int = 60) -> str:
@@ -189,7 +214,7 @@ def log_tail(name: str = "cradle", lines: int = 60) -> str:
         data = path.read_text(errors="replace").splitlines()
         return "\n".join(data[-lines:])
     except Exception as e:
-        return "(unreadable: %s)" % e
+        return "(unreadable: {})".format(e)
 
 
 # ---------------------------------------------------------------- page
@@ -285,7 +310,8 @@ class _Handler(BaseHTTPRequestHandler):
             return {}
 
     def do_GET(self):
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import parse_qs, urlparse
+
         u = urlparse(self.path)
         if u.path == "/":
             body = PAGE.encode()
@@ -315,16 +341,20 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         from eve_unleashed import model_picker as _mp
+
         if self.path == "/api/select":
             want = (self._body().get("id") or "").strip()
             entries = _mp.discover()
             match = next((e for e in entries if _mp.entry_id(e) == want), None)
             if match is None:
                 lowered = want.lower()
-                match = next((e for e in entries
-                              if lowered in _mp.entry_id(e).lower()), None)
+                match = next(
+                    (e for e in entries if lowered in _mp.entry_id(e).lower()), None
+                )
             if match is None:
-                self._send({"ok": False, "error": "no provider matches %r" % want})
+                self._send(
+                    {"ok": False, "error": "no provider matches {!r}".format(want)}
+                )
                 return
             _mp.save_selection(match)
             self._send({"ok": True, "selected": _mp.entry_id(match)})
@@ -343,10 +373,9 @@ class _Handler(BaseHTTPRequestHandler):
 
 def serve(port: int = 8899) -> int:
     srv = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
-    print("eve dashboard: http://127.0.0.1:%d  (Ctrl-C to stop)" % port)
+    print("eve dashboard: http://127.0.0.1:{:d}  (Ctrl-C to stop)".format(port))
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
     return 0
-

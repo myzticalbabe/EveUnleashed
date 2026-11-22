@@ -71,16 +71,21 @@ def audit():
     try:
         from eve_unleashed import cognition as _c
     except Exception as e:
-        return {"ok": False, "reason": "cognition unavailable (%s)" % e}
+        return {"ok": False, "reason": "cognition unavailable ({})".format(e)}
     rep = _c.audit()
     by_stratum = {}
     for r in rep["processes"]:
         by_stratum.setdefault(r["stratum"], []).append(r["name"])
-    return {"ok": True, "total": rep["total"], "used": rep["used"],
-            "declared": rep["declared"], "absent": rep["absent"],
-            "strata": {k: sorted(v) for k, v in by_stratum.items()},
-            "gaps": rep["gaps"],
-            "note": "gaps are named plans, never hidden absences"}
+    return {
+        "ok": True,
+        "total": rep["total"],
+        "used": rep["used"],
+        "declared": rep["declared"],
+        "absent": rep["absent"],
+        "strata": {k: sorted(v) for k, v in by_stratum.items()},
+        "gaps": rep["gaps"],
+        "note": "gaps are named plans, never hidden absences",
+    }
 
 
 def mind(request):
@@ -89,22 +94,21 @@ def mind(request):
     try:
         from eve_unleashed import cognition as _c
     except Exception as e:
-        return {"ok": False, "reason": "cognition unavailable (%s)" % e}
+        return {"ok": False, "reason": "cognition unavailable ({})".format(e)}
     request = str(request or "").strip()[:500]
     if not request:
         return {"ok": False, "reason": "nothing to think about: empty request"}
     try:
         nx = _c.nexus(request)
     except Exception as e:
-        return {"ok": False, "reason": "nexus unavailable (%s)" % e}
+        return {"ok": False, "reason": "nexus unavailable ({})".format(e)}
     paradigms = {}
     for s in ("conscious", "subconscious", "unconscious"):
         try:
             paradigms[s] = _c.paradigm(s)["members"]
         except Exception:
             paradigms[s] = []
-    return {"ok": True, "request": request, "nexus": nx,
-            "paradigms": paradigms}
+    return {"ok": True, "request": request, "nexus": nx, "paradigms": paradigms}
 
 
 def _debunk_notes(problem):
@@ -113,22 +117,29 @@ def _debunk_notes(problem):
     try:
         from eve_unleashed.debunk import debunk_claim as _d
     except Exception as e:
-        return {"available": False, "reason": "debunk unavailable (%s)" % e}
+        return {"available": False, "reason": "debunk unavailable ({})".format(e)}
     try:
         d = _d(problem)
     except Exception as e:
-        return {"available": False, "reason": "debunk failed (%s)" % e}
-    return {"available": True, "verdict": d.get("verdict"),
-            "propositions": d.get("propositions", [])[:5],
-            "flags": d.get("fallacy_flags", [])[:5]}
+        return {"available": False, "reason": "debunk failed ({})".format(e)}
+    return {
+        "available": True,
+        "verdict": d.get("verdict"),
+        "propositions": d.get("propositions", [])[:5],
+        "flags": d.get("fallacy_flags", [])[:5],
+    }
 
 
 def _toolchain(lang):
     tool, _hint = _TOOL_HINT.get(lang, ("python", ""))
     found = shutil.which(tool)
-    return {"tool": tool, "present": bool(found),
-            "path": found or "not on PATH -- the scaffold below still runs "
-                    "once %s is installed" % tool}
+    return {
+        "tool": tool,
+        "present": bool(found),
+        "path": found
+        or "not on PATH -- the scaffold below still runs "
+        "once {} is installed".format(tool),
+    }
 
 
 def code_coach(problem, language="python", level="spark", name=None):
@@ -140,102 +151,126 @@ def code_coach(problem, language="python", level="spark", name=None):
     """
     language = str(language or "python").lower().strip()
     if language not in COACH_LANGS:
-        return {"ok": False,
-                "reason": "unknown language %r (known: %s)"
-                          % (language, ", ".join(COACH_LANGS))}
+        return {
+            "ok": False,
+            "reason": "unknown language {!r} (known: {})".format(
+                language, ", ".join(COACH_LANGS)
+            ),
+        }
     level = str(level or "spark").lower().strip()
     if level not in COACH_LEVELS:
-        return {"ok": False,
-                "reason": "unknown level %r (known: %s)"
-                          % (level, ", ".join(COACH_LEVELS))}
+        return {
+            "ok": False,
+            "reason": "unknown level {!r} (known: {})".format(
+                level, ", ".join(COACH_LEVELS)
+            ),
+        }
     problem = _scrub(problem)
     if not problem:
-        return {"ok": False, "reason": "tell me the assignment in one "
-                                       "sentence, then we build it together"}
+        return {
+            "ok": False,
+            "reason": "tell me the assignment in one "
+            "sentence, then we build it together",
+        }
     if len(problem) > 1000:
         problem = problem[:1000]
 
     notes = _debunk_notes(problem)
     tools = _toolchain(language)
     digest = hashlib.sha256(
-        ("%s|%s|%s" % (language, level, problem)).encode("utf-8")).hexdigest()
+        ("{}|{}|{}".format(language, level, problem)).encode("utf-8")
+    ).hexdigest()
 
     if level == "spark":
-        steps = ["Read the assignment aloud and circle the ONE thing it "
-                 "asks the computer to do.",
-                 "Type the starter below exactly, run it, and tell me what "
-                 "it printed.",
-                 "Change one word in the starter and predict the new "
-                 "output before you run it again."]
+        steps = [
+            "Read the assignment aloud and circle the ONE thing it "
+            "asks the computer to do.",
+            "Type the starter below exactly, run it, and tell me what " "it printed.",
+            "Change one word in the starter and predict the new "
+            "output before you run it again.",
+        ]
     elif level == "builder":
-        steps = ["Split the task into input, one small rule, and output -- "
-                 "write the three as comments first.",
-                 "Fill in the rule with the smallest true thing (one if, "
-                 "one loop).",
-                 "Run it on two examples: one normal, one weird. Keep the "
-                 "weird one as your test."]
+        steps = [
+            "Split the task into input, one small rule, and output -- "
+            "write the three as comments first.",
+            "Fill in the rule with the smallest true thing (one if, " "one loop).",
+            "Run it on two examples: one normal, one weird. Keep the "
+            "weird one as your test.",
+        ]
     else:
-        steps = ["State the claim your program must keep true, then write "
-                 "the check that would prove it false.",
-                 "Build the smallest version that passes the check.",
-                 "Write the lesson in one line: what broke, and what the "
-                 "fix was. Lessons are the deliverable."]
+        steps = [
+            "State the claim your program must keep true, then write "
+            "the check that would prove it false.",
+            "Build the smallest version that passes the check.",
+            "Write the lesson in one line: what broke, and what the "
+            "fix was. Lessons are the deliverable.",
+        ]
 
     starter = _STARTER[language]
     lines = [
         "Hey builder -- I am Berzerker, your coding coach. We solve this "
         "together, step by step.",
         "",
-        "Your assignment, in its own words: %s" % problem,
+        "Your assignment, in its own words: {}".format(problem),
     ]
     if notes.get("available"):
-        lines.append("Rock throw (debunk): %s." % notes.get("verdict"))
+        lines.append("Rock throw (debunk): {}.".format(notes.get("verdict")))
         for p in notes.get("propositions", [])[:3]:
-            lines.append("  - checkable piece: %s" % p)
+            lines.append("  - checkable piece: {}".format(p))
         for f in notes.get("flags", [])[:3]:
-            lines.append("  - watch out for: %s" % f)
+            lines.append("  - watch out for: {}".format(f))
     else:
-        lines.append("Rock throw: %s." % notes.get("reason"))
+        lines.append("Rock throw: {}.".format(notes.get("reason")))
     lines += [
-        "Toolchain: %s %s." % (tools["tool"],
-                               "found" if tools["present"]
-                               else "not found yet -- " + tools["path"]),
+        "Toolchain: {} {}.".format(
+            tools["tool"],
+            "found" if tools["present"] else "not found yet -- " + tools["path"],
+        ),
         "",
-        "Starter (%s, level %s) -- type it, run it, own it:" % (language,
-                                                                level),
+        "Starter ({}, level {}) -- type it, run it, own it:".format(language, level),
         starter.rstrip(),
         "",
         "Your 3 steps:",
     ]
     for i, s in enumerate(steps, 1):
-        lines.append("  %d. %s" % (i, s))
+        lines.append("  {:d}. {}".format(i, s))
     if level in ("builder", "pilot"):
         lines.append("")
         lines.append("Your weird tests (keep the weird one):")
         for w in weird_tests(language).get("weird", []):
-            lines.append("  - %s" % w)
+            lines.append("  - {}".format(w))
     if name:
         sug = suggest_level(name)
         lines.append("")
-        lines.append("Level: steady at %s -- %s." % (level,
-                                                     sug["reason"]))
+        lines.append("Level: steady at {} -- {}.".format(level, sug["reason"]))
     lines += [
         "",
-        "Receipt: sha256 %s. No answer was invented; every line above "
-        "runs offline." % digest[:16],
+        "Receipt: sha256 {}. No answer was invented; every line above "
+        "runs offline.".format(digest[:16]),
     ]
-    return {"ok": True, "language": language, "level": level,
-            "problem": problem, "debunk": notes, "toolchain": tools,
-            "starter": starter, "steps": steps,
-            "digest": digest,
-            "response": "\n".join(lines)}
+    return {
+        "ok": True,
+        "language": language,
+        "level": level,
+        "problem": problem,
+        "debunk": notes,
+        "toolchain": tools,
+        "starter": starter,
+        "steps": steps,
+        "digest": digest,
+        "response": "\n".join(lines),
+    }
 
 
 def _scrub(text):
     """Guardrail: the coach needs a first name, never contact details."""
     import re
-    text = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
-                  "[redacted-email]", str(text or ""))
+
+    text = re.sub(
+        r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+        "[redacted-email]",
+        str(text or ""),
+    )
     text = re.sub(r"\d[\d\-\.\s]{6,}\d", "[redacted-number]", text)
     return text.strip()[:1000]
 
@@ -246,13 +281,17 @@ def dream(host=None):
     try:
         from eve_unleashed.intuition import dream as _dream
     except Exception as e:
-        return {"ok": False, "reason": "dream unavailable (%s)" % e}
+        return {"ok": False, "reason": "dream unavailable ({})".format(e)}
     try:
         rep = _dream()
     except Exception as e:
-        return {"ok": False, "reason": "dream failed (%s)" % e}
-    out = {"ok": True, "pairs": rep["pairs"],
-           "hit_rate": rep["hit_rate"], "by_rung": rep["by_rung"]}
+        return {"ok": False, "reason": "dream failed ({})".format(e)}
+    out = {
+        "ok": True,
+        "pairs": rep["pairs"],
+        "hit_rate": rep["hit_rate"],
+        "by_rung": rep["by_rung"],
+    }
     if host:
         host = str(host).lower().strip()
         out["host"] = {host: rep["hosts"].get(host, {"fetches": 0})}
@@ -267,30 +306,44 @@ def inhibited(host, threshold=0.5):
     try:
         from eve_unleashed.intuition import inhibited_rungs as _inh
     except Exception as e:
-        return {"ok": False, "reason": "inhibition unavailable (%s)" % e}
+        return {"ok": False, "reason": "inhibition unavailable ({})".format(e)}
     try:
         rungs = _inh(host, threshold=float(threshold))
     except Exception as e:
-        return {"ok": False, "reason": "inhibition failed (%s)" % e}
-    return {"ok": True, "host": str(host or ""),
-            "inhibited": sorted(rungs),
-            "note": ("skip these rungs for this host" if rungs
-                       else "nothing to skip -- the ladder stands")}
+        return {"ok": False, "reason": "inhibition failed ({})".format(e)}
+    return {
+        "ok": True,
+        "host": str(host or ""),
+        "inhibited": sorted(rungs),
+        "note": (
+            "skip these rungs for this host"
+            if rungs
+            else "nothing to skip -- the ladder stands"
+        ),
+    }
 
 
 _WEIRD = {
-    "python": ["empty input: just press Enter",
-                 "a huge number: 10 ** 100",
-                 "emoji: 'you did it! Hurrah.'"],
-    "javascript": ["empty input: submit with nothing typed",
-                     "a huge number: 10n ** 100n",
-                     "emoji: 'you did it! Hurrah.'"],
-    "go": ["empty input: an empty string",
-             "a huge number: 1 << 100 (math/big)",
-             "emoji: 'you did it! Hurrah.'"],
-    "rust": ["empty input: an empty String",
-               "a huge number: u128::MAX",
-               "emoji: 'you did it! Hurrah.'"],
+    "python": [
+        "empty input: just press Enter",
+        "a huge number: 10 ** 100",
+        "emoji: 'you did it! Hurrah.'",
+    ],
+    "javascript": [
+        "empty input: submit with nothing typed",
+        "a huge number: 10n ** 100n",
+        "emoji: 'you did it! Hurrah.'",
+    ],
+    "go": [
+        "empty input: an empty string",
+        "a huge number: 1 << 100 (math/big)",
+        "emoji: 'you did it! Hurrah.'",
+    ],
+    "rust": [
+        "empty input: an empty String",
+        "a huge number: u128::MAX",
+        "emoji: 'you did it! Hurrah.'",
+    ],
 }
 
 
@@ -298,9 +351,8 @@ def weird_tests(language="python"):
     """The weird half of the pair: normal + weird, keep the weird one."""
     language = str(language or "python").lower().strip()
     if language not in COACH_LANGS:
-        return {"ok": False, "reason": "unknown language %r" % language}
-    return {"ok": True, "language": language,
-            "weird": list(_WEIRD[language])}
+        return {"ok": False, "reason": "unknown language {!r}".format(language)}
+    return {"ok": True, "language": language, "weird": list(_WEIRD[language])}
 
 
 def _ledger_path():
@@ -325,15 +377,17 @@ def record_completion(name, level):
         return {"ok": False, "reason": "need a name and a true level"}
     try:
         data = _ledger_read()
-        cell = data.setdefault(name, {"spark": 0, "builder": 0,
-                                      "pilot": 0})
+        cell = data.setdefault(name, {"spark": 0, "builder": 0, "pilot": 0})
         cell[level] = int(cell.get(level, 0)) + 1
-        _ledger_path().write_text(json.dumps(data, indent=1),
-                                  encoding="utf-8")
+        _ledger_path().write_text(json.dumps(data, indent=1), encoding="utf-8")
     except Exception as e:
-        return {"ok": False, "reason": "ledger unwritable (%s)" % e}
-    return {"ok": True, "name": name, "level": level,
-            "suggests": suggest_level(name)["suggests"]}
+        return {"ok": False, "reason": "ledger unwritable ({})".format(e)}
+    return {
+        "ok": True,
+        "name": name,
+        "level": level,
+        "suggests": suggest_level(name)["suggests"],
+    }
 
 
 def suggest_level(name):
@@ -342,16 +396,25 @@ def suggest_level(name):
     counts = _ledger_read().get(name, {})
     for lvl, nxt in (("spark", "builder"), ("builder", "pilot")):
         if int(counts.get(lvl, 0)) >= 3 and not int(counts.get(nxt, 0)):
-            return {"ok": True, "name": name, "suggests": nxt,
-                    "reason": "%d %s sessions finished -- try %s"
-                              % (counts[lvl], lvl, nxt)}
+            return {
+                "ok": True,
+                "name": name,
+                "suggests": nxt,
+                "reason": "{:d} {} sessions finished -- try {}".format(
+                    counts[lvl], lvl, nxt
+                ),
+            }
     cur = "spark"
     for lvl in ("pilot", "builder"):
         if int(counts.get(lvl, 0)):
             cur = lvl
             break
-    return {"ok": True, "name": name, "suggests": cur,
-            "reason": "steady at %s" % cur}
+    return {
+        "ok": True,
+        "name": name,
+        "suggests": cur,
+        "reason": "steady at {}".format(cur),
+    }
 
 
 def as_jsonable(obj):
@@ -359,5 +422,7 @@ def as_jsonable(obj):
         json.dumps(obj)
         return obj
     except Exception:
-        return {"note": "unserializable -- reported, not raised",
-                "type": str(type(obj))}
+        return {
+            "note": "unserializable -- reported, not raised",
+            "type": str(type(obj)),
+        }

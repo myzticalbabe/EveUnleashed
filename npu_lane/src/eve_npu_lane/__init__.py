@@ -59,20 +59,26 @@ def probe(out_path=None):
         try:
             report["names"][d] = core.get_property(d, "FULL_DEVICE_NAME")
         except Exception as e:
-            report["names"][d] = "name query failed: %s" % str(e)[:100]
+            report["names"][d] = "name query failed: {}".format(str(e)[:100])
     if "NPU" not in devs:
         report["verdict"] = "NO-NPU-HERE"
-        report["note"] = ("expected in WSL2 guests (dxgkrnl never paravirtualizes "
-                          "the NPU) and non-Intel boxes; run on bare metal Windows/Linux")
+        report["note"] = (
+            "expected in WSL2 guests (dxgkrnl never paravirtualizes "
+            "the NPU) and non-Intel boxes; run on bare metal Windows/Linux"
+        )
         return 2, report
     m = _tiny_model()
-    x = (np.arange(64, dtype=np.float16).reshape(1, 64) / 64.0)
+    x = np.arange(64, dtype=np.float16).reshape(1, 64) / 64.0
     got = {}
     for dev in ("CPU", "NPU"):
         cm = core.compile_model(m, dev)
         val, mn, p50, mx = _infer(cm, x)
-        got[dev] = {"out": val, "min_ms": round(mn, 3),
-                    "p50_ms": round(p50, 3), "max_ms": round(mx, 3)}
+        got[dev] = {
+            "out": val,
+            "min_ms": round(mn, 3),
+            "p50_ms": round(p50, 3),
+            "max_ms": round(mx, 3),
+        }
     report["runs"] = got
     ok_npu = abs(got["NPU"]["out"] - EXPECTED) < 1e-2
     ok_cpu = abs(got["CPU"]["out"] - EXPECTED) < 1e-2
@@ -87,9 +93,14 @@ def main(argv=None):
     out_path = args[1] if args[:1] == ["--out"] and len(args) > 1 else None
     code, report = probe(out_path)
     npu = report.get("runs", {}).get("NPU", {})
-    print("NPU_LANE verdict=%s devices=%s npu_p50_ms=%s out=%s" % (
-        report.get("verdict"), report.get("devices"),
-        npu.get("p50_ms", "?"), npu.get("out", "?")))
+    print(
+        "NPU_LANE verdict={} devices={} npu_p50_ms={} out={}".format(
+            report.get("verdict"),
+            report.get("devices"),
+            npu.get("p50_ms", "?"),
+            npu.get("out", "?"),
+        )
+    )
     text = json.dumps(report, indent=2)
     if out_path:
         with open(out_path, "w") as f:

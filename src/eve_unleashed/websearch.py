@@ -18,6 +18,7 @@ pages, no credentialed APIs, no query logging anywhere.
 Challenge appendix: live rungs, then memory rungs (Wayback,
 Common Crawl) that never touch the host; a wall reads `blocked`.
 """
+
 import json as _json
 import os as _os
 import time as _time
@@ -27,8 +28,10 @@ import urllib.request as _request
 try:
     from CORE.failure_ledger import note_failure
 except Exception:
+
     def note_failure(where, exc=None):
         pass
+
 
 _TIMEOUT = 12
 _UA = {"User-Agent": "EveUnleashed-websearch/1.0 (research; keyless)"}
@@ -36,13 +39,17 @@ _PER_PROVIDER = 5
 _RENDER_TIMEOUT = 45
 
 # Full browser header set: the second rung of the mutation ladder.
-_BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-               "AppleWebKit/537.36 (KHTML, like Gecko) "
-               "Chrome/131.0.0.0 Safari/537.36")
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 _BROWSER_HEADERS = {
     "User-Agent": _BROWSER_UA,
-    "Accept": ("text/html,application/xhtml+xml,application/xml;"
-                "q=0.9,image/avif,image/webp,*/*;q=0.8"),
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;"
+        "q=0.9,image/avif,image/webp,*/*;q=0.8"
+    ),
     "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "identity",
     "Upgrade-Insecure-Requests": "1",
@@ -74,8 +81,7 @@ _CHALLENGE_MARKS = (
     ("bot-wall", "are you a robot"),
 )
 
-PROVIDERS = ("wikipedia", "loc", "openlibrary", "crossref",
-             "stackexchange")
+PROVIDERS = ("wikipedia", "loc", "openlibrary", "crossref", "stackexchange")
 
 
 def _get(url):
@@ -90,86 +96,129 @@ def _get(url):
 
 
 def _wikipedia(query):
-    url = ("https://en.wikipedia.org/w/api.php?action=query&list=search"
-           "&srsearch=%s&format=json&srlimit=%d" % (_parse.quote(query),
-                                                   _PER_PROVIDER))
+    url = (
+        "https://en.wikipedia.org/w/api.php?action=query&list=search"
+        "&srsearch=%s&format=json&srlimit=%d" % (_parse.quote(query), _PER_PROVIDER)
+    )
     data, err = _get(url)
     if err:
-        return {"via": "wikipedia", "state": "error", "detail": err,
-                "hits": []}
-    hits = [{"title": h.get("title", ""),
-             "url": "https://en.wikipedia.org/wiki/" + _parse.quote(
-                 h.get("title", "").replace(" ", "_")),
-             "snippet": h.get("snippet", "").replace("<span class=\"searchmatch\">", "")
-             .replace("</span>", "")[:200]}
-            for h in (data or {}).get("query", {}).get("search", [])]
-    return {"via": "wikipedia",
-            "state": "ok" if hits else "empty",
-            "detail": "%d hit(s)" % len(hits), "hits": hits[:_PER_PROVIDER]}
+        return {"via": "wikipedia", "state": "error", "detail": err, "hits": []}
+    hits = [
+        {
+            "title": h.get("title", ""),
+            "url": "https://en.wikipedia.org/wiki/"
+            + _parse.quote(h.get("title", "").replace(" ", "_")),
+            "snippet": h.get("snippet", "")
+            .replace('<span class="searchmatch">', "")
+            .replace("</span>", "")[:200],
+        }
+        for h in (data or {}).get("query", {}).get("search", [])
+    ]
+    return {
+        "via": "wikipedia",
+        "state": "ok" if hits else "empty",
+        "detail": "{:d} hit(s)".format(len(hits)),
+        "hits": hits[:_PER_PROVIDER],
+    }
 
 
 def _loc(query):
     url = "https://www.loc.gov/search/?q=%s&fo=json&c=%d" % (
-        _parse.quote(query), _PER_PROVIDER)
+        _parse.quote(query),
+        _PER_PROVIDER,
+    )
     data, err = _get(url)
     if err:
         return {"via": "loc", "state": "error", "detail": err, "hits": []}
-    hits = [{"title": r.get("title", ""),
-             "url": r.get("url", ""),
-             "snippet": ("%s -- %s" % (r.get("title", ""),
-                                       r.get("date", "") or "undated"))[:200]}
-            for r in (data or {}).get("results", [])]
-    return {"via": "loc", "state": "ok" if hits else "empty",
-            "detail": "%d hit(s)" % len(hits), "hits": hits[:_PER_PROVIDER]}
+    hits = [
+        {
+            "title": r.get("title", ""),
+            "url": r.get("url", ""),
+            "snippet": (
+                "{} -- {}".format(r.get("title", ""), r.get("date", "") or "undated")
+            )[:200],
+        }
+        for r in (data or {}).get("results", [])
+    ]
+    return {
+        "via": "loc",
+        "state": "ok" if hits else "empty",
+        "detail": "{:d} hit(s)".format(len(hits)),
+        "hits": hits[:_PER_PROVIDER],
+    }
 
 
 def _openlibrary(query):
     url = "https://openlibrary.org/search.json?q=%s&limit=%d" % (
-        _parse.quote(query), _PER_PROVIDER)
+        _parse.quote(query),
+        _PER_PROVIDER,
+    )
     data, err = _get(url)
     if err:
-        return {"via": "openlibrary", "state": "error", "detail": err,
-                "hits": []}
-    hits = [{"title": d.get("title", ""),
-             "url": "https://openlibrary.org%s" % d.get("key", ""),
-             "snippet": ", ".join(d.get("author_name", [])[:3])[:200]}
-            for d in (data or {}).get("docs", [])]
-    return {"via": "openlibrary", "state": "ok" if hits else "empty",
-            "detail": "%d hit(s)" % len(hits), "hits": hits[:_PER_PROVIDER]}
+        return {"via": "openlibrary", "state": "error", "detail": err, "hits": []}
+    hits = [
+        {
+            "title": d.get("title", ""),
+            "url": "https://openlibrary.org{}".format(d.get("key", "")),
+            "snippet": ", ".join(d.get("author_name", [])[:3])[:200],
+        }
+        for d in (data or {}).get("docs", [])
+    ]
+    return {
+        "via": "openlibrary",
+        "state": "ok" if hits else "empty",
+        "detail": "{:d} hit(s)".format(len(hits)),
+        "hits": hits[:_PER_PROVIDER],
+    }
 
 
 def _crossref(query):
-    url = "https://api.crossref.org/works?query=%s&rows=%d&select=title,URL,author,published" % (
-        _parse.quote(query), _PER_PROVIDER)
+    url = (
+        "https://api.crossref.org/works?query=%s&rows=%d&select=title,URL,author,published"
+        % (_parse.quote(query), _PER_PROVIDER)
+    )
     data, err = _get(url)
     if err:
-        return {"via": "crossref", "state": "error", "detail": err,
-                "hits": []}
+        return {"via": "crossref", "state": "error", "detail": err, "hits": []}
     hits = []
     for item in (data or {}).get("message", {}).get("items", []):
         title = "; ".join(item.get("title", []))
-        hits.append({"title": title,
-                     "url": item.get("URL", ""),
-                     "snippet": title[:200]})
-    return {"via": "crossref", "state": "ok" if hits else "empty",
-            "detail": "%d hit(s)" % len(hits), "hits": hits[:_PER_PROVIDER]}
+        hits.append(
+            {"title": title, "url": item.get("URL", ""), "snippet": title[:200]}
+        )
+    return {
+        "via": "crossref",
+        "state": "ok" if hits else "empty",
+        "detail": "{:d} hit(s)".format(len(hits)),
+        "hits": hits[:_PER_PROVIDER],
+    }
 
 
 def _stackexchange(query):
-    url = ("https://api.stackexchange.com/2.3/search/advanced"
-           "?order=desc&sort=relevance&q=%s&site=stackoverflow&pagesize=%d"
-           % (_parse.quote(query), _PER_PROVIDER))
+    url = (
+        "https://api.stackexchange.com/2.3/search/advanced"
+        "?order=desc&sort=relevance&q=%s&site=stackoverflow&pagesize=%d"
+        % (_parse.quote(query), _PER_PROVIDER)
+    )
     data, err = _get(url)
     if err:
-        return {"via": "stackexchange", "state": "error", "detail": err,
-                "hits": []}
-    hits = [{"title": it.get("title", ""),
-             "url": it.get("link", ""),
-             "snippet": "score %s, %s answer(s)" % (
-                 it.get("score", "?"), it.get("answer_count", "?"))}
-            for it in (data or {}).get("items", [])]
-    return {"via": "stackexchange", "state": "ok" if hits else "empty",
-            "detail": "%d hit(s)" % len(hits), "hits": hits[:_PER_PROVIDER]}
+        return {"via": "stackexchange", "state": "error", "detail": err, "hits": []}
+    hits = [
+        {
+            "title": it.get("title", ""),
+            "url": it.get("link", ""),
+            "snippet": "score {}, {} answer(s)".format(
+                it.get("score", "?"), it.get("answer_count", "?")
+            ),
+        }
+        for it in (data or {}).get("items", [])
+    ]
+    return {
+        "via": "stackexchange",
+        "state": "ok" if hits else "empty",
+        "detail": "{:d} hit(s)".format(len(hits)),
+        "hits": hits[:_PER_PROVIDER],
+    }
 
 
 def detect_challenge(status, headers, body):
@@ -179,14 +228,16 @@ def detect_challenge(status, headers, body):
     A 403/503 alone is an error, not a challenge; it becomes a
     named challenge only when a challenge marker is present."""
     try:
-        text = body if isinstance(body, str) else (body or b"").decode(
-            "utf-8", "replace")
+        text = (
+            body if isinstance(body, str) else (body or b"").decode("utf-8", "replace")
+        )
     except Exception as e:
         note_failure("websearch:detect:decode", e)
         text = ""
     low = text.lower()
-    head = " ".join("%s: %s" % (k, v) for k, v in
-                      dict(headers or {}).items()).lower()
+    head = " ".join(
+        "{}: {}".format(k, v) for k, v in dict(headers or {}).items()
+    ).lower()
     for kind, mark in _CHALLENGE_MARKS:
         if mark.lower() in low or mark.lower() in head:
             return kind
@@ -205,25 +256,26 @@ def _render_fetch(url):
     try:
         from playwright.sync_api import sync_playwright
     except Exception as e:
-        raise RuntimeError("playwright not installed: %s" % (e,))
+        raise RuntimeError("playwright not installed: {}".format(e))
     text, err = "", None
     try:
         with sync_playwright() as p:
             try:
-                browser = p.chromium.launch(channel="chrome",
-                                            headless=True)
+                browser = p.chromium.launch(channel="chrome", headless=True)
             except Exception:
                 browser = p.chromium.launch(headless=True)
             try:
                 page = browser.new_page(user_agent=_BROWSER_UA)
-                page.goto(url, timeout=_RENDER_TIMEOUT * 1000,
-                          wait_until="domcontentloaded")
+                page.goto(
+                    url, timeout=_RENDER_TIMEOUT * 1000, wait_until="domcontentloaded"
+                )
                 try:
                     page.wait_for_timeout(4000)
                 except Exception as e:
                     note_failure("websearch:render:settle", e)
                 text = page.evaluate(
-                    "() => document.body ? document.body.innerText : ''")
+                    "() => document.body ? document.body.innerText : ''"
+                )
             finally:
                 browser.close()
     except Exception as e:
@@ -233,8 +285,9 @@ def _render_fetch(url):
 
 
 def _pick_proxy():
-    rotate = [x.strip() for x in _os.environ.get("PROXY_ROTATE", "")
-              .split(",") if x.strip()]
+    rotate = [
+        x.strip() for x in _os.environ.get("PROXY_ROTATE", "").split(",") if x.strip()
+    ]
     if rotate:
         return rotate[int(_time.time()) % len(rotate)]
     return _os.environ.get("PROXY_URL") or None
@@ -250,34 +303,38 @@ def _curl_cffi_fetch(url):
     try:
         from curl_cffi import requests as _cr
     except Exception as e:
-        raise RuntimeError("curl_cffi not installed: %s" % (e,))
+        raise RuntimeError("curl_cffi not installed: {}".format(e))
     profiles = ("chrome124", "chrome120", "safari15_5", "edge101")
     proxy = _pick_proxy()
     proxies = {"http": proxy, "https": proxy} if proxy else None
     last_err, last_kind = "all profiles challenged", None
     for profile in profiles:
         try:
-            r = _cr.get(url, impersonate=profile, timeout=_TIMEOUT,
-                        headers={"Accept-Language": "en-US,en;q=0.9"},
-                        proxies=proxies)
-            kind = detect_challenge(r.status_code, dict(r.headers),
-                                    r.text or "")
+            r = _cr.get(
+                url,
+                impersonate=profile,
+                timeout=_TIMEOUT,
+                headers={"Accept-Language": "en-US,en;q=0.9"},
+                proxies=proxies,
+            )
+            kind = detect_challenge(r.status_code, dict(r.headers), r.text or "")
             if kind:
                 last_kind = kind
                 continue
             if r.status_code == 200:
                 return r.text or "", profile, None
-            last_err = "HTTP %s (%s)" % (r.status_code, profile)
+            last_err = "HTTP {} ({})".format(r.status_code, profile)
         except Exception as e:
-            note_failure("websearch:curl-cffi:%s" % profile, e)
+            note_failure("websearch:curl-cffi:{}".format(profile), e)
             last_err = str(e)[:160]
-    return "", None, "%s; last wall: %s" % (last_err, last_kind)
+    return "", None, "{}; last wall: {}".format(last_err, last_kind)
 
 
 def _archive_urls(url):
     """Wayback availability lookup, then the snapshot address."""
-    api = ("https://archive.org/wayback/available?url=%s"
-           % _parse.quote(url, safe=""))
+    api = "https://archive.org/wayback/available?url={}".format(
+        _parse.quote(url, safe="")
+    )
     return api
 
 
@@ -286,7 +343,7 @@ def _scrapling_fetch(url):
     try:
         from scrapling.fetchers import StealthyFetcher
     except Exception as e:
-        raise RuntimeError("scrapling not installed: %s" % (e,))
+        raise RuntimeError("scrapling not installed: {}".format(e))
     try:
         page = StealthyFetcher.fetch(url, headless=True)
     except Exception as e:
@@ -299,7 +356,6 @@ def _scrapling_fetch(url):
     return body, None
 
 
-
 def _cc_pick(ndjson_text):
     """First successful text/html capture in an index page."""
     for line in (ndjson_text or "").splitlines():
@@ -310,9 +366,13 @@ def _cc_pick(ndjson_text):
             rec = {}
         if not rec:
             continue
-        ok = (str(rec.get("status")) == "200" and "html" in
-              str(rec.get("mime", "")).lower() and rec.get("filename")
-              and rec.get("offset") is not None and rec.get("length"))
+        ok = (
+            str(rec.get("status")) == "200"
+            and "html" in str(rec.get("mime", "")).lower()
+            and rec.get("filename")
+            and rec.get("offset") is not None
+            and rec.get("length")
+        )
         if ok:
             return rec
     return None
@@ -321,6 +381,7 @@ def _cc_pick(ndjson_text):
 def _cc_extract(blob):
     """HTTP body out of a (possibly gzipped) WARC response record."""
     import gzip as _gzip
+
     data = blob
     if data[:2] == b"\x1f\x8b":
         try:
@@ -347,26 +408,28 @@ def _cc_extract(blob):
 
 def _cc_try_crawl(cid, url):
     """One crawl's index lookup plus WARC pull; None when unusable."""
-    api = ("https://index.commoncrawl.org/%s-index?url=%s"
-           "&output=json&filter=status:200"
-           % (cid, _parse.quote(url, safe="")))
+    api = (
+        "https://index.commoncrawl.org/{}-index?url={}"
+        "&output=json&filter=status:200".format(cid, _parse.quote(url, safe=""))
+    )
     try:
         req = _request.Request(api, headers=_UA)
         with _request.urlopen(req, timeout=30) as r:
             nd = r.read().decode("utf-8", "replace")
     except Exception as e:
-        note_failure("websearch:cc:index:%s" % cid, e)
+        note_failure("websearch:cc:index:{}".format(cid), e)
         nd = ""
     rec = _cc_pick(nd) or {}
     off, ln = str(rec.get("offset", "")), str(rec.get("length", ""))
     if not (off.isdigit() and ln.isdigit()):
         return None
     off, ln = int(off), int(ln)
-    warc_url = "https://data.commoncrawl.org/%s" % rec["filename"]
+    warc_url = "https://data.commoncrawl.org/{}".format(rec["filename"])
     try:
         req = _request.Request(
-            warc_url, headers={**_UA, "Range": "bytes=%d-%d"
-                              % (off, off + ln - 1)})
+            warc_url,
+            headers={**_UA, "Range": "bytes={:d}-{:d}".format(off, off + ln - 1)},
+        )
         with _request.urlopen(req, timeout=30) as r:
             blob = r.read()
     except Exception as e:
@@ -388,7 +451,7 @@ def _commoncrawl_fetch(url):
         body = _cc_try_crawl(cid, url)
         if body:
             return body, cid, None
-    return "", "", "no usable capture in %d recent crawl(s)" % len(ids)
+    return "", "", "no usable capture in {:d} recent crawl(s)".format(len(ids))
 
 
 def _archive_fallback(url):
@@ -399,7 +462,7 @@ def _archive_fallback(url):
     the page itself."""
     data, err = _get(_archive_urls(url))
     if err:
-        return "", "", "availability lookup failed: %s" % err
+        return "", "", "availability lookup failed: {}".format(err)
     outer = (data or {}).get("archived_snapshots", {}) or {}
     snap = outer.get("closest", {}) or {}
     snap_url = snap.get("url", "")
@@ -421,10 +484,10 @@ def _archive_fallback(url):
             if "429" not in ferr:
                 break
     if ferr:
-        return "", snap_url, "snapshot fetch failed: %s" % ferr
+        return "", snap_url, "snapshot fetch failed: {}".format(ferr)
     kind = detect_challenge(200, {}, body)
     if kind:
-        return "", snap_url, "snapshot itself walled: %s" % kind
+        return "", snap_url, "snapshot itself walled: {}".format(kind)
     return body, snap_url, None
 
 
@@ -450,59 +513,81 @@ def fetch_visible(url):
                     # Challenged, not answered: climb to the next rung.
                     last_kind = kind
                     continue
-                return {"state": "ok", "rung": rung, "kind": None,
-                        "text": body[:20000]}
+                return {"state": "ok", "rung": rung, "kind": None, "text": body[:20000]}
         except Exception as e:
             last_err = str(e)[:160]
-            note_failure("websearch:fetch:%s" % rung, e)
+            note_failure("websearch:fetch:{}".format(rung), e)
     try:
         text, profile, cerr = _curl_cffi_fetch(url)
     except RuntimeError as e:
         text, profile, cerr = "", None, str(e)
     if not cerr:
-        return {"state": "ok", "rung": "tls-impersonation",
-                "kind": None, "profile": profile,
-                "text": (text or "")[:20000]}
-    note_failure("websearch:fetch:tls-impersonation",
-                 Exception(cerr[:120]))
+        return {
+            "state": "ok",
+            "rung": "tls-impersonation",
+            "kind": None,
+            "profile": profile,
+            "text": (text or "")[:20000],
+        }
+    note_failure("websearch:fetch:tls-impersonation", Exception(cerr[:120]))
     try:
         text, err = _render_fetch(url)
     except RuntimeError as e:
-        text, err = "", "render unavailable: %s" % (e,)
+        text, err = "", "render unavailable: {}".format(e)
     render_kind = None
     if err:
         note_failure("websearch:fetch:render", Exception(err[:120]))
     else:
         render_kind = detect_challenge(200, {}, text)
         if not render_kind:
-            return {"state": "ok", "rung": "render", "kind": None,
-                    "text": (text or "")[:20000]}
+            return {
+                "state": "ok",
+                "rung": "render",
+                "kind": None,
+                "text": (text or "")[:20000],
+            }
     try:
         stext, serr = _scrapling_fetch(url)
     except RuntimeError as e:
         stext, serr = "", str(e)
     if not serr:
-        return {"state": "ok", "rung": "stealth-render",
-                "kind": None, "text": (stext or "")[:20000]}
+        return {
+            "state": "ok",
+            "rung": "stealth-render",
+            "kind": None,
+            "text": (stext or "")[:20000],
+        }
     note_failure("websearch:fetch:stealth", Exception(str(serr)[:120]))
     wall = render_kind or last_kind or "live fetch failed"
     body, snap_url, aerr = _archive_fallback(url)
     if not aerr:
-        return {"state": "ok", "rung": "archive",
-                "kind": wall, "snapshot": snap_url,
-                "text": (body or "")[:20000]}
+        return {
+            "state": "ok",
+            "rung": "archive",
+            "kind": wall,
+            "snapshot": snap_url,
+            "text": (body or "")[:20000],
+        }
     cbody, cid, cerr = _commoncrawl_fetch(url)
     if not cerr:
-        return {"state": "ok", "rung": "commoncrawl", "kind": wall,
-                "crawl": cid, "text": (cbody or "")[:20000]}
-    detail = "wall '%s' held; archive: %s; crawl: %s" % (wall, aerr, cerr)
-    return {"state": "blocked", "rung": "commoncrawl", "kind": wall,
-            "detail": detail}
+        return {
+            "state": "ok",
+            "rung": "commoncrawl",
+            "kind": wall,
+            "crawl": cid,
+            "text": (cbody or "")[:20000],
+        }
+    detail = "wall '{}' held; archive: {}; crawl: {}".format(wall, aerr, cerr)
+    return {"state": "blocked", "rung": "commoncrawl", "kind": wall, "detail": detail}
 
 
-_FNS = {"wikipedia": _wikipedia, "loc": _loc,
-        "openlibrary": _openlibrary, "crossref": _crossref,
-        "stackexchange": _stackexchange}
+_FNS = {
+    "wikipedia": _wikipedia,
+    "loc": _loc,
+    "openlibrary": _openlibrary,
+    "crossref": _crossref,
+    "stackexchange": _stackexchange,
+}
 
 
 def search(query, providers=PROVIDERS):
@@ -511,28 +596,35 @@ def search(query, providers=PROVIDERS):
         raise ValueError("nothing to search: empty query")
     wanted = [p for p in providers if p in _FNS]
     if not wanted:
-        raise ValueError("no known providers named: %s" % (providers,))
+        raise ValueError("no known providers named: {}".format(providers))
     legs, seen, hits = [], set(), []
     for name in wanted:
         try:
             leg = _FNS[name](query.strip())
         except Exception as e:
-            note_failure("websearch:%s" % name, e)
-            leg = {"via": name, "state": "error",
-                   "detail": str(e)[:160], "hits": []}
+            note_failure("websearch:{}".format(name), e)
+            leg = {"via": name, "state": "error", "detail": str(e)[:160], "hits": []}
         for h in leg.get("hits", []):
             key = (h.get("url") or h.get("title", "")).lower().strip()
             if key and key not in seen:
                 seen.add(key)
                 hits.append({**h, "via": name})
-        legs.append({"via": name, "state": leg.get("state", "error"),
-                     "detail": leg.get("detail", "")[:160],
-                     "kept": len([h for h in leg.get("hits", [])])})
-    return {"query": query.strip(),
-            "searched_utc": _time.strftime("%Y-%m-%dT%H:%M:%SZ",
-                                           _time.gmtime()),
-            "legs": legs,
-            "answered": sum(1 for l in legs if l["state"] != "error"),
-            "hits": hits,
-            "note": ("error legs could not answer and are not zeros; "
-                     "empty legs answered with nothing found.")}
+        legs.append(
+            {
+                "via": name,
+                "state": leg.get("state", "error"),
+                "detail": leg.get("detail", "")[:160],
+                "kept": len([h for h in leg.get("hits", [])]),
+            }
+        )
+    return {
+        "query": query.strip(),
+        "searched_utc": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        "legs": legs,
+        "answered": sum(1 for l in legs if l["state"] != "error"),
+        "hits": hits,
+        "note": (
+            "error legs could not answer and are not zeros; "
+            "empty legs answered with nothing found."
+        ),
+    }

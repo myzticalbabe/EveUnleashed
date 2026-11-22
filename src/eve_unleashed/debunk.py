@@ -14,27 +14,79 @@ Every uncheckable proposition is labeled OPINION, never proof --
 the same doctrine as redress.prove_case. Eve compiles the
 analysis; only you file it, and only you judge the person.
 """
+
 import re
 
 try:
     from CORE.failure_ledger import note_failure
 except Exception:
+
     def note_failure(where, exc=None):
         pass
 
-ABSOLUTES = ["always", "never", "all ", " every", " none ", "nobody",
-             "nothing", "impossible", "undeniable", "irrefutable"]
-HEDGES = ["maybe", "perhaps", "could be", "might be", "some say",
-          "some people say", "allegedly", "reportedly"]
-OPINION_CUES = ["i feel", "i believe", "in my opinion", "should be",
-                "ought to", "disgusting", "corrupt", "evil", "stupid",
-                "everyone knows", "obviously"]
-WEASELS = ["studies show", "experts agree", "science says", "they say",
-           "it is known", "sources say", "everyone agrees"]
-AD_HOMINEM = ["shill", "sheep", "idiot", "moron", "liar", "fraud",
-              "scam artist", "criminal"]
-ANECDOTE = ["my neighbor", "my friend", "my cousin", "someone i know",
-            "happened to me", "in my experience"]
+
+ABSOLUTES = [
+    "always",
+    "never",
+    "all ",
+    " every",
+    " none ",
+    "nobody",
+    "nothing",
+    "impossible",
+    "undeniable",
+    "irrefutable",
+]
+HEDGES = [
+    "maybe",
+    "perhaps",
+    "could be",
+    "might be",
+    "some say",
+    "some people say",
+    "allegedly",
+    "reportedly",
+]
+OPINION_CUES = [
+    "i feel",
+    "i believe",
+    "in my opinion",
+    "should be",
+    "ought to",
+    "disgusting",
+    "corrupt",
+    "evil",
+    "stupid",
+    "everyone knows",
+    "obviously",
+]
+WEASELS = [
+    "studies show",
+    "experts agree",
+    "science says",
+    "they say",
+    "it is known",
+    "sources say",
+    "everyone agrees",
+]
+AD_HOMINEM = [
+    "shill",
+    "sheep",
+    "idiot",
+    "moron",
+    "liar",
+    "fraud",
+    "scam artist",
+    "criminal",
+]
+ANECDOTE = [
+    "my neighbor",
+    "my friend",
+    "my cousin",
+    "someone i know",
+    "happened to me",
+    "in my experience",
+]
 
 
 def _sentences(text):
@@ -66,8 +118,7 @@ def flag_fallacies(text):
     absents = _has_any(low, ABSOLUTES)
     hedges = _has_any(low, HEDGES)
     if absents and hedges:
-        flags.append(("absolute_plus_hedge",
-                      absents[:2] + hedges[:2]))
+        flags.append(("absolute_plus_hedge", absents[:2] + hedges[:2]))
     if _has_any(low, WEASELS):
         flags.append(("weasel_authority", _has_any(low, WEASELS)[:2]))
     if _has_any(low, AD_HOMINEM):
@@ -82,9 +133,9 @@ def check_self_contradiction(props):
     notes = []
     for p in props:
         low = p.lower()
-        if (("always" in low or "never" in low)
-                and ("except" in low or "but " in low
-                     or "however" in low or "although" in low)):
+        if ("always" in low or "never" in low) and (
+            "except" in low or "but " in low or "however" in low or "although" in low
+        ):
             notes.append(p)
     return notes
 
@@ -99,16 +150,24 @@ def debunk_claim(text):
     checks = []
 
     def check(name, ok, detail):
-        checks.append({"check": name, "passed": bool(ok),
-                       "detail": detail})
+        checks.append({"check": name, "passed": bool(ok), "detail": detail})
         return bool(ok)
 
-    check("has_checkable_proposition", bool(props),
-          "%d proposition(s), %d opinion(s)" % (len(props), len(opinions)))
-    check("no_self_contradiction", not contra,
-          "contradicted=%s" % contra if contra else "none found")
-    check("no_fallacy_shapes", not flags,
-          "flags=%s" % [f[0] for f in flags] if flags else "none found")
+    check(
+        "has_checkable_proposition",
+        bool(props),
+        "{:d} proposition(s), {:d} opinion(s)".format(len(props), len(opinions)),
+    )
+    check(
+        "no_self_contradiction",
+        not contra,
+        "contradicted={}".format(contra) if contra else "none found",
+    )
+    check(
+        "no_fallacy_shapes",
+        not flags,
+        "flags=%s" % [f[0] for f in flags] if flags else "none found",
+    )
     if contra:
         verdict = "REFUTED"
     elif not props:
@@ -117,12 +176,17 @@ def debunk_claim(text):
         verdict = "SUSPECT"
     else:
         verdict = "CHECKABLE"
-    return {"claim": text, "propositions": props,
-            "opinions": [o["text"] for o in opinions],
-            "fallacy_flags": [{"flag": f, "matched": m}
-                              for f, m in flags],
-            "contradictions": contra, "checks": checks,
-            "verdict": verdict,
-            "next": ("run `eve factcheck --claim` on the propositions"
-                     if verdict in ("CHECKABLE", "SUSPECT")
-                     else "no live check can settle this; treat as OPINION")}
+    return {
+        "claim": text,
+        "propositions": props,
+        "opinions": [o["text"] for o in opinions],
+        "fallacy_flags": [{"flag": f, "matched": m} for f, m in flags],
+        "contradictions": contra,
+        "checks": checks,
+        "verdict": verdict,
+        "next": (
+            "run `eve factcheck --claim` on the propositions"
+            if verdict in ("CHECKABLE", "SUSPECT")
+            else "no live check can settle this; treat as OPINION"
+        ),
+    }

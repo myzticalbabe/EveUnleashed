@@ -15,10 +15,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from eve_unleashed import wasm_tutorial as _w
 
-STATE = {"total": 2, "answered": 1, "summary": "ABLATION: probe",
-         "rows": [{"provider": "a", "verdict": "ANSWERED", "detail": "d1"},
-                  {"provider": "b", "verdict": "REFUSED", "detail": "d2"}],
-         "nsp": "judged"}
+STATE = {
+    "total": 2,
+    "answered": 1,
+    "summary": "ABLATION: probe",
+    "rows": [
+        {"provider": "a", "verdict": "ANSWERED", "detail": "d1"},
+        {"provider": "b", "verdict": "REFUSED", "detail": "d2"},
+    ],
+    "nsp": "judged",
+}
 
 
 def test_generate_go_writes_module_sources(tmp_path):
@@ -42,7 +48,8 @@ def test_have_toolchain_reports_shape():
 
 needs_go_node = pytest.mark.skipif(
     not (shutil.which("go") and shutil.which("node")),
-    reason="go+node toolchains required for compile+execute")
+    reason="go+node toolchains required for compile+execute",
+)
 
 
 @needs_go_node

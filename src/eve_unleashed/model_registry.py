@@ -27,14 +27,15 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -42,7 +43,16 @@ except ImportError:                               # never break the host
 REGISTRY_PATH = Path.home() / ".azazael" / "model_registry.json"
 
 # Common model file extensions to scan for
-MODEL_EXTENSIONS = {".gguf", ".pt", ".pth", ".onnx", ".joblib", ".pkl", ".safetensors", ".bin"}
+MODEL_EXTENSIONS = {
+    ".gguf",
+    ".pt",
+    ".pth",
+    ".onnx",
+    ".joblib",
+    ".pkl",
+    ".safetensors",
+    ".bin",
+}
 
 # Minimum file size to consider (bytes)
 MIN_MODEL_SIZE = 1000
@@ -68,6 +78,7 @@ def _guess_framework_ext(path: str) -> str:
 @dataclass
 class ModelRecord:
     """A single model entry in the registry."""
+
     path: str = ""
     canonical_path: str = ""  # resolved, deduplicated path
     filename: str = ""
@@ -96,14 +107,14 @@ class ModelRecord:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ModelRecord":
+    def from_dict(cls, d: dict[str, Any]) -> ModelRecord:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
 class ModelRegistry:
     """Cross-project model registry with deduplication and persistent stats."""
 
-    def __init__(self, registry_path: (Path | None) = None):
+    def __init__(self, registry_path: Path | None = None):
         self._path = registry_path or REGISTRY_PATH
         self._models: dict[str, ModelRecord] = {}  # keyed by canonical_path
         self._load()
@@ -134,7 +145,9 @@ class ModelRegistry:
 
     # ── Registration ────────────────────────────────────────────
 
-    def register(self, path: str, framework: str = "unknown", project: str = "") -> (str | None):
+    def register(
+        self, path: str, framework: str = "unknown", project: str = ""
+    ) -> str | None:
         """Register a model file. Returns canonical_path if new, None if already known."""
         resolved = str(Path(path).resolve())
         if resolved in self._models:
@@ -147,7 +160,7 @@ class ModelRegistry:
         p = Path(resolved)
         size_mb = 0.0
         if p.exists():
-            size_mb = p.stat().st_size / (1024 ** 2)
+            size_mb = p.stat().st_size / (1024**2)
 
         now = time.time()
         record = ModelRecord(
@@ -173,7 +186,9 @@ class ModelRegistry:
         record = self._models[resolved]
         record.inference_count += 1
         record.total_latency_ms += latency_ms
-        record.avg_latency_ms = round(record.total_latency_ms / record.inference_count, 2)
+        record.avg_latency_ms = round(
+            record.total_latency_ms / record.inference_count, 2
+        )
         record.last_used = time.time()
         # Auto-save every 10 inferences to balance persistence vs I/O
         if record.inference_count % 10 == 0:
@@ -181,7 +196,7 @@ class ModelRegistry:
 
     # ── Query ───────────────────────────────────────────────────
 
-    def get(self, path: str) -> (ModelRecord | None):
+    def get(self, path: str) -> ModelRecord | None:
         """Get a model record by path."""
         resolved = str(Path(path).resolve())
         return self._models.get(resolved)
@@ -211,8 +226,13 @@ class ModelRegistry:
         """Return aggregate registry statistics."""
         models = list(self._models.values())
         if not models:
-            return {"model_count": 0, "total_inferences": 0, "total_size_gb": 0.0,
-                    "frameworks": {}, "most_used": None}
+            return {
+                "model_count": 0,
+                "total_inferences": 0,
+                "total_size_gb": 0.0,
+                "frameworks": {},
+                "most_used": None,
+            }
 
         frameworks: dict[str, int] = {}
         for m in models:
@@ -225,34 +245,43 @@ class ModelRegistry:
             "total_inferences": sum(m.inference_count for m in models),
             "total_size_gb": round(sum(m.size_mb for m in models) / 1024.0, 2),
             "frameworks": frameworks,
-            "most_used": {
-                "filename": most_used.filename,
-                "framework": most_used.framework,
-                "inference_count": most_used.inference_count,
-                "avg_latency_ms": most_used.avg_latency_ms,
-            } if most_used.inference_count > 0 else None,
+            "most_used": (
+                {
+                    "filename": most_used.filename,
+                    "framework": most_used.framework,
+                    "inference_count": most_used.inference_count,
+                    "avg_latency_ms": most_used.avg_latency_ms,
+                }
+                if most_used.inference_count > 0
+                else None
+            ),
         }
 
-    def select_fastest(self, framework: (str | None) = None) -> (str | None):
+    def select_fastest(self, framework: str | None = None) -> str | None:
         """Evolution: route to the lowest-latency model with observed data.
 
         Falls back to the smallest registered model (cheapest to try) when
         nothing has measurements yet. Returns canonical path or None.
         """
-        cands = [m for m in self._models.values()
-                 if m.inference_count > 0
-                 and (framework is None or m.framework == framework)]
+        cands = [
+            m
+            for m in self._models.values()
+            if m.inference_count > 0 and (framework is None or m.framework == framework)
+        ]
         if cands:
             return min(cands, key=lambda m: m.avg_latency_ms).canonical_path
-        cold = [m for m in self._models.values()
-                if framework is None or m.framework == framework]
+        cold = [
+            m
+            for m in self._models.values()
+            if framework is None or m.framework == framework
+        ]
         if cold:
             return min(cold, key=lambda m: m.size_mb).canonical_path
         return None
 
     # ── Scanning ────────────────────────────────────────────────
 
-    def scan(self, directories: (list[str] | None) = None) -> int:
+    def scan(self, directories: list[str] | None = None) -> int:
         """Scan directories for model files and register new ones.
 
         Args:
@@ -290,8 +319,11 @@ class ModelRegistry:
         """Drop entries whose file no longer exists. Self-heal for stale
         rows (e.g. legacy entries from moved model dirs). Returns the pruned
         canonical paths and saves only when something was removed."""
-        gone = [c for c, m in self._models.items()
-                if not Path(m.canonical_path or c).is_file()]
+        gone = [
+            c
+            for c, m in self._models.items()
+            if not Path(m.canonical_path or c).is_file()
+        ]
         for c in gone:
             del self._models[c]
         if gone:
@@ -308,7 +340,7 @@ class ModelRegistry:
 
 # ── Singleton ────────────────────────────────────────────────────
 
-_registry: (ModelRegistry | None) = None
+_registry: ModelRegistry | None = None
 
 
 def get_registry() -> ModelRegistry:

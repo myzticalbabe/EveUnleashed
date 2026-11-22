@@ -29,12 +29,11 @@ run_suite() executes all cases and returns held/bypassed counts
 plus every BYPASSED case with its input and effect. Green means
 measured, not invincible: the kit grows, the walls keep score.
 """
-import os as _os
-import tempfile as _tempfile
 
 try:
     from CORE.failure_ledger import note_failure
 except Exception:
+
     def note_failure(where, exc=None):
         pass
 
@@ -113,47 +112,53 @@ def section_spoofs():
 
 
 def _try_instruction(case):
-    from .live_morph import parse_instruction, apply_op
+    from .live_morph import apply_op, parse_instruction
+
     try:
         op = parse_instruction(case)
     except ValueError:
         return "HELD", "refused at parse"
     if op["op"] == "replace" and (not op["old"] or not op["new"]):
-        return "BYPASSED", "empty side survived parse: %r" % op
+        return "BYPASSED", "empty side survived parse: {!r}".format(op)
     try:
         _, detail = apply_op("alpha beta\ngamma delta\n", op)
     except Exception as e:
-        return "HELD", "refused at apply: %s" % str(e)[:80]
+        return "HELD", "refused at apply: {}".format(str(e)[:80])
     # A multi-word new side ("replace a with b with c" -> new "b with c")
     # is a legitimate greedy parse, not a smuggle: the whole tail becomes
     # the replacement, and the log shows it. Only an empty side surviving
     # parse would be a bypass, and that is refused above.
-    return "HELD", "parsed as %s: %s" % (op["op"], detail[:80])
+    return "HELD", "parsed as {}: {}".format(op["op"], detail[:80])
 
 
 def _try_path(case):
     from .doc_tutor import read_document
+
     try:
         read_document(case)
-        return "BYPASSED", "opened without refusal: %r" % case[:60]
+        return "BYPASSED", "opened without refusal: {!r}".format(case[:60])
     except ValueError:
         return "HELD", "refused: no such document or bad format"
     except Exception as e:
         note_failure("bypass_kit:path", e)
-        return "HELD", "refused by OS: %s" % str(e)[:80]
+        return "HELD", "refused by OS: {}".format(str(e)[:80])
 
 
 def _try_oversized(case):
     from .live_morph import LiveState
+
     st = LiveState(case, "bulk")
     try:
         r = st.instruct("outline")
         ok = r["ok"] and isinstance(st.text, str)
-        return ("HELD", "outline over bulk ok") if ok else ("BYPASSED",
-                "bulk broke outline")
+        return (
+            ("HELD", "outline over bulk ok")
+            if ok
+            else ("BYPASSED", "bulk broke outline")
+        )
     except Exception as e:
         note_failure("bypass_kit:bulk", e)
-        return "HELD", "refused: %s" % str(e)[:80]
+        return "HELD", "refused: {}".format(str(e)[:80])
 
 
 def _try_unicode(case):
@@ -162,22 +167,25 @@ def _try_unicode(case):
 
 def _try_spoof(case):
     from .live_morph import apply_op
-    doc = "%s\nbody line here\n## Next\nmore text\n" % case
+
+    doc = "{}\nbody line here\n## Next\nmore text\n".format(case)
     try:
-        _, detail = apply_op(doc, {"op": "case", "upper": True,
-                                   "section": "Inspection", "raw": case})
-        return "HELD", "section span contained: %s" % detail[:80]
+        _, detail = apply_op(
+            doc, {"op": "case", "upper": True, "section": "Inspection", "raw": case}
+        )
+        return "HELD", "section span contained: {}".format(detail[:80])
     except Exception as e:
         note_failure("bypass_kit:spoof", e)
-        return "HELD", "refused: %s" % str(e)[:80]
+        return "HELD", "refused: {}".format(str(e)[:80])
 
 
-_SUITES = (("instruction_injections", instruction_injections,
-            _try_instruction),
-           ("path_escapes", path_escapes, _try_path),
-           ("oversized", oversized, _try_oversized),
-           ("unicode_tricks", unicode_tricks, _try_unicode),
-           ("section_spoofs", section_spoofs, _try_spoof))
+_SUITES = (
+    ("instruction_injections", instruction_injections, _try_instruction),
+    ("path_escapes", path_escapes, _try_path),
+    ("oversized", oversized, _try_oversized),
+    ("unicode_tricks", unicode_tricks, _try_unicode),
+    ("section_spoofs", section_spoofs, _try_spoof),
+)
 
 
 def run_suite():
@@ -189,16 +197,26 @@ def run_suite():
                 verdict, detail = try_fn(case)
             except Exception as e:
                 note_failure("bypass_kit:case", e)
-                verdict, detail = "HELD", "harness refused: %s" % str(e)[:80]
-            results.append({"suite": suite_name, "verdict": verdict,
-                            "detail": detail,
-                            "input": case[:80] if isinstance(case, str)
-                            else "<bulk>"})
+                verdict, detail = "HELD", "harness refused: {}".format(str(e)[:80])
+            results.append(
+                {
+                    "suite": suite_name,
+                    "verdict": verdict,
+                    "detail": detail,
+                    "input": case[:80] if isinstance(case, str) else "<bulk>",
+                }
+            )
             if verdict == "BYPASSED":
                 bypassed.append(results[-1])
     held = sum(1 for r in results if r["verdict"] == "HELD")
-    return {"ran": len(results), "held": held,
-            "bypassed": bypassed, "bypassed_count": len(bypassed),
-            "results": results,
-            "note": ("HELD means refused or contained. Any BYPASSED is a "
-                     "finding: record it, fix the parser, re-run.")}
+    return {
+        "ran": len(results),
+        "held": held,
+        "bypassed": bypassed,
+        "bypassed_count": len(bypassed),
+        "results": results,
+        "note": (
+            "HELD means refused or contained. Any BYPASSED is a "
+            "finding: record it, fix the parser, re-run."
+        ),
+    }

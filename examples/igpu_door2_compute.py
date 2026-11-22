@@ -29,6 +29,7 @@ Exit: 0 when the GPU result matches the CPU expectation exactly;
 The MCML baseline (pure-Python list comprehension, same math) is timed
 alongside, so the decision is a reading, not an opinion.
 """
+
 from __future__ import annotations
 
 import ctypes
@@ -123,33 +124,66 @@ def main() -> int:
     # ---- device ----------------------------------------------------------
     d3d11.D3D11CreateDevice.restype = HRESULT
     d3d11.D3D11CreateDevice.argtypes = [
-        ctypes.c_void_p, wintypes.UINT, ctypes.c_void_p, wintypes.UINT,
-        ctypes.c_void_p, wintypes.UINT, wintypes.UINT,
-        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(wintypes.UINT),
+        ctypes.c_void_p,
+        wintypes.UINT,
+        ctypes.c_void_p,
+        wintypes.UINT,
+        ctypes.c_void_p,
+        wintypes.UINT,
+        wintypes.UINT,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.POINTER(wintypes.UINT),
         ctypes.POINTER(ctypes.c_void_p),
     ]
     device = ctypes.c_void_p()
     context = ctypes.c_void_p()
     level = wintypes.UINT(0)
-    check(d3d11.D3D11CreateDevice(
-        None, D3D_DRIVER_TYPE_HARDWARE, None, 0, None, 0, D3D11_SDK_VERSION,
-        ctypes.byref(device), ctypes.byref(level), ctypes.byref(context),
-    ), "D3D11CreateDevice")
+    check(
+        d3d11.D3D11CreateDevice(
+            None,
+            D3D_DRIVER_TYPE_HARDWARE,
+            None,
+            0,
+            None,
+            0,
+            D3D11_SDK_VERSION,
+            ctypes.byref(device),
+            ctypes.byref(level),
+            ctypes.byref(context),
+        ),
+        "D3D11CreateDevice",
+    )
     print(f"device: feature level 0x{level.value:X}")
 
     # ---- compile one HLSL source ----------------------------------------
     compiler.D3DCompile.restype = HRESULT
     compiler.D3DCompile.argtypes = [
-        ctypes.c_void_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_void_p,
-        ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p, wintypes.UINT,
-        wintypes.UINT, ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.c_char_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        wintypes.UINT,
+        wintypes.UINT,
+        ctypes.POINTER(ctypes.c_void_p),
         ctypes.POINTER(ctypes.c_void_p),
     ]
     code = ctypes.c_void_p()
     errors = ctypes.c_void_p()
     hr = compiler.D3DCompile(
-        HLSL, len(HLSL), b"inline.hlsl", None, None, b"CSMain", b"cs_5_0",
-        D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, ctypes.byref(code), ctypes.byref(errors),
+        HLSL,
+        len(HLSL),
+        b"inline.hlsl",
+        None,
+        None,
+        b"CSMain",
+        b"cs_5_0",
+        D3DCOMPILE_OPTIMIZATION_LEVEL3,
+        0,
+        ctypes.byref(code),
+        ctypes.byref(errors),
     )
     if hr != 0:
         if errors.value:
@@ -163,58 +197,139 @@ def main() -> int:
     values = [float(i % 97) for i in range(N)]
     source = (ctypes.c_float * N)(*values)
 
-    create_buffer = method(device.value, 3, ctypes.POINTER(D3D11_BUFFER_DESC),
-                           ctypes.POINTER(D3D11_SUBRESOURCE_DATA),
-                           ctypes.POINTER(ctypes.c_void_p))
+    create_buffer = method(
+        device.value,
+        3,
+        ctypes.POINTER(D3D11_BUFFER_DESC),
+        ctypes.POINTER(D3D11_SUBRESOURCE_DATA),
+        ctypes.POINTER(ctypes.c_void_p),
+    )
 
-    src_desc = D3D11_BUFFER_DESC(N * 4, D3D11_USAGE_DEFAULT,
-                                 D3D11_BIND_SHADER_RESOURCE, 0,
-                                 D3D11_RESOURCE_MISC_BUFFER_STRUCTURED, 4)
+    src_desc = D3D11_BUFFER_DESC(
+        N * 4,
+        D3D11_USAGE_DEFAULT,
+        D3D11_BIND_SHADER_RESOURCE,
+        0,
+        D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
+        4,
+    )
     src_data = D3D11_SUBRESOURCE_DATA(ctypes.cast(source, ctypes.c_void_p), 0, 0)
     src_buf = ctypes.c_void_p()
-    check(create_buffer(device.value, ctypes.byref(src_desc), ctypes.byref(src_data),
-                        ctypes.byref(src_buf)), "CreateBuffer(source)")
+    check(
+        create_buffer(
+            device.value,
+            ctypes.byref(src_desc),
+            ctypes.byref(src_data),
+            ctypes.byref(src_buf),
+        ),
+        "CreateBuffer(source)",
+    )
 
     dst_buf = ctypes.c_void_p()
-    check(create_buffer(device.value, ctypes.byref(D3D11_BUFFER_DESC(
-        N * 4, D3D11_USAGE_DEFAULT, D3D11_BIND_UNORDERED_ACCESS, 0,
-        D3D11_RESOURCE_MISC_BUFFER_STRUCTURED, 4)), None, ctypes.byref(dst_buf)),
-        "CreateBuffer(destination)")
+    check(
+        create_buffer(
+            device.value,
+            ctypes.byref(
+                D3D11_BUFFER_DESC(
+                    N * 4,
+                    D3D11_USAGE_DEFAULT,
+                    D3D11_BIND_UNORDERED_ACCESS,
+                    0,
+                    D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
+                    4,
+                )
+            ),
+            None,
+            ctypes.byref(dst_buf),
+        ),
+        "CreateBuffer(destination)",
+    )
 
     # A staging copy is the only way to read a DEFAULT buffer back.
     stage_buf = ctypes.c_void_p()
-    check(create_buffer(device.value, ctypes.byref(D3D11_BUFFER_DESC(
-        N * 4, D3D11_USAGE_STAGING, 0, D3D11_CPU_ACCESS_READ, 0, 4)), None,
-        ctypes.byref(stage_buf)), "CreateBuffer(staging)")
+    check(
+        create_buffer(
+            device.value,
+            ctypes.byref(
+                D3D11_BUFFER_DESC(
+                    N * 4, D3D11_USAGE_STAGING, 0, D3D11_CPU_ACCESS_READ, 0, 4
+                )
+            ),
+            None,
+            ctypes.byref(stage_buf),
+        ),
+        "CreateBuffer(staging)",
+    )
 
     # ---- views -----------------------------------------------------------
     uav = ctypes.c_void_p()
-    check(method(device.value, 8, ctypes.c_void_p, ctypes.c_void_p,
-                 ctypes.POINTER(ctypes.c_void_p))(
-        device.value, dst_buf, None, ctypes.byref(uav)), "CreateUnorderedAccessView")
+    check(
+        method(
+            device.value,
+            8,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_void_p),
+        )(device.value, dst_buf, None, ctypes.byref(uav)),
+        "CreateUnorderedAccessView",
+    )
 
     srv = ctypes.c_void_p()
-    check(method(device.value, 7, ctypes.c_void_p, ctypes.c_void_p,
-                 ctypes.POINTER(ctypes.c_void_p))(
-        device.value, src_buf, None, ctypes.byref(srv)), "CreateShaderResourceView")
+    check(
+        method(
+            device.value,
+            7,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_void_p),
+        )(device.value, src_buf, None, ctypes.byref(srv)),
+        "CreateShaderResourceView",
+    )
 
     shader = ctypes.c_void_p()
-    check(method(device.value, 18, ctypes.c_void_p, ctypes.c_size_t,
-                 ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))(
-        device.value, blob, blob_size, None, ctypes.byref(shader)), "CreateComputeShader")
+    check(
+        method(
+            device.value,
+            18,
+            ctypes.c_void_p,
+            ctypes.c_size_t,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_void_p),
+        )(device.value, blob, blob_size, None, ctypes.byref(shader)),
+        "CreateComputeShader",
+    )
 
     # ---- context: the draw order ----------------------------------------
-    csset_shader = method(context.value, 69, ctypes.c_void_p, ctypes.c_void_p,
-                          wintypes.UINT)
-    csset_uav = method(context.value, 68, wintypes.UINT, wintypes.UINT,
-                       ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p)
-    csset_srv = method(context.value, 67, wintypes.UINT, wintypes.UINT,
-                       ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p)
+    csset_shader = method(
+        context.value, 69, ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT
+    )
+    csset_uav = method(
+        context.value,
+        68,
+        wintypes.UINT,
+        wintypes.UINT,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p,
+    )
+    csset_srv = method(
+        context.value,
+        67,
+        wintypes.UINT,
+        wintypes.UINT,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_void_p,
+    )
     dispatch = method(context.value, 41, wintypes.UINT, wintypes.UINT, wintypes.UINT)
     copy_resource = method(context.value, 47, ctypes.c_void_p, ctypes.c_void_p)
-    map_resource = method(context.value, 14, ctypes.c_void_p, wintypes.UINT,
-                          wintypes.UINT, wintypes.UINT,
-                          ctypes.POINTER(D3D11_MAPPED_SUBRESOURCE))
+    map_resource = method(
+        context.value,
+        14,
+        ctypes.c_void_p,
+        wintypes.UINT,
+        wintypes.UINT,
+        wintypes.UINT,
+        ctypes.POINTER(D3D11_MAPPED_SUBRESOURCE),
+    )
     unmap = method(context.value, 15, ctypes.c_void_p, wintypes.UINT)
 
     csset_shader(context.value, shader, None, 0)
@@ -230,18 +345,25 @@ def main() -> int:
         dispatch(context.value, groups, 1, 1)
         copy_resource(context.value, stage_buf, dst_buf)
         mapped = D3D11_MAPPED_SUBRESOURCE()
-        check(map_resource(context.value, stage_buf, 0, D3D11_MAP_READ, 0,
-                           ctypes.byref(mapped)), "Map")
+        check(
+            map_resource(
+                context.value, stage_buf, 0, D3D11_MAP_READ, 0, ctypes.byref(mapped)
+            ),
+            "Map",
+        )
         out = ctypes.cast(mapped.pData, ctypes.POINTER(ctypes.c_float))
-        ok = all(out[i] == values[i] * 2.0 + 1.0
-                 for i in (0, 1, 2, N // 3, N // 2, N - 1))
+        ok = all(
+            out[i] == values[i] * 2.0 + 1.0 for i in (0, 1, 2, N // 3, N // 2, N - 1)
+        )
         unmap(context.value, stage_buf, 0)
         timings.append((time.perf_counter() - t0) * 1000.0)
 
     gpu_ms = min(timings)
     gpu_rate = N / (gpu_ms / 1000.0) / 1e6
-    print(f"gpu: {N:,} floats  y=2x+1  dispatch+readback {gpu_ms:.2f} ms  "
-          f"{gpu_rate:.1f} M elem/s  correct={ok}")
+    print(
+        f"gpu: {N:,} floats  y=2x+1  dispatch+readback {gpu_ms:.2f} ms  "
+        f"{gpu_rate:.1f} M elem/s  correct={ok}"
+    )
 
     # ---- MCML baseline: same math as pure Python -------------------------
     cpu_n = 1 << 17
@@ -250,8 +372,10 @@ def main() -> int:
     ys = [x * 2.0 + 1.0 for x in xs]
     cpu_ms = (time.perf_counter() - t0) * 1000.0
     cpu_rate = cpu_n / (cpu_ms / 1000.0) / 1e6
-    print(f"cpu: {cpu_n:,} floats  same math  {cpu_ms:.2f} ms  "
-          f"{cpu_rate:.2f} M elem/s")
+    print(
+        f"cpu: {cpu_n:,} floats  same math  {cpu_ms:.2f} ms  "
+        f"{cpu_rate:.2f} M elem/s"
+    )
     print(f"ratio: iGPU runs {gpu_rate / cpu_rate:.1f}x the pure-Python rate")
     print(f"cpu spot-check: y[3]={ys[3]} (expect {xs[3] * 2.0 + 1.0})")
 

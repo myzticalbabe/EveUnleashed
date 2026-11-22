@@ -15,7 +15,7 @@ measured facts (bytes, framework, probe result) plus the Z3 verdict on
 the routing decision. A receipt is evidence, not a trophy: a failed
 probe registers nothing.
 """
-import glob
+
 import json
 import os
 import shutil
@@ -28,8 +28,10 @@ from pathlib import Path
 try:
     from CORE.failure_ledger import note_failure
 except Exception:
+
     def note_failure(where, exc=None):
         pass
+
 
 CRADLE_DIR = Path.home() / ".azazael" / "cradle"
 RECEIPT_DIR = Path("state")
@@ -73,7 +75,11 @@ def _probe_gguf(model_path):
     """
     cands = _llama_server_candidates()
     if not cands:
-        return False, "no llama-server binary (LM Studio backends, winget llama.cpp, PATH)", None
+        return (
+            False,
+            "no llama-server binary (LM Studio backends, winget llama.cpp, PATH)",
+            None,
+        )
     port = _free_port()
     if port is None:
         return False, "no free port for sidecar probe", None
@@ -81,17 +87,23 @@ def _probe_gguf(model_path):
     proc = None
     try:
         proc = subprocess.Popen(
-            [runner, "-m", str(model_path), "--port", str(port),
-             "--n-predict", "64"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            [runner, "-m", str(model_path), "--port", str(port), "--n-predict", "64"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         deadline = time.time() + 120
         healthy = False
         while time.time() < deadline:
             if proc.poll() is not None:
-                return False, "sidecar exited during load (exit %s)" % proc.returncode, runner
+                return (
+                    False,
+                    "sidecar exited during load (exit {})".format(proc.returncode),
+                    runner,
+                )
             try:
                 with urllib.request.urlopen(
-                        "http://127.0.0.1:%d/health" % port, timeout=5) as r:
+                    "http://127.0.0.1:%d/health" % port, timeout=5
+                ) as r:
                     if r.status == 200:
                         healthy = True
                         break
@@ -99,20 +111,23 @@ def _probe_gguf(model_path):
                 time.sleep(2)
         if not healthy:
             return False, "sidecar never reached /health in 120 s", runner
-        body = json.dumps({"prompt": "Reply with the single word: ALIVE",
-                           "n_predict": 8}).encode()
+        body = json.dumps(
+            {"prompt": "Reply with the single word: ALIVE", "n_predict": 8}
+        ).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:%d/completion" % port, data=body,
-            headers={"Content-Type": "application/json"})
+            "http://127.0.0.1:{:d}/completion".format(port),
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
         with urllib.request.urlopen(req, timeout=120) as r:
             out = json.load(r)
         text = (out.get("content") or "").strip()
         if text:
-            return True, "native completion: %s" % text[:120], runner
+            return True, "native completion: {}".format(text[:120]), runner
         return False, "sidecar answered with empty completion", runner
     except Exception as e:
         note_failure("cradle:gguf-probe", e)
-        return False, "probe failed: %s" % e, runner
+        return False, "probe failed: {}".format(e), runner
     finally:
         if proc is not None and proc.poll() is None:
             proc.terminate()
@@ -123,40 +138,49 @@ def _probe_direct(model_path, framework):
     try:
         if framework in ("torch",):
             import torch
-            obj = torch.load(str(model_path), map_location="cpu",
-                             weights_only=True)
-            return True, "torch load ok (%s)" % type(obj).__name__
+
+            obj = torch.load(str(model_path), map_location="cpu", weights_only=True)
+            return True, "torch load ok ({})".format(type(obj).__name__)
         if framework in ("sklearn", "joblib", "pickle"):
             import joblib
+
             obj = joblib.load(str(model_path))
-            return True, "joblib load ok (%s)" % type(obj).__name__
+            return True, "joblib load ok ({})".format(type(obj).__name__)
         if framework == "onnx":
             import onnxruntime
+
             sess = onnxruntime.InferenceSession(str(model_path))
-            return True, "onnxruntime session ok (%d inputs)" % len(sess.get_inputs())
+            return True, "onnxruntime session ok ({:d} inputs)".format(
+                len(sess.get_inputs())
+            )
     except ImportError as e:
-        return False, "framework not installed: %s" % e
+        return False, "framework not installed: {}".format(e)
     except Exception as e:
         note_failure("cradle:direct-probe", e)
-        return False, "load probe failed: %s" % e
-    return False, "no probe for framework %s" % framework
+        return False, "load probe failed: {}".format(e)
+    return False, "no probe for framework {}".format(framework)
 
 
 def list_cradle_models(cradle_dir=None):
     """Every model file in the cradle: [{name, bytes, framework}]."""
     from .core import ModelLoader
+
     cdir = Path(cradle_dir) if cradle_dir else CRADLE_DIR
     if not cdir.is_dir():
         return []
     out = []
     for path in sorted(cdir.iterdir()):
-        if not path.is_file() or path.suffix.lower() in (
-                ".json", ".receipt", ".bak"):
+        if not path.is_file() or path.suffix.lower() in (".json", ".receipt", ".bak"):
             continue
         if path.name.startswith("."):
             continue
-        out.append({"name": path.name, "bytes": path.stat().st_size,
-                    "framework": ModelLoader.guess_framework(path)})
+        out.append(
+            {
+                "name": path.name,
+                "bytes": path.stat().st_size,
+                "framework": ModelLoader.guess_framework(path),
+            }
+        )
     return out
 
 
@@ -166,13 +190,17 @@ def resolve_model(name, cradle_dir=None):
     if p.is_file():
         return p
     cdir = Path(cradle_dir) if cradle_dir else CRADLE_DIR
-    cands = [m for m in list_cradle_models(cdir)
-             if m["name"] == name or Path(m["name"]).stem == name]
+    cands = [
+        m
+        for m in list_cradle_models(cdir)
+        if m["name"] == name or Path(m["name"]).stem == name
+    ]
     if not cands:
-        raise ValueError("no cradle model %r (%s)" % (name, cdir))
+        raise ValueError("no cradle model {!r} ({})".format(name, cdir))
     if len(cands) > 1:
-        raise ValueError("ambiguous %r: %s" % (
-            name, ", ".join(m["name"] for m in cands)))
+        raise ValueError(
+            "ambiguous {!r}: {}".format(name, ", ".join(m["name"] for m in cands))
+        )
     return cdir / cands[0]["name"]
 
 
@@ -192,25 +220,29 @@ def run_gguf(model_path, prompt, max_tokens=256, sidebar_timeout=180):
     try:
         proc = subprocess.Popen(
             [str(cands[0]), "-m", str(model_path), "--port", str(port)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         deadline = time.time() + sidebar_timeout
         while time.time() < deadline:
             if proc.poll() is not None:
                 raise RuntimeError("sidecar exited during load")
             try:
                 with urllib.request.urlopen(
-                        "http://127.0.0.1:%d/health" % port, timeout=5) as r:
+                    "http://127.0.0.1:%d/health" % port, timeout=5
+                ) as r:
                     if r.status == 200:
                         break
             except Exception:
                 time.sleep(2)
         else:
             raise RuntimeError("sidecar never reached /health")
-        body = json.dumps({"prompt": prompt,
-                           "n_predict": max_tokens}).encode()
+        body = json.dumps({"prompt": prompt, "n_predict": max_tokens}).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:%d/completion" % port, data=body,
-            headers={"Content-Type": "application/json"})
+            "http://127.0.0.1:{:d}/completion".format(port),
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
         with urllib.request.urlopen(req, timeout=sidebar_timeout) as r:
             out = json.load(r)
         return (out.get("content") or "").strip()
@@ -221,8 +253,8 @@ def run_gguf(model_path, prompt, max_tokens=256, sidebar_timeout=180):
 
 def adopt_cradle(cradle_dir=None):
     """Adopt every model file in the cradle. Returns a summary dict."""
-    from .model_registry import ModelRegistry, MODEL_EXTENSIONS
     from .core import ModelLoader
+    from .model_registry import MODEL_EXTENSIONS, ModelRegistry
     from .nsp_check import verify_router_trace
 
     cdir = Path(cradle_dir) if cradle_dir else CRADLE_DIR
@@ -244,31 +276,52 @@ def adopt_cradle(cradle_dir=None):
             ok, detail, runner = _probe_gguf(path)
         elif fw in ("torch", "sklearn", "joblib", "pickle", "onnx"):
             ok, detail = _probe_direct(path, fw)
-            runner = "direct:%s" % fw
+            runner = "direct:{}".format(fw)
         else:
             ok, detail, runner = False, "no native runner yet; swarm at infer", None
         nsp_note = "nsp-unavailable"
         if ok:
             try:
-                events = [{"event_type": "route", "symbolic_state": {
-                    "query_norm": 1.0, "selected_idx": 0,
-                    "num_providers": 1, "dead_provider_idx": -1}}]
-                verdict, vdetail = verify_router_trace(events, [
-                    "valid_query_features", "valid_provider_selection",
-                    "no_dead_provider"])
-                nsp_note = "nsp:%s [%s]" % (verdict, vdetail)
+                events = [
+                    {
+                        "event_type": "route",
+                        "symbolic_state": {
+                            "query_norm": 1.0,
+                            "selected_idx": 0,
+                            "num_providers": 1,
+                            "dead_provider_idx": -1,
+                        },
+                    }
+                ]
+                verdict, vdetail = verify_router_trace(
+                    events,
+                    [
+                        "valid_query_features",
+                        "valid_provider_selection",
+                        "no_dead_provider",
+                    ],
+                )
+                nsp_note = "nsp:{} [{}]".format(verdict, vdetail)
             except Exception as e:
                 note_failure("cradle:nsp", e)
-        receipt = {"model": path.name, "bytes": size, "framework": fw,
-                   "native_runner": runner, "probe_ok": ok,
-                   "probe_detail": detail, "nsp": nsp_note,
-                   "adopted_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
-                                                time.gmtime())}
+        receipt = {
+            "model": path.name,
+            "bytes": size,
+            "framework": fw,
+            "native_runner": runner,
+            "probe_ok": ok,
+            "probe_detail": detail,
+            "nsp": nsp_note,
+            "adopted_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
         rdir = RECEIPT_DIR
         try:
             rdir.mkdir(parents=True, exist_ok=True)
-            with open(rdir / ("eve-cradle-%s.receipt.json" % path.stem),
-                      "w", encoding="utf-8") as f:
+            with open(
+                rdir / ("eve-cradle-{}.receipt.json".format(path.stem)),
+                "w",
+                encoding="utf-8",
+            ) as f:
                 json.dump(receipt, f, indent=2)
         except Exception as e:
             note_failure("cradle:receipt", e)
@@ -277,5 +330,9 @@ def adopt_cradle(cradle_dir=None):
             adopted.append((path.name, fw, runner))
         else:
             failed.append((path.name, detail))
-    return {"cradle": str(cdir), "adopted": adopted, "failed": failed,
-            "skipped": skipped}
+    return {
+        "cradle": str(cdir),
+        "adopted": adopted,
+        "failed": failed,
+        "skipped": skipped,
+    }

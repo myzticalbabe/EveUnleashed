@@ -1,4 +1,5 @@
 """Tests for eve_unleashed.model_picker (stdlib only, no network beyond localhost)."""
+
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -30,8 +31,9 @@ def test_custom_add_remove_roundtrip(tmp_path, monkeypatch):
 def test_selection_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(mp, "SELECTION_FILE", tmp_path / "s.json")
     assert mp.load_selection() is None
-    sel = mp.save_selection({"provider": "kilo", "model": "kilo/x",
-                             "kind": "agent", "agent": "kilo"})
+    sel = mp.save_selection(
+        {"provider": "kilo", "model": "kilo/x", "kind": "agent", "agent": "kilo"}
+    )
     assert mp.load_selection()["model"] == "kilo/x"
     assert mp.current_id() == "kilo/kilo/x"
     assert sel["kind"] == "agent"
@@ -59,8 +61,12 @@ def test_discover_finds_server_not_embeds(monkeypatch):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
         monkeypatch.setattr(mp, "DEFAULT_PORTS", (port,))
-        found = [e for e in mp.discover() if e["kind"] == "server"
-                 and e.get("base", "").endswith(":%d/v1" % port)]
+        found = [
+            e
+            for e in mp.discover()
+            if e["kind"] == "server"
+            and e.get("base", "").endswith(":{:d}/v1".format(port))
+        ]
     finally:
         srv.shutdown()
     assert [e["model"] for e in found] == ["stub-model"]
@@ -68,6 +74,7 @@ def test_discover_finds_server_not_embeds(monkeypatch):
 
 def test_discover_agents_lists_kilo_when_present():
     import shutil
+
     if not shutil.which("kilo"):
         pytest.skip("kilo CLI not installed")
     entries = mp.discover_agents()
@@ -80,10 +87,15 @@ def test_discover_agents_lists_kilo_when_present():
 
 def test_run_agent_reports_signin_cleanly():
     import shutil
+
     if not shutil.which("kilo"):
         pytest.skip("kilo CLI not installed")
-    out = mp.run_agent("kilo", "kilo/~deepseek/deepseek-flash-latest",
-                       "reply with exactly: PICKER_TEST_OK", timeout=120.0)
+    out = mp.run_agent(
+        "kilo",
+        "kilo/~deepseek/deepseek-flash-latest",
+        "reply with exactly: PICKER_TEST_OK",
+        timeout=120.0,
+    )
     assert out["status"] == "error"
     # kilo may return "sign in" or "add credits" depending on auth state
     err = out["error"].lower()

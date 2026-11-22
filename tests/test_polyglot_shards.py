@@ -12,8 +12,13 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from INTERPRETERS import node_runner, pwsh_runner, sh_runner
-from INTERPRETERS import run_code, supported_languages
+from INTERPRETERS import (
+    node_runner,
+    pwsh_runner,
+    run_code,
+    sh_runner,
+    supported_languages,
+)
 from SHARDS import polyglot, registry
 
 
@@ -52,6 +57,7 @@ def test_run_code_javascript_inline():
 
 def test_route_lang_spends_budgets():
     from SHARDS.registry import route_lang
+
     assert route_lang("gateway", "balanced") == "go"
     assert route_lang("gateway", "peak") == "rust"
     assert route_lang("gateway", "fast") in ("go", "rust")
@@ -59,7 +65,13 @@ def test_route_lang_spends_budgets():
     assert route_lang("no-such-shard") == "python"
     assert route_lang("interpreters", "balanced") == "python"
     assert route_lang("interpreters", "fast") in (
-        "python", "go", "rust", "javascript", "powershell", "bash")
+        "python",
+        "go",
+        "rust",
+        "javascript",
+        "powershell",
+        "bash",
+    )
 
 
 def test_work_tier_sum_agreement_where_toolchains_exist():
@@ -68,6 +80,7 @@ def test_work_tier_sum_agreement_where_toolchains_exist():
     # language summed 0..19999 — nothing covered the work tier, so the
     # routing table silently ranked bash on a failing measurement.)
     from SHARDS.polyglot import EXPECTED_SUM, WORK_SNIPPETS
+
     assert EXPECTED_SUM == 20000 * 19999 // 2 == 199990000
     assert set(WORK_SNIPPETS) == set(polyglot.supported_shard_langs())
     for lang in polyglot.supported_shard_langs():
@@ -83,6 +96,7 @@ def test_stale_sweep_falls_back_to_canonical_order():
     # preference, never spends stale numbers. MAX_AGE=-1 makes every
     # table stale by age, deterministically, on any machine.
     import SHARDS.registry as reg
+
     old = reg.SWEEP_MAX_AGE_HOURS
     reg.SWEEP_MAX_AGE_HOURS = -1
     try:

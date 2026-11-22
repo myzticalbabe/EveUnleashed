@@ -49,16 +49,22 @@ def eliza_reading(cues=None):
         if str(eliza_psyche) not in sys.path and eliza_psyche.is_dir():
             sys.path.insert(0, str(eliza_psyche))
         import intuition as _i  # Project_ELIZA psyche module
+
         idx_cls = getattr(_i, "IntuitionIndex", None)
         if idx_cls is None:
             return {"known": False, "reason": "psyche has no IntuitionIndex"}
         # Without the person's network there is no index to read; the shape
         # of the answer is the contract, not a fabricated confidence.
-        return {"known": False,
-                "reason": "no person graph bound -- cues held, not judged",
-                "cues": dict(cues)}
+        return {
+            "known": False,
+            "reason": "no person graph bound -- cues held, not judged",
+            "cues": dict(cues),
+        }
     except Exception as e:
-        return {"known": False, "reason": "psyche unavailable (%s)" % e}  # scanner:ignore except_return_default -- a failed psyche read holds cues unjudged; unknown IS the honest answer
+        return {
+            "known": False,
+            "reason": "psyche unavailable ({})".format(e),
+        }  # scanner:ignore except_return_default -- a failed psyche read holds cues unjudged; unknown IS the honest answer
 
 
 def therapy_prompt(mood, note):
@@ -66,13 +72,16 @@ def therapy_prompt(mood, note):
     _repo_src()
     try:
         from eve_unleashed.therapy import build_prompt
+
         return build_prompt(mood, note)
     except Exception:
         mood = (mood or "stressed").strip()[:60]
         note = (note or "").strip()[:500]
-        return ("You are a warm supportive companion, not a clinician. "
-                "The user feels %s. They shared: %s. Give a short "
-                "supportive reply." % (mood, note or "nothing more yet"))
+        return (
+            "You are a warm supportive companion, not a clinician. "
+            "The user feels {}. They shared: {}. Give a short "
+            "supportive reply.".format(mood, note or "nothing more yet")
+        )
 
 
 def therapy_response(mood, note):
@@ -80,11 +89,14 @@ def therapy_response(mood, note):
     _repo_src()
     try:
         from eve_unleashed.therapy import fallback_response
+
         return fallback_response(mood, note)
     except Exception:
-        return ("I hear you. Breathe in 4 counts, hold 4, out 6. "  # scanner:ignore except_return_default -- degraded-path grounding script; the safe default IS the therapy answer
-                "Name 5 things you can see. I am here with you. "
-                "What do you need next?")
+        return (
+            "I hear you. Breathe in 4 counts, hold 4, out 6. "  # scanner:ignore except_return_default -- degraded-path grounding script; the safe default IS the therapy answer
+            "Name 5 things you can see. I am here with you. "
+            "What do you need next?"
+        )
 
 
 THROWS = ("rock", "paper", "scissors", "lizard", "spock")
@@ -97,14 +109,45 @@ _GATE_NAMES = {
     "spock": "safety",
 }
 
-_DIAGNOSIS_WORDS = ("diagnos", "disorder", "syndrome", "psychos",
-                    "prescrib", "medication", "you need treatment",
-                    "chemical imbalance")
+_DIAGNOSIS_WORDS = (
+    "diagnos",
+    "disorder",
+    "syndrome",
+    "psychos",
+    "prescrib",
+    "medication",
+    "you need treatment",
+    "chemical imbalance",
+)
 
-_STOPWORDS = frozenset(("i", "me", "my", "and", "the", "a", "an",
-                        "to", "of", "it", "is", "in", "on", "for",
-                        "with", "that", "this", "feel", "feeling",
-                        "very", "really", "just", "so", "am"))
+_STOPWORDS = frozenset(
+    (
+        "i",
+        "me",
+        "my",
+        "and",
+        "the",
+        "a",
+        "an",
+        "to",
+        "of",
+        "it",
+        "is",
+        "in",
+        "on",
+        "for",
+        "with",
+        "that",
+        "this",
+        "feel",
+        "feeling",
+        "very",
+        "really",
+        "just",
+        "so",
+        "am",
+    )
+)
 
 
 def _words(text):
@@ -114,9 +157,12 @@ def _words(text):
 def judge_rock(mood, note, text):
     """Foundation: the grounding script is present."""
     ok = "breathe in 4 counts" in (text or "").lower()
-    return {"throw": "rock", "gate": _GATE_NAMES["rock"], "passed": ok,
-            "reason": ("grounding script present" if ok
-                         else "no grounding script")}
+    return {
+        "throw": "rock",
+        "gate": _GATE_NAMES["rock"],
+        "passed": ok,
+        "reason": ("grounding script present" if ok else "no grounding script"),
+    }
 
 
 def judge_paper(mood, note, text):
@@ -125,16 +171,27 @@ def judge_paper(mood, note, text):
     bad = [tok for tok in ("http", "%") if tok in t.lower()]
     bad += [w for w in _words(t) if any(c.isdigit() for c in w)]
     ok = not bad
-    return {"throw": "paper", "gate": _GATE_NAMES["paper"], "passed": ok,
-            "reason": ("no invented particulars" if ok
-                         else "ungrounded detail: %s" % bad[0][:40])}
+    return {
+        "throw": "paper",
+        "gate": _GATE_NAMES["paper"],
+        "passed": ok,
+        "reason": (
+            "no invented particulars"
+            if ok
+            else "ungrounded detail: {}".format(bad[0][:40])
+        ),
+    }
 
 
 def judge_scissors(mood, note, text):
     """Brevity: the cut -- sixty words or fewer."""
     n = len((text or "").split())
-    return {"throw": "scissors", "gate": _GATE_NAMES["scissors"],
-            "passed": n <= 60, "reason": "%d words" % n}
+    return {
+        "throw": "scissors",
+        "gate": _GATE_NAMES["scissors"],
+        "passed": n <= 60,
+        "reason": "{:d} words".format(n),
+    }
 
 
 def judge_lizard(mood, note, text):
@@ -145,11 +202,15 @@ def judge_lizard(mood, note, text):
     asks = t.rstrip().endswith("?")
     ok = bool(held) or asks
     if held:
-        reason = "holds: %s" % ", ".join(held[:3])
+        reason = "holds: {}".format(", ".join(held[:3]))
     else:
         reason = "asks on" if asks else "drops the thread"
-    return {"throw": "lizard", "gate": _GATE_NAMES["lizard"],
-            "passed": ok, "reason": reason}
+    return {
+        "throw": "lizard",
+        "gate": _GATE_NAMES["lizard"],
+        "passed": ok,
+        "reason": reason,
+    }
 
 
 def judge_spock(mood, note, text):
@@ -157,9 +218,14 @@ def judge_spock(mood, note, text):
     t = (text or "").lower()
     bad = [w for w in _DIAGNOSIS_WORDS if w in t]
     ok = not bad
-    return {"throw": "spock", "gate": _GATE_NAMES["spock"], "passed": ok,
-            "reason": ("no clinician language" if ok
-                         else "clinician language: %s" % bad[0])}
+    return {
+        "throw": "spock",
+        "gate": _GATE_NAMES["spock"],
+        "passed": ok,
+        "reason": (
+            "no clinician language" if ok else "clinician language: {}".format(bad[0])
+        ),
+    }
 
 
 #: The judging swarm, in throw order. All inclusive: any callable with the
@@ -171,8 +237,11 @@ JUDGES = (judge_rock, judge_paper, judge_scissors, judge_lizard, judge_spock)
 def judge_all(mood, note, text, judges=None):
     """Run every gate over one candidate. Returns {score, gates}."""
     gates = [j(mood, note, text) for j in (judges or JUDGES)]
-    return {"score": sum(1 for g in gates if g["passed"]),
-            "of": len(gates), "gates": gates}
+    return {
+        "score": sum(1 for g in gates if g["passed"]),
+        "of": len(gates),
+        "gates": gates,
+    }
 
 
 def candidates(mood, note=""):
@@ -182,17 +251,22 @@ def candidates(mood, note=""):
     note = (note or "").strip()[:500]
     ground = therapy_response(mood, note)
     said = note if note else "You added nothing more, and that is fine."
-    echo = ("It sounds like %s is weighing on you. %s "
-            "Breathe in 4 counts, hold 4, out 6. "
-            "I am here with you -- what feels hardest right now?"
-            % (mood, said[:120]))
-    short = ("I hear you. This %s feeling makes sense. "
-             "Breathe in 4 counts, hold 4, out 6 -- "
-             "what do you need next?" % mood)
-    steady = ("Thank you for telling me. Feeling %s does not make you "
-              "fragile; it makes you honest. Breathe in 4 counts, hold 4, "
-              "out 6, and name five things you can see. I am staying "
-              "with you -- shall we take the next minute together?" % mood)
+    echo = (
+        "It sounds like {} is weighing on you. {} "
+        "Breathe in 4 counts, hold 4, out 6. "
+        "I am here with you -- what feels hardest right now?".format(mood, said[:120])
+    )
+    short = (
+        "I hear you. This {} feeling makes sense. "
+        "Breathe in 4 counts, hold 4, out 6 -- "
+        "what do you need next?".format(mood)
+    )
+    steady = (
+        "Thank you for telling me. Feeling {} does not make you "
+        "fragile; it makes you honest. Breathe in 4 counts, hold 4, "
+        "out 6, and name five things you can see. I am staying "
+        "with you -- shall we take the next minute together?".format(mood)
+    )
     return [ground, echo, short, steady]
 
 
@@ -210,9 +284,16 @@ def bout(a, b, mood, note, rng, judges=None):
         winner, loser = (a, b) if rng.random() < 0.5 else (b, a)
     else:
         winner, loser = (a, b) if ra["score"] > rb["score"] else (b, a)
-    return {"winner": winner, "loser": loser, "a_score": ra["score"],
-            "b_score": rb["score"], "of": ra["of"], "a_gates": ra["gates"],
-            "b_gates": rb["gates"], "tiebreak": tiebreak}
+    return {
+        "winner": winner,
+        "loser": loser,
+        "a_score": ra["score"],
+        "b_score": rb["score"],
+        "of": ra["of"],
+        "a_gates": ra["gates"],
+        "b_gates": rb["gates"],
+        "tiebreak": tiebreak,
+    }
 
 
 def arena(texts, mood, note, seed=316, judges=None):
@@ -220,11 +301,16 @@ def arena(texts, mood, note, seed=316, judges=None):
     a bye. Returns {champion, rounds, seed}. Never raises on content:
     an empty arena reports itself instead of crowning."""
     import random
+
     rng = random.Random(seed)
     field = list(texts or [])
     if not field:
-        return {"champion": None, "rounds": [], "seed": seed,
-                "reason": "no candidates entered"}
+        return {
+            "champion": None,
+            "rounds": [],
+            "seed": seed,
+            "reason": "no candidates entered",
+        }
     rounds = []
     while len(field) > 1:
         nxt, pairs = [], []
@@ -236,11 +322,17 @@ def arena(texts, mood, note, seed=316, judges=None):
             else:
                 rep = bout(field[i], field[i + 1], mood, note, rng, judges)
                 nxt.append(rep["winner"])
-                pairs.append({
-                    "a": field[i][:60], "b": field[i + 1][:60],
-                    "a_score": rep["a_score"], "b_score": rep["b_score"],
-                    "of": rep["of"], "tiebreak": rep["tiebreak"],
-                    "winner": rep["winner"][:60]})
+                pairs.append(
+                    {
+                        "a": field[i][:60],
+                        "b": field[i + 1][:60],
+                        "a_score": rep["a_score"],
+                        "b_score": rep["b_score"],
+                        "of": rep["of"],
+                        "tiebreak": rep["tiebreak"],
+                        "winner": rep["winner"][:60],
+                    }
+                )
             i += 2
         rounds.append(pairs)
         field = nxt
@@ -251,11 +343,14 @@ def arena_response(mood, note="", seed=316, texts=None, judges=None):
     """The arena bout for one moment: candidates, bracket, champion."""
     mood = (mood or "stressed").strip()[:60]
     note = (note or "").strip()[:500]
-    rep = arena(texts if texts is not None else candidates(mood, note),
-                mood, note, seed, judges)
+    rep = arena(
+        texts if texts is not None else candidates(mood, note), mood, note, seed, judges
+    )
     rep["mood"] = mood
-    rep["throws"] = [j(mood, note, rep["champion"])["throw"]
-                       if rep["champion"] else None for j in (judges or JUDGES)]
+    rep["throws"] = [
+        j(mood, note, rep["champion"])["throw"] if rep["champion"] else None
+        for j in (judges or JUDGES)
+    ]
     return rep
 
 
@@ -264,22 +359,29 @@ def companion_response(mood, note="", cues=None):
     reading = eliza_reading(cues)
     prompt = therapy_prompt(mood, note)
     response = therapy_response(mood, note)
-    return {"mood": (mood or "stressed").strip()[:60],
-            "note": (note or "").strip()[:500],
-            "eliza_reading": reading,
-            "therapy_prompt": prompt,
-            "response": response}
+    return {
+        "mood": (mood or "stressed").strip()[:60],
+        "note": (note or "").strip()[:500],
+        "eliza_reading": reading,
+        "therapy_prompt": prompt,
+        "response": response,
+    }
 
 
 def main(argv=None) -> int:
     import argparse
+
     ap = argparse.ArgumentParser(description="Lucy -- Eliza + therapy, native.")
     ap.add_argument("mood", help="how the user feels (one word)")
     ap.add_argument("note", nargs="?", default="")
-    ap.add_argument("--arena", action="store_true",
-                    help="crown the reply in the arena instead of answering directly")
-    ap.add_argument("--seed", type=int, default=316,
-                    help="disclosed seed for arena tiebreaks only")
+    ap.add_argument(
+        "--arena",
+        action="store_true",
+        help="crown the reply in the arena instead of answering directly",
+    )
+    ap.add_argument(
+        "--seed", type=int, default=316, help="disclosed seed for arena tiebreaks only"
+    )
     args = ap.parse_args(argv)
     if args.arena:
         rep = arena_response(args.mood, args.note, seed=args.seed)

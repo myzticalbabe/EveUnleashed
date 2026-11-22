@@ -53,9 +53,11 @@ def _trace_ids():
         if str(repo_src) not in sys.path:
             sys.path.insert(0, str(repo_src))
         from AOA.core.delegation_tracer import new_span_id, new_trace_id
+
         return new_trace_id(), new_span_id()
     except Exception:
         import secrets
+
         return secrets.token_hex(16), secrets.token_hex(8)
 
 
@@ -66,59 +68,80 @@ def _record_span(prompt, *, capability, arm_id, trace_id, span_id):
         if str(repo_src) not in sys.path:
             sys.path.insert(0, str(repo_src))
         from AOA.core.delegation_tracer import emit_delegation
+
         t0 = time.perf_counter()
-        flat = {"status": "ok",
-                "prompt_chars": len(prompt or ""),
-                "injector": "jaeger-316t"}
+        flat = {
+            "status": "ok",
+            "prompt_chars": len(prompt or ""),
+            "injector": "jaeger-316t",
+        }
         duration_ms = (time.perf_counter() - t0) * 1000.0
-        got = emit_delegation(flat, capability=capability, arm_id=arm_id,
-                              trace_id=trace_id, span_id=span_id,
-                              duration_ms=duration_ms)
+        got = emit_delegation(
+            flat,
+            capability=capability,
+            arm_id=arm_id,
+            trace_id=trace_id,
+            span_id=span_id,
+            duration_ms=duration_ms,
+        )
         # Honest flag: emit returns None when nothing was written (tracing off,
         # writer unimportable, write failed). A True here once masked a dead
         # ledger for a whole session -- never again.
         return bool(got)
     except Exception:
         try:
-            from CORE.failure_ledger import note_failure  # noqa: E401
+            pass
         except Exception:
             pass  # scanner:ignore silent_except_pass -- last-resort telemetry guard; record() must never raise
         return False
 
 
-def inject(prompt, *, capability="opencode.prompt", arm_id="jaeger-316t",
-           max_push=True):
+def inject(
+    prompt, *, capability="opencode.prompt", arm_id="jaeger-316t", max_push=True
+):
     """Wrap prompt with a Jaeger 3:16T header (+ drive block)."""
     prompt = prompt or ""
     trace_id, span_id = _trace_ids()
-    recorded = _record_span(prompt, capability=capability, arm_id=arm_id,
-                            trace_id=trace_id, span_id=span_id)
-    header = ("<jaeger-316t trace_id=%s span_id=%s capability=%s arm=%s "
-              "recorded=%s>" % (trace_id, span_id, capability, arm_id,
-                                "yes" if recorded else "header-only"))
+    recorded = _record_span(
+        prompt, capability=capability, arm_id=arm_id, trace_id=trace_id, span_id=span_id
+    )
+    header = (
+        "<jaeger-316t trace_id={} span_id={} capability={} arm={} "
+        "recorded={}>".format(
+            trace_id, span_id, capability, arm_id, "yes" if recorded else "header-only"
+        )
+    )
     parts = [header, prompt.strip()]
     if max_push:
         parts.append(DRIVE_BLOCK)
     injected = "\n\n".join(p for p in parts if p)
-    return {"injected": injected, "trace_id": trace_id, "span_id": span_id,
-            "capability": capability, "arm_id": arm_id,
-            "recorded": recorded}
+    return {
+        "injected": injected,
+        "trace_id": trace_id,
+        "span_id": span_id,
+        "capability": capability,
+        "arm_id": arm_id,
+        "recorded": recorded,
+    }
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
-        description="Jaeger 3:16T prompt injector (OpenCode CLI evolved).")
+        description="Jaeger 3:16T prompt injector (OpenCode CLI evolved)."
+    )
     ap.add_argument("prompt", help="prompt text, or - for stdin")
     ap.add_argument("--capability", default="opencode.prompt")
     ap.add_argument("--arm", default="jaeger-316t")
-    ap.add_argument("--no-drive", action="store_true",
-                    help="header only, no push/drive block")
+    ap.add_argument(
+        "--no-drive", action="store_true", help="header only, no push/drive block"
+    )
     args = ap.parse_args(argv)
     prompt = args.prompt
     if prompt == "-":
         prompt = sys.stdin.read()
-    out = inject(prompt, capability=args.capability, arm_id=args.arm,
-                 max_push=not args.no_drive)
+    out = inject(
+        prompt, capability=args.capability, arm_id=args.arm, max_push=not args.no_drive
+    )
     sys.stdout.write(out["injected"])
     if not out["injected"].endswith("\n"):
         sys.stdout.write("\n")

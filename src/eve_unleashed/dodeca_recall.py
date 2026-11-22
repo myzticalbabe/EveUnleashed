@@ -32,21 +32,24 @@ import hashlib
 import json
 import random
 from collections import deque
-from typing import Any, Callable, Dict, List, Tuple
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import urlparse
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
+
 
 _DN = 10  # dodecahedron ring size (G(10,2))
 _PN = 5  # petersen ring size (G(5,2))
 N_VERTICES = 20  # slots on the default solid (kept for callers)
 
 
-def dodeca_neighbors(v: int) -> List[int]:
+def dodeca_neighbors(v: int) -> list[int]:
     """G(10,2): outer 10-ring + spokes + inner star steps of 2."""
     if not 0 <= v < 20:
         raise ValueError(f"vertex {v!r} not on the dodecahedron")
@@ -57,7 +60,7 @@ def dodeca_neighbors(v: int) -> List[int]:
     return sorted([i, _DN + (i - 2) % _DN, _DN + (i + 2) % _DN])
 
 
-def petersen_neighbors(v: int) -> List[int]:
+def petersen_neighbors(v: int) -> list[int]:
     """G(5,2): outer 5-ring + spokes + inner pentagram steps of 2."""
     if not 0 <= v < 10:
         raise ValueError(f"vertex {v!r} not on the petersen")
@@ -68,32 +71,37 @@ def petersen_neighbors(v: int) -> List[int]:
     return sorted([i, _PN + (i - 2) % _PN, _PN + (i + 2) % _PN])
 
 
-def cycle_neighbors(n: int) -> Callable[[int], List[int]]:
+def cycle_neighbors(n: int) -> Callable[[int], list[int]]:
     """C_n: the rectangular extreme -- degree 2, diameter n//2."""
-    def _nbr(v: int) -> List[int]:
+
+    def _nbr(v: int) -> list[int]:
         if not 0 <= v < n:
             raise ValueError(f"vertex {v!r} not on the cycle")
         return sorted([(v - 1) % n, (v + 1) % n])
+
     return _nbr
 
 
-def complete_neighbors(n: int) -> Callable[[int], List[int]]:
+def complete_neighbors(n: int) -> Callable[[int], list[int]]:
     """K_n: the broadcast extreme -- diameter 1, no ordering possible."""
-    def _nbr(v: int) -> List[int]:
+
+    def _nbr(v: int) -> list[int]:
         if not 0 <= v < n:
             raise ValueError(f"vertex {v!r} not on the complete graph")
         return [w for w in range(n) if w != v]
+
     return _nbr
 
 
-def generalized_petersen(n: int) -> Callable[[int], List[int]]:
+def generalized_petersen(n: int) -> Callable[[int], list[int]]:
     """G(n,2): outer n-ring + spokes + inner star steps of 2.
 
     G(5,2) is the Petersen, G(10,2) the dodecahedron; larger n grows
     the solid (more slots, longer cover). Measured: G(20,2) = 40 slots,
     degree 3, diameter 7.
     """
-    def _nbr(x: int) -> List[int]:
+
+    def _nbr(x: int) -> list[int]:
         if not 0 <= x < 2 * n:
             raise ValueError(f"vertex {x!r} not on G({n},2)")
         if x < n:
@@ -101,10 +109,11 @@ def generalized_petersen(n: int) -> Callable[[int], List[int]]:
             return sorted([(i - 1) % n, (i + 1) % n, n + i])
         i = x - n
         return sorted([i, n + (i - 2) % n, n + (i + 2) % n])
+
     return _nbr
 
 
-def icosahedron_neighbors(v: int) -> List[int]:
+def icosahedron_neighbors(v: int) -> list[int]:
     """12 vertices, degree 5, diameter 3: pole + two staggered pentagons.
 
     0 = north pole; 1-5 upper ring; 6-10 lower ring; 11 = south pole.
@@ -117,14 +126,12 @@ def icosahedron_neighbors(v: int) -> List[int]:
         return [6, 7, 8, 9, 10]
     if v < 6:
         i = v - 1
-        return sorted([0, 1 + (i - 1) % 5, 1 + (i + 1) % 5,
-                       6 + i, 6 + (i + 1) % 5])
+        return sorted([0, 1 + (i - 1) % 5, 1 + (i + 1) % 5, 6 + i, 6 + (i + 1) % 5])
     i = v - 6
-    return sorted([11, 6 + (i - 1) % 5, 6 + (i + 1) % 5,
-                   1 + i, 1 + (i - 1) % 5])
+    return sorted([11, 6 + (i - 1) % 5, 6 + (i + 1) % 5, 1 + i, 1 + (i - 1) % 5])
 
 
-def girth(n: int, nbr: Callable[[int], List[int]]) -> int:
+def girth(n: int, nbr: Callable[[int], list[int]]) -> int:
     """Shortest cycle length: BFS from each edge's far end, minus the edge.
 
     Min over edges of (shortest u-v path avoiding (u,v)) + 1."""
@@ -148,19 +155,20 @@ def girth(n: int, nbr: Callable[[int], List[int]]) -> int:
     return best
 
 
-def hypercube(d: int) -> Callable[[int], List[int]]:
+def hypercube(d: int) -> Callable[[int], list[int]]:
     """Q_d: 2^d vertices, degree d, diameter d. Bit-flip edges."""
-    n = 2 ** d
+    n = 2**d
 
-    def _nbr(v: int) -> List[int]:
+    def _nbr(v: int) -> list[int]:
         if not 0 <= v < n:
             raise ValueError(f"vertex {v!r} not on Q_{d}")
         return sorted([v ^ (1 << b) for b in range(d)])
+
     return _nbr
 
 
 # name -> (vertex count, neighbor function)
-SHAPES: Dict[str, Tuple[int, Callable[[int], List[int]]]] = {
+SHAPES: dict[str, tuple[int, Callable[[int], list[int]]]] = {
     "dodecahedron": (20, dodeca_neighbors),
     "petersen": (10, petersen_neighbors),
     "cycle-20": (20, cycle_neighbors(20)),
@@ -171,8 +179,7 @@ SHAPES: Dict[str, Tuple[int, Callable[[int], List[int]]]] = {
 }
 
 
-def bfs_distances(home: int, n: int,
-                  nbr: Callable[[int], List[int]]) -> Dict[int, int]:
+def bfs_distances(home: int, n: int, nbr: Callable[[int], list[int]]) -> dict[int, int]:
     """Shortest-path distance from home to every vertex."""
     dist = {home: 0}
     queue = deque([home])
@@ -185,7 +192,7 @@ def bfs_distances(home: int, n: int,
     return dist
 
 
-def diameter(n: int, nbr: Callable[[int], List[int]]) -> int:
+def diameter(n: int, nbr: Callable[[int], list[int]]) -> int:
     """Worst-case hops to cover the solid: the morph-space coordinate."""
     return max(max(bfs_distances(v, n, nbr).values()) for v in range(n))
 
@@ -203,8 +210,7 @@ class ShapeStore:
             raise ValueError(f"unknown shape {shape!r}; SHAPES={sorted(SHAPES)}")
         self.shape = shape
         self.n, self.nbr = SHAPES[shape]
-        self.slots: Dict[int, List[Tuple[str, Any]]] = {
-            v: [] for v in range(self.n)}
+        self.slots: dict[int, list[tuple[str, Any]]] = {v: [] for v in range(self.n)}
 
     def put(self, key: str, value: Any) -> int:
         """Store value under key. Returns the home vertex."""
@@ -212,12 +218,14 @@ class ShapeStore:
         self.slots[home].append((key, value))
         return home
 
-    def _distances(self, home: int,
-                   weights: Dict[frozenset, float] = None) -> Dict[int, float]:
+    def _distances(
+        self, home: int, weights: dict[frozenset, float] = None
+    ) -> dict[int, float]:
         """Shortest costs from home: BFS unweighted, Dijkstra weighted."""
         if not weights:
-            return {k: float(v)
-                    for k, v in bfs_distances(home, self.n, self.nbr).items()}
+            return {
+                k: float(v) for k, v in bfs_distances(home, self.n, self.nbr).items()
+            }
         dist = {home: 0.0}
         done = set()
         while len(done) < self.n:
@@ -232,8 +240,9 @@ class ShapeStore:
                     dist[y] = dist[x] + c
         return dist
 
-    def recall(self, key: str, radius: int = None,
-               weights: Dict[frozenset, float] = None) -> Dict[str, Any]:
+    def recall(
+        self, key: str, radius: int = None, weights: dict[frozenset, float] = None
+    ) -> dict[str, Any]:
         """Walk outward from key's home vertex; collect nearest-first.
 
         `exact`: entries under key (home vertex, distance 0). `context`:
@@ -245,13 +254,12 @@ class ShapeStore:
         if radius is None:
             # Hops unweighted; cost units weighted (a hop budget would
             # starve every detour, so the weighted default covers all).
-            radius = (float("inf") if weights
-                      else diameter(self.n, self.nbr))
+            radius = float("inf") if weights else diameter(self.n, self.nbr)
         home = home_of(key, self.n)
         dist = self._distances(home, weights)
         order = sorted(range(self.n), key=lambda v: (dist[v], v))
-        exact: List[Tuple[int, str, Any]] = []
-        context: List[Tuple[int, str, Any]] = []
+        exact: list[tuple[int, str, Any]] = []
+        context: list[tuple[int, str, Any]] = []
         visited = 0
         hops = 0
         for v in order:
@@ -262,28 +270,35 @@ class ShapeStore:
             hops = max(hops, d)
             for k, val in self.slots[v]:
                 (exact if k == key else context).append((d, k, val))
-        return {"exact": exact, "context": context, "hops": hops,
-                "visited": visited, "home": home, "shape": self.shape}
+        return {
+            "exact": exact,
+            "context": context,
+            "hops": hops,
+            "visited": visited,
+            "home": home,
+            "shape": self.shape,
+        }
 
-    def matrix_scan(self, key: str) -> Dict[str, Any]:
+    def matrix_scan(self, key: str) -> dict[str, Any]:
         """Rectangular baseline: row-major scan, scan order, full visit."""
         home = home_of(key, self.n)
         dist = bfs_distances(home, self.n, self.nbr)
-        exact: List[Tuple[int, str, Any]] = []
-        context: List[Tuple[int, str, Any]] = []
+        exact: list[tuple[int, str, Any]] = []
+        context: list[tuple[int, str, Any]] = []
         for v in range(self.n):  # slot order, not distance order
             for k, val in self.slots[v]:
                 (exact if k == key else context).append((dist[v], k, val))
         return {"exact": exact, "context": context, "visited": self.n}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Persist the store: shape plus every entry. Values stay caller's."""
-        return {"shape": self.shape,
-                "entries": [[k, v] for v in range(self.n)
-                              for k, v in self.slots[v]]}
+        return {
+            "shape": self.shape,
+            "entries": [[k, v] for v in range(self.n) for k, v in self.slots[v]],
+        }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ShapeStore":
+    def from_dict(cls, d: dict[str, Any]) -> ShapeStore:
         """Resume a persisted store. Unknown shape -> ValueError, loudly."""
         st = cls(d["shape"])
         for k, v in d.get("entries", []):
@@ -305,10 +320,13 @@ def morph_store(store: ShapeStore, shape: str) -> ShapeStore:
     return new
 
 
-def transmogrify(name: str, n: int,
-                 nbr: Callable[[int], List[int]],
-                 max_diameter: int = None,
-                 min_girth: int = None) -> str:
+def transmogrify(
+    name: str,
+    n: int,
+    nbr: Callable[[int], list[int]],
+    max_diameter: int = None,
+    min_girth: int = None,
+) -> str:
     """Register ANY neighbor-function as a new solid. Validated, or refused.
 
     Refuses: vertex out of range, self-loop, disconnected graph, and --
@@ -337,9 +355,9 @@ def transmogrify(name: str, n: int,
     return name
 
 
-def mutate_shape(name: str, swaps: int = 3,
-                 rng: "random.Random | None" = None,
-                 prefix: str = "mut") -> Tuple[str, int]:
+def mutate_shape(
+    name: str, swaps: int = 3, rng: random.Random | None = None, prefix: str = "mut"
+) -> tuple[str, int]:
     """Rewire a registered solid's edges; register the variant; report it.
 
     Edge-swaps preserve the degree sequence (swap (a,b),(c,d) for
@@ -349,7 +367,7 @@ def mutate_shape(name: str, swaps: int = 3,
     if name not in SHAPES:
         raise ValueError(f"unknown shape {name!r}; SHAPES={sorted(SHAPES)}")
     n, nbr = SHAPES[name]
-    adj: Dict[int, set] = {v: set(nbr(v)) for v in range(n)}
+    adj: dict[int, set] = {v: set(nbr(v)) for v in range(n)}
     edges = sorted({tuple(sorted((v, w))) for v in range(n) for w in adj[v]})
     have = {tuple(sorted(e)) for e in edges}
     done = 0
@@ -368,14 +386,14 @@ def mutate_shape(name: str, swaps: int = 3,
         for x, y in ((a, d), (c, b)):
             adj[x].add(y)
             adj[y].add(x)
-        edges = sorted({tuple(sorted((v, w)))
-                        for v in range(n) for w in adj[v]})
+        edges = sorted({tuple(sorted((v, w))) for v in range(n) for w in adj[v]})
         have = {tuple(sorted(e)) for e in edges}
         done += 1
     frozen = {v: sorted(ws) for v, ws in adj.items()}
 
-    def _mut(v: int) -> List[int]:
+    def _mut(v: int) -> list[int]:
         return list(frozen[v])
+
     if len(bfs_distances(0, n, _mut)) != n:
         raise ValueError(f"mutation of {name} disconnected the solid")
     new_name = f"{prefix}-{name}-{done}sw"
@@ -383,9 +401,9 @@ def mutate_shape(name: str, swaps: int = 3,
     return new_name, diameter(n, _mut)
 
 
-def transsubstantiate(store: ShapeStore,
-                      key_fn: Callable[[str, Any], str],
-                      shape: str = None) -> ShapeStore:
+def transsubstantiate(
+    store: ShapeStore, key_fn: Callable[[str, Any], str], shape: str = None
+) -> ShapeStore:
     """Change what the vertices HOLD: re-home every entry under new keys.
 
     Same graph (or a named new one); new addressing substance. Entries
@@ -409,8 +427,7 @@ class SwarmStore:
         if isinstance(shape, (list, tuple)):
             shapes = list(shape)
             if shards != 4 and shards != len(shapes):
-                raise ValueError(
-                    f"shard count {shards} != shapes given {len(shapes)}")
+                raise ValueError(f"shard count {shards} != shapes given {len(shapes)}")
         else:
             if shards < 1:
                 raise ValueError(f"a swarm needs >= 1 shard, got {shards}")
@@ -420,31 +437,35 @@ class SwarmStore:
         self.stores = [ShapeStore(s) for s in shapes]
 
     def _shard(self, key: str) -> int:
-        return int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16) \
-            % len(self.stores)
+        return int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16) % len(self.stores)
 
-    def put(self, key: str, value: Any) -> Tuple[int, int]:
+    def put(self, key: str, value: Any) -> tuple[int, int]:
         """Store value; returns (shard, home vertex)."""
         s = self._shard(key)
         return s, self.stores[s].put(key, value)
 
-    def recall(self, key: str, radius: int = None,
-               weights: Dict[frozenset, float] = None) -> Dict[str, Any]:
+    def recall(
+        self, key: str, radius: int = None, weights: dict[frozenset, float] = None
+    ) -> dict[str, Any]:
         """Fan out to every shard; merge. Exact stays exact."""
-        exact: List[Tuple[int, str, Any]] = []
-        context: List[Tuple[int, int, str, Any]] = []
+        exact: list[tuple[int, str, Any]] = []
+        context: list[tuple[int, int, str, Any]] = []
         hops = visited = 0
         for i, st in enumerate(self.stores):
             res = st.recall(key, radius=radius, weights=weights)
             exact.extend(res["exact"])
-            context.extend((d, i, k, v)
-                           for d, k, v in res["context"])
+            context.extend((d, i, k, v) for d, k, v in res["context"])
             hops = max(hops, res["hops"])
             visited += res["visited"]
         context.sort(key=lambda m: (m[0], m[1]))
-        return {"exact": exact, "context": context, "hops": hops,
-                "visited": visited, "shards": len(self.stores),
-                "shape": self.shape}
+        return {
+            "exact": exact,
+            "context": context,
+            "hops": hops,
+            "visited": visited,
+            "shards": len(self.stores),
+            "shape": self.shape,
+        }
 
     def put_on(self, i: int, key: str, value: Any) -> int:
         """Store directly on shard i (assembly routing). Returns home."""
@@ -454,9 +475,8 @@ class SwarmStore:
         """Total entries across all shards."""
         return sum(len(sl) for st in self.stores for sl in st.slots.values())
 
-    def _all_entries(self) -> List[Tuple[str, Any]]:
-        return [(k, v) for st in self.stores for sl in st.slots.values()
-                for k, v in sl]
+    def _all_entries(self) -> list[tuple[str, Any]]:
+        return [(k, v) for st in self.stores for sl in st.slots.values() for k, v in sl]
 
     def rebalance(self, shards: int) -> int:
         """Rebuild the swarm at a new shard count; every entry re-homed.
@@ -466,8 +486,7 @@ class SwarmStore:
         if shards < 1:
             raise ValueError(f"a swarm needs >= 1 shard, got {shards}")
         entries = self._all_entries()
-        self.shapes = [self.shapes[i % len(self.shapes)]
-                       for i in range(shards)]
+        self.shapes = [self.shapes[i % len(self.shapes)] for i in range(shards)]
         self.shape = self.shapes[0]
         self.stores = [ShapeStore(s) for s in self.shapes]
         for k, v in entries:
@@ -483,8 +502,9 @@ class SwarmStore:
         return self.rebalance(len(self.stores) - n)
 
 
-def cast_projection(store: ShapeStore, genome: Dict[str, Any],
-                    provenance: Dict[str, Any] = None) -> Dict[str, Any]:
+def cast_projection(
+    store: ShapeStore, genome: dict[str, Any], provenance: dict[str, Any] = None
+) -> dict[str, Any]:
     """PROJECTION: cast the finished stone -- in ALL forms, not one.
 
     Gold comes in all forms, so the artifact is three: JSON (portable,
@@ -498,13 +518,16 @@ def cast_projection(store: ShapeStore, genome: Dict[str, Any],
     json-serializable (default=str beyond that)."""
     entries = [(k, v) for v in range(store.n) for k, v in store.slots[v]]
     prov = dict(provenance or {})
-    prov.setdefault("cast_utc",
-                    datetime.datetime.now(datetime.timezone.utc).isoformat())
-    payload = {"shape": store.shape, "slots": store.n,
-               "diameter": diameter(store.n, store.nbr),
-               "genome": dict(genome),
-               "hunches": list(genome.get("hunches") or []),
-               "entries": entries, "provenance": prov}
+    prov.setdefault("cast_utc", datetime.datetime.now(datetime.UTC).isoformat())
+    payload = {
+        "shape": store.shape,
+        "slots": store.n,
+        "diameter": diameter(store.n, store.nbr),
+        "genome": dict(genome),
+        "hunches": list(genome.get("hunches") or []),
+        "entries": entries,
+        "provenance": prov,
+    }
     gid = genome.get("worm_id", "?")
     json_text = json.dumps(payload, indent=2, default=str)
     py_text = (
@@ -517,33 +540,55 @@ def cast_projection(store: ShapeStore, genome: Dict[str, Any],
         "    for k, v in ENTRIES:\n"
         "        st.put(k, v)\n"
         "    return st\n"
-    ).format(shape=store.shape, gid=gid, genome=dict(genome),
-             hunches=list(genome.get("hunches") or []), entries=entries)
-    md_lines = [f"# Cast stone: `{gid}`", "",
-                f"- solid: **{store.shape}** "
-                f"({store.n} slots, diameter "
-                f"{diameter(store.n, store.nbr)})",
-                f"- lineage: gen {genome.get('generation', '?')}, "
-                f"parents {genome.get('parent_ids', [])}",
-                f"- hunches: {list(genome.get('hunches') or [])}",
-                f"- entries: {len(entries)}",
-                f"- cast: {prov['cast_utc']}", "",
-                "## genes", ""]
-    for gene in ("aggressiveness", "min_confidence", "cooldown_s",
-                 "scan_interval_s", "resource_budget_mb",
-                 "mutation_rate"):
+    ).format(
+        shape=store.shape,
+        gid=gid,
+        genome=dict(genome),
+        hunches=list(genome.get("hunches") or []),
+        entries=entries,
+    )
+    md_lines = [
+        f"# Cast stone: `{gid}`",
+        "",
+        f"- solid: **{store.shape}** "
+        f"({store.n} slots, diameter "
+        f"{diameter(store.n, store.nbr)})",
+        f"- lineage: gen {genome.get('generation', '?')}, "
+        f"parents {genome.get('parent_ids', [])}",
+        f"- hunches: {list(genome.get('hunches') or [])}",
+        f"- entries: {len(entries)}",
+        f"- cast: {prov['cast_utc']}",
+        "",
+        "## genes",
+        "",
+    ]
+    for gene in (
+        "aggressiveness",
+        "min_confidence",
+        "cooldown_s",
+        "scan_interval_s",
+        "resource_budget_mb",
+        "mutation_rate",
+    ):
         md_lines.append(f"- {gene}: {genome.get(gene, '?')}")
     md_lines += ["", "## provenance", ""]
     for k, v in prov.items():
         if k != "cast_utc":
             md_lines.append(f"- {k}: {v}")
-    return {"json": json_text, "py": py_text,
-            "md": "\n".join(md_lines) + "\n", "payload": payload}
+    return {
+        "json": json_text,
+        "py": py_text,
+        "md": "\n".join(md_lines) + "\n",
+        "payload": payload,
+    }
 
 
-def write_projection(store: ShapeStore, genome: Dict[str, Any],
-                     base_path: str,
-                     provenance: Dict[str, Any] = None) -> List[str]:
+def write_projection(
+    store: ShapeStore,
+    genome: dict[str, Any],
+    base_path: str,
+    provenance: dict[str, Any] = None,
+) -> list[str]:
     """Write all three forms to <base>.json / <base>.py / <base>.md."""
     cast = cast_projection(store, genome, provenance)
     paths = []
@@ -557,9 +602,17 @@ def write_projection(store: ShapeStore, genome: Dict[str, Any],
 
 #: The shipped solids. Custom registrations may dissolve; these may not.
 #: The shipped solids. Custom registrations may dissolve; these may not.
-BUILTIN_SHAPES = frozenset(["dodecahedron", "petersen", "cycle-20",
-                            "complete-20", "hypercube-32", "g40",
-                            "icosahedron"])
+BUILTIN_SHAPES = frozenset(
+    [
+        "dodecahedron",
+        "petersen",
+        "cycle-20",
+        "complete-20",
+        "hypercube-32",
+        "g40",
+        "icosahedron",
+    ]
+)
 
 
 def conjoin(a: ShapeStore, b: ShapeStore, shape: str = None) -> ShapeStore:
@@ -577,8 +630,9 @@ def conjoin(a: ShapeStore, b: ShapeStore, shape: str = None) -> ShapeStore:
     return new
 
 
-def separate(store: ShapeStore, pred: Callable[[str, Any], bool],
-             shape: str = None) -> Tuple[ShapeStore, ShapeStore]:
+def separate(
+    store: ShapeStore, pred: Callable[[str, Any], bool], shape: str = None
+) -> tuple[ShapeStore, ShapeStore]:
     """SEPARATE: divide one store by predicate. (match, rest).
 
     Disjoint and complete: every entry lands in exactly one child.
@@ -634,12 +688,9 @@ def ferment(store: ShapeStore, salience: Any, threshold: float = 1.0) -> list:
     return removed
 
 
-
-
 def morph_shard(sw: SwarmStore, i: int, shape: str) -> ShapeStore:
     """Re-index one shard onto a new solid; its entries survive the move."""
-    entries = [(k, v) for v in range(sw.stores[i].n)
-               for k, v in sw.stores[i].slots[v]]
+    entries = [(k, v) for v in range(sw.stores[i].n) for k, v in sw.stores[i].slots[v]]
     new = ShapeStore(shape)
     for k, v in entries:
         new.put(k, v)
@@ -648,14 +699,16 @@ def morph_shard(sw: SwarmStore, i: int, shape: str) -> ShapeStore:
     return new
 
 
-def ferment_shard(sw: SwarmStore, i: int, salience: Any,
-                  threshold: float = 1.0) -> list:
+def ferment_shard(
+    sw: SwarmStore, i: int, salience: Any, threshold: float = 1.0
+) -> list:
     """Rot one shard's low-salience entries; the rest of the swarm keeps."""
     return ferment(sw.stores[i], salience, threshold)
 
 
-def assemble_swarm(entries: List[Tuple[str, Any]],
-                   spec: List[Tuple[str, Any]]) -> SwarmStore:
+def assemble_swarm(
+    entries: list[tuple[str, Any]], spec: list[tuple[str, Any]]
+) -> SwarmStore:
     """Assemble a heterogeneous micro-swarm from a routing spec.
 
     spec: [(shape, pred_or_None)]. Each entry lands on the FIRST shard
@@ -683,11 +736,11 @@ class DodecaStore(ShapeStore):
 
 
 # backwards-compatible module-level helpers (dodecahedron default)
-def neighbors(v: int) -> List[int]:
+def neighbors(v: int) -> list[int]:
     return dodeca_neighbors(v)
 
 
-def bfs_order(home: int) -> List[int]:
+def bfs_order(home: int) -> list[int]:
     dist = bfs_distances(home, 20, dodeca_neighbors)
     return sorted(range(20), key=lambda v: (dist[v], v))
 
@@ -709,12 +762,17 @@ def index_live_log(log_path: str, store: ShapeStore = None) -> ShapeStore:
                 continue
             url = ev.get("url", "")
             host = urlparse(url).netloc or url
-            store.put(host, {"rung": ev.get("rung"),
-                             "state": ev.get("state"),
-                             "kind": ev.get("kind")})
+            store.put(
+                host,
+                {
+                    "rung": ev.get("rung"),
+                    "state": ev.get("state"),
+                    "kind": ev.get("kind"),
+                },
+            )
     return store
 
 
-def recall_host(store: ShapeStore, host: str) -> Dict[str, Any]:
+def recall_host(store: ShapeStore, host: str) -> dict[str, Any]:
     """What do we know about this host, nearest memory first."""
     return store.recall(host)

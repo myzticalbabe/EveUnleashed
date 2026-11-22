@@ -6,12 +6,10 @@ Model loading, inference result types, and framework detection.
 
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
 import time
-from typing import Any, List
 from pathlib import Path
+from typing import Any
 
 # Import compatibility layer first
 from eve_unleashed.compat import available_frameworks as _compat_frameworks
@@ -21,20 +19,23 @@ from eve_unleashed.compat import available_frameworks as _compat_frameworks
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
+
 
 # Get framework availability from compatibility layer
 _COMPAT_FRAMEWORKS = _compat_frameworks()
 
 # Cached XPU availability check (subprocess-based to survive segfaults)
-_XPU_AVAILABLE: (bool | None) = None
+_XPU_AVAILABLE: bool | None = None
 
 
 # PIL / image support detection
 try:
     from PIL import Image
+
     HAS_PIL = True
 except ImportError as exc:
     note_failure("core:L105", exc)
@@ -60,7 +61,7 @@ class InferenceResult:
     output_shape: tuple = ()
     latency_ms: float = 0.0
     predictions: list[Any] = field(default_factory=list)
-    probabilities: (list[float] | None) = None
+    probabilities: list[float] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -73,7 +74,7 @@ class BatchResult:
 
 
 try:
-    from shared.models import InferenceResult, BatchResult
+    from shared.models import BatchResult, InferenceResult
 except ImportError as exc:
     # Fallback: local dataclasses above stand (shared module not available)
     note_failure("core:L112", exc)
@@ -98,14 +99,15 @@ class ModelLoader:
         # Use compatibility layer for framework detection
         for name in ["torch", "tensorflow", "sklearn", "transformers", "onnx", "gguf"]:
             frameworks[name] = _COMPAT_FRAMEWORKS.get(name, False)
-        
+
         # VL = transformers + PIL
         frameworks["vl"] = frameworks.get("transformers", False) and HAS_PIL
-        
+
         # GPU acceleration detection
         if frameworks.get("torch"):
             try:
                 import torch
+
                 frameworks["cuda"] = torch.cuda.is_available()
                 frameworks["metal"] = torch.backends.mps.is_available()
                 # Intel XPU (Arc GPU via Level Zero / SYCL)
@@ -122,6 +124,7 @@ class ModelLoader:
         if _COMPAT_FRAMEWORKS.get("pyopencl", False):
             try:
                 import pyopencl
+
                 platforms = pyopencl.get_platforms()
                 frameworks["opencl"] = len(platforms) > 0
             except Exception as exc:
@@ -132,6 +135,7 @@ class ModelLoader:
         if frameworks.get("torch"):
             try:
                 import torch
+
                 _vulkan = getattr(torch, "vulkan", None)
                 frameworks["vulkan"] = bool(_vulkan and _vulkan.is_available())
             except Exception as exc:
@@ -185,7 +189,15 @@ class ModelLoader:
         elif suffix in (".h5", ".keras"):
             return "tensorflow"
         elif suffix in (".safetensors", ".bin"):
-            for vl_keyword in ["llava", "blip", "clip", "vit", "detr", "yolo", "resnet"]:
+            for vl_keyword in [
+                "llava",
+                "blip",
+                "clip",
+                "vit",
+                "detr",
+                "yolo",
+                "resnet",
+            ]:
                 if vl_keyword in name:
                     return "vl"
             return "transformers"
@@ -211,6 +223,7 @@ class ModelLoader:
         if _COMPAT_FRAMEWORKS.get("torch", False):
             try:
                 import torch
+
                 info["cuda_available"] = torch.cuda.is_available()
                 info["metal_available"] = torch.backends.mps.is_available()
                 # Use crash-safe subprocess check — direct call can segfault
@@ -220,44 +233,57 @@ class ModelLoader:
                     info["cuda_version"] = torch.version.cuda or ""
                     for i in range(torch.cuda.device_count()):
                         props = torch.cuda.get_device_properties(i)
-                        info["devices"].append({
-                            "index": i,
-                            "name": props.name,
-                            "total_memory_gb": round(props.total_memory / (1024**3), 2),
-                            "compute_capability": f"{props.major}.{props.minor}",
-                            "backend": "cuda",
-                        })
+                        info["devices"].append(
+                            {
+                                "index": i,
+                                "name": props.name,
+                                "total_memory_gb": round(
+                                    props.total_memory / (1024**3), 2
+                                ),
+                                "compute_capability": f"{props.major}.{props.minor}",
+                                "backend": "cuda",
+                            }
+                        )
                 if info["xpu_available"]:
                     info["xpu_devices"] = torch.xpu.device_count()
                     for i in range(torch.xpu.device_count()):
                         try:
                             name = torch.xpu.get_device_name(i)
                             props = torch.xpu.get_device_properties(i)
-                            info["devices"].append({
-                                "index": i,
-                                "name": name,
-                                "total_memory_gb": round(props.total_memory / (1024**3), 2),
-                                "backend": "xpu",
-                            })
+                            info["devices"].append(
+                                {
+                                    "index": i,
+                                    "name": name,
+                                    "total_memory_gb": round(
+                                        props.total_memory / (1024**3), 2
+                                    ),
+                                    "backend": "xpu",
+                                }
+                            )
                         except Exception as exc:
                             note_failure("core:L301", exc)
-                            info["devices"].append({
-                                "index": i,
-                                "name": f"Intel XPU Device {i}",
-                                "backend": "xpu",
-                            })
+                            info["devices"].append(
+                                {
+                                    "index": i,
+                                    "name": f"Intel XPU Device {i}",
+                                    "backend": "xpu",
+                                }
+                            )
                 if info["metal_available"]:
-                    info["devices"].append({
-                        "index": 0,
-                        "name": "Apple Metal (MPS)",
-                        "backend": "mps",
-                    })
+                    info["devices"].append(
+                        {
+                            "index": 0,
+                            "name": "Apple Metal (MPS)",
+                            "backend": "mps",
+                        }
+                    )
             except ImportError as exc:
                 note_failure("core:L313", exc)
 
         # OpenCL detection (independent of torch)
         try:
             import pyopencl
+
             platforms = pyopencl.get_platforms()
             if platforms:
                 info["opencl_available"] = True
@@ -265,12 +291,14 @@ class ModelLoader:
                     devices = platform.get_devices()
                     for d_idx, device in enumerate(devices):
                         mem = device.get_info(pyopencl.device_info.GLOBAL_MEM_SIZE)
-                        info["devices"].append({
-                            "index": len(info["devices"]),
-                            "name": f"{platform.name} - {device.name}",
-                            "total_memory_gb": round(mem / (1024**3), 2),
-                            "backend": "opencl",
-                        })
+                        info["devices"].append(
+                            {
+                                "index": len(info["devices"]),
+                                "name": f"{platform.name} - {device.name}",
+                                "total_memory_gb": round(mem / (1024**3), 2),
+                                "backend": "opencl",
+                            }
+                        )
         except ImportError:
             pass
         except Exception as exc:
@@ -285,7 +313,7 @@ class ModelLoader:
             info["recommended_device"] = "mps"
         elif info["opencl_available"]:
             info["recommended_device"] = "opencl"
-        
+
         info["device_count"] = len(info["devices"])
         return info
 
@@ -298,6 +326,7 @@ class ModelLoader:
         """
         try:
             import torch
+
             if torch.cuda.is_available():
                 return "cuda"
             if _check_xpu_available():

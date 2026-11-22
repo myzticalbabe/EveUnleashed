@@ -24,8 +24,7 @@ def test_mind_crosses_three_strata():
     rep = berzerker.mind("https://example.com")
     assert rep["ok"] is True
     assert set(rep["nexus"]) >= {"conscious", "subconscious", "unconscious"}
-    assert set(rep["paradigms"]) == {"conscious", "subconscious",
-                                     "unconscious"}
+    assert set(rep["paradigms"]) == {"conscious", "subconscious", "unconscious"}
 
 
 def test_mind_rejects_empty_request():
@@ -34,8 +33,7 @@ def test_mind_rejects_empty_request():
 
 
 def test_code_coach_scaffolds_python_spark():
-    rep = berzerker.code_coach("print my name", language="python",
-                               level="spark")
+    rep = berzerker.code_coach("print my name", language="python", level="spark")
     assert rep["ok"] is True
     assert len(rep["steps"]) == 3
     assert "Hello" in rep["starter"]
@@ -72,31 +70,31 @@ def test_coach_scrubs_contact_details():
 
 
 def test_builder_gets_weird_tests_and_level_line():
-    rep = berzerker.code_coach("add two numbers", level="builder",
-                               name="Ada")
+    rep = berzerker.code_coach("add two numbers", level="builder", name="Ada")
     assert rep["ok"] is True
     assert "weird" in rep["response"].lower()
     assert "Level" in rep["response"]
 
 
 def test_ledger_records_and_suggests(tmp_path, monkeypatch):
-    monkeypatch.setattr(berzerker, "_ledger_path",
-                        lambda: tmp_path / "levels.json")
+    monkeypatch.setattr(berzerker, "_ledger_path", lambda: tmp_path / "levels.json")
     for _ in range(3):
         r = berzerker.record_completion("Ada", "spark")
         assert r["ok"] is True
     assert berzerker.suggest_level("Ada")["suggests"] == "builder"
-    assert berzerker.suggest_level("Nobody") == berzerker.suggest_level(
-        "Nobody")
+    assert berzerker.suggest_level("Nobody") == berzerker.suggest_level("Nobody")
 
 
 def test_starter_parity_python_compiles_and_others_honest():
     import shutil
+
     py = berzerker._STARTER["python"]
     compile(py, "<starter>", "exec")
-    probes = {"javascript": ("node", ["--check"]),
-              "go": ("go", ["vet"]),
-              "rust": ("rustc", ["--crate-type", "lib"])}
+    probes = {
+        "javascript": ("node", ["--check"]),
+        "go": ("go", ["vet"]),
+        "rust": ("rustc", ["--crate-type", "lib"]),
+    }
     for lang, (tool, _args) in probes.items():
         starter = berzerker._STARTER[lang]
         assert starter.strip()  # scaffold present either way
@@ -107,11 +105,22 @@ def test_starter_parity_python_compiles_and_others_honest():
 def test_gamora_berzerker_commands_run_offline():
     assert gamora.main(["berzerker", "audit"]) == 0
     assert gamora.main(["berzerker", "mind", "https://example.com"]) == 0
-    assert gamora.main(["berzerker", "code", "add two numbers",
-                        "--lang", "python", "--level", "builder"]) == 0
+    assert (
+        gamora.main(
+            [
+                "berzerker",
+                "code",
+                "add two numbers",
+                "--lang",
+                "python",
+                "--level",
+                "builder",
+            ]
+        )
+        == 0
+    )
     assert gamora.main(["berzerker", "dream"]) == 0
     assert gamora.main(["berzerker", "inhibited", "example.com"]) == 0
     assert gamora.main(["berzerker", "weird", "--lang", "rust"]) == 0
-    assert gamora.main(["berzerker", "code", "add two numbers",
-                        "--json"]) == 0
+    assert gamora.main(["berzerker", "code", "add two numbers", "--json"]) == 0
     assert gamora.main(["doctor", "--json"]) in (0, 1)

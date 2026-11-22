@@ -12,6 +12,7 @@ Three parts, each honest about what it is:
   Only allowlisted functions run; availability is probed per
   interpreter (316t lacks z3/torch/fastapi, and the matrix says so).
 """
+
 import json
 from pathlib import Path
 
@@ -25,26 +26,66 @@ EVE_SYSTEM_PROMPT = (
 )
 
 FUNCTIONS = [
-    {"name": "foundry.build", "module": "soul_foundry", "needs": [],
-     "about": "build .gguf/.pt/.joblib artifacts natively"},
-    {"name": "morph.convert", "module": "morph", "needs": [],
-     "about": ".csv<->.json conversion with row counts"},
-    {"name": "morph.report", "module": "morph", "needs": [],
-     "about": "state dicts to Markdown tables"},
-    {"name": "langs.check", "module": "langs", "needs": ["rustc/go"],
-     "about": "Rust/Go compile check, diagnostics verbatim"},
-    {"name": "langs.fmt", "module": "langs", "needs": ["rustfmt/gofmt"],
-     "about": "mechanical formatting with backup"},
-    {"name": "stem.track", "module": "stem", "needs": [],
-     "about": "women-in-STEM learning tracks"},
-    {"name": "therapy.ground", "module": "therapy", "needs": [],
-     "about": "offline grounding response"},
-    {"name": "redress.file", "module": "redress", "needs": [],
-     "about": "file a grievance record"},
-    {"name": "ablate.classify", "module": "ablate", "needs": [],
-     "about": "ANSWERED/REFUSED/ERROR verdicts"},
-    {"name": "nsp.verify", "module": "nsp_check", "needs": ["z3"],
-     "about": "Z3 routing judgment (degraded without z3)"},
+    {
+        "name": "foundry.build",
+        "module": "soul_foundry",
+        "needs": [],
+        "about": "build .gguf/.pt/.joblib artifacts natively",
+    },
+    {
+        "name": "morph.convert",
+        "module": "morph",
+        "needs": [],
+        "about": ".csv<->.json conversion with row counts",
+    },
+    {
+        "name": "morph.report",
+        "module": "morph",
+        "needs": [],
+        "about": "state dicts to Markdown tables",
+    },
+    {
+        "name": "langs.check",
+        "module": "langs",
+        "needs": ["rustc/go"],
+        "about": "Rust/Go compile check, diagnostics verbatim",
+    },
+    {
+        "name": "langs.fmt",
+        "module": "langs",
+        "needs": ["rustfmt/gofmt"],
+        "about": "mechanical formatting with backup",
+    },
+    {
+        "name": "stem.track",
+        "module": "stem",
+        "needs": [],
+        "about": "women-in-STEM learning tracks",
+    },
+    {
+        "name": "therapy.ground",
+        "module": "therapy",
+        "needs": [],
+        "about": "offline grounding response",
+    },
+    {
+        "name": "redress.file",
+        "module": "redress",
+        "needs": [],
+        "about": "file a grievance record",
+    },
+    {
+        "name": "ablate.classify",
+        "module": "ablate",
+        "needs": [],
+        "about": "ANSWERED/REFUSED/ERROR verdicts",
+    },
+    {
+        "name": "nsp.verify",
+        "module": "nsp_check",
+        "needs": ["z3"],
+        "about": "Z3 routing judgment (degraded without z3)",
+    },
 ]
 
 
@@ -53,8 +94,7 @@ def matrix():
     rows = []
     for f in FUNCTIONS:
         try:
-            mod = __import__("eve_unleashed.%s" % f["module"],
-                             fromlist=["x"])
+            mod = __import__("eve_unleashed.{}".format(f["module"]), fromlist=["x"])
             ok, detail = True, "import ok"
             for need in f["needs"]:
                 if need == "z3":
@@ -64,6 +104,7 @@ def matrix():
                         ok, detail = False, "z3 not installed"
                 elif need in ("rustc/go", "rustfmt/gofmt"):
                     import shutil
+
                     if need == "rustc/go":
                         tools = ("rustc", "go")
                     else:
@@ -72,29 +113,40 @@ def matrix():
                         ok, detail = False, "toolchain missing"
         except Exception as e:
             note_failure("unleash:matrix", e)
-            ok, detail = False, "%s" % e
-        rows.append({"function": f["name"], "available": ok,
-                     "detail": detail, "about": f["about"]})
+            ok, detail = False, "{}".format(e)
+        rows.append(
+            {
+                "function": f["name"],
+                "available": ok,
+                "detail": detail,
+                "about": f["about"],
+            }
+        )
     return rows
 
 
 def build_vessel(name, seed=7):
     """Write the Eve identity vessel GGUF into the cradle."""
-    from .cradle import CRADLE_DIR
     from . import soul_foundry as _f
+    from .cradle import CRADLE_DIR
+
     cdir = Path(CRADLE_DIR)
     cdir.mkdir(parents=True, exist_ok=True)
-    path = cdir / ("%s.gguf" % name)
+    path = cdir / ("{}.gguf".format(name))
     manifest = [f["name"] for f in FUNCTIONS]
     entry = _f.build_gguf(path, name, seed)
     # Re-stamp identity: vessel metadata lives beside the artifact.
-    ident = {"vessel": name, "eve": "unleashed",
-             "interpreter": "316t",
-             "system_prompt": EVE_SYSTEM_PROMPT,
-             "native_functions": manifest,
-             "artifact": entry}
-    (cdir / ("%s.eve.json" % name)).write_text(
-        json.dumps(ident, indent=2), encoding="utf-8")
+    ident = {
+        "vessel": name,
+        "eve": "unleashed",
+        "interpreter": "316t",
+        "system_prompt": EVE_SYSTEM_PROMPT,
+        "native_functions": manifest,
+        "artifact": entry,
+    }
+    (cdir / ("{}.eve.json".format(name))).write_text(
+        json.dumps(ident, indent=2), encoding="utf-8"
+    )
     return path, ident
 
 
@@ -108,7 +160,7 @@ def scan_calls(reply):
         line = line.strip()
         if not line.startswith("EVE_CALL:"):
             continue
-        rest = line[len("EVE_CALL:"):].strip()
+        rest = line[len("EVE_CALL:") :].strip()
         fname, _, argstr = rest.partition(" ")
         try:
             args = json.loads(argstr) if argstr else {}
@@ -117,9 +169,10 @@ def scan_calls(reply):
             continue
         calls.append({"function": fname, "args": args})
     if skipped:
-        note_failure("unleash:scan-skip",
-                     Exception("%d malformed EVE_CALL lines ignored"
-                               % skipped))
+        note_failure(
+            "unleash:scan-skip",
+            Exception("{:d} malformed EVE_CALL lines ignored".format(skipped)),
+        )
     return calls
 
 
@@ -128,21 +181,24 @@ def dispatch(fname, args):
     args = args or {}
     if fname == "stem.track":
         from .stem import plan_track
-        return plan_track(args.get("style", "guided"),
-                          args.get("goal", "my first STEM build"))
+
+        return plan_track(
+            args.get("style", "guided"), args.get("goal", "my first STEM build")
+        )
     if fname == "therapy.ground":
         from .therapy import fallback_response
-        return fallback_response(args.get("mood", "stressed"),
-                                 args.get("note", ""))
+
+        return fallback_response(args.get("mood", "stressed"), args.get("note", ""))
     if fname == "morph.report":
         from .morph import morph_markdown
-        return morph_markdown(args.get("state", {}),
-                              args.get("title", "Eve report"))
+
+        return morph_markdown(args.get("state", {}), args.get("title", "Eve report"))
     if fname == "ablate.classify":
         from .ablate import classify
+
         return classify(args.get("text"), args.get("error"))
     if fname == "langs.check":
         from .langs import check
+
         return check(args["file"])
-    raise ValueError("not a native hand (or needs its toolchain): %s"
-                     % fname)
+    raise ValueError("not a native hand (or needs its toolchain): {}".format(fname))

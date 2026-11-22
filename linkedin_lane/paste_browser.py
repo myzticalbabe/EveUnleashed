@@ -40,7 +40,8 @@ def clean(text):
 def resolve_slug(pg):
     me = pg.evaluate(
         "() => { const a = document.querySelector('a[href*=\"/in/\"]');"
-        " return a ? a.href : null; }")
+        " return a ? a.href : null; }"
+    )
     if not me:
         raise RuntimeError("could not resolve own profile slug from feed")
     return me.split("?")[0].rstrip("/")
@@ -86,20 +87,23 @@ def paste(state, md_path, headed):
     with open(md_path, encoding="utf-8") as f:
         text = clean(f.read())
     probe = " ".join(text.splitlines()[0:2])[:80]
-    print("paste: %d chars; probe=%r" % (len(text), probe))
+    print("paste: {:d} chars; probe={!r}".format(len(text), probe))
     calls = []
     with sync_playwright() as p:
         try:
             browser = p.chromium.launch(channel="chrome", headless=not headed)
         except Exception as e:
-            print("chrome channel failed (%s); trying default" % str(e)[:120])
+            print("chrome channel failed ({}); trying default".format(str(e)[:120]))
             browser = p.chromium.launch(headless=not headed)
         ctx = browser.new_context(storage_state=state)
         pg = ctx.new_page()
         # F2: unfiltered -- every voyager/api XHR, any endpoint.
-        pg.on("response",
-              lambda r: calls.append((r.status, r.url))
-              if "/voyager/api/" in r.url else None)
+        pg.on(
+            "response",
+            lambda r: (
+                calls.append((r.status, r.url)) if "/voyager/api/" in r.url else None
+            ),
+        )
         try:
             pg.goto(FEED, timeout=60000)
             pg.wait_for_timeout(4000)
@@ -113,7 +117,7 @@ def paste(state, md_path, headed):
             box.wait_for(timeout=20000)
             box.click()
             for i in range(0, len(text), 400):
-                box.type(text[i:i + 400], delay=5)
+                box.type(text[i : i + 400], delay=5)
             pg.wait_for_timeout(2000)
             post = pg.get_by_role("button", name="Post", exact=True)
             post.wait_for(timeout=20000)
@@ -131,13 +135,26 @@ def paste(state, md_path, headed):
             pg.wait_for_timeout(800)
             post.click()
             pg.wait_for_timeout(12000)
-            writes = [(s, u) for s, u in calls if "contentcreation" in u or "shares" in u
-                      or "ugc" in u.lower() or "updates" in u]
-            print("voyager XHR total=%d; write-shaped=%d" % (len(calls), len(writes)))
+            writes = [
+                (s, u)
+                for s, u in calls
+                if "contentcreation" in u
+                or "shares" in u
+                or "ugc" in u.lower()
+                or "updates" in u
+            ]
+            print(
+                "voyager XHR total={:d}; write-shaped={:d}".format(
+                    len(calls), len(writes)
+                )
+            )
             for s, u in writes[:10]:
                 print("  ", s, u[:160])
             try:
-                print("toasts:", pg.locator("[role=status], .artdeco-toast-item").all_inner_texts())
+                print(
+                    "toasts:",
+                    pg.locator("[role=status], .artdeco-toast-item").all_inner_texts(),
+                )
             except Exception as e:
                 print("toast read err:", str(e)[:150])
             # F1: author surface, never the feed.
@@ -153,7 +170,7 @@ def paste(state, md_path, headed):
                 pass
             return 1
         except Exception as e:
-            print("FAILED: %s" % str(e)[:300])
+            print("FAILED: {}".format(str(e)[:300]))
             try:
                 pg.screenshot(path="/tmp/lipaste_fail.png")
                 print("screenshot: /tmp/lipaste_fail.png")
@@ -182,7 +199,9 @@ def main(argv):
             positional.append(args[i])
             i += 1
     if not positional:
-        print("usage: paste_browser.py [--verify-only] <markdown-file> [--state PATH] [--headed]")
+        print(
+            "usage: paste_browser.py [--verify-only] <markdown-file> [--state PATH] [--headed]"
+        )
         return 2
     if verify:
         return verify_only(state, positional[0])

@@ -10,29 +10,33 @@ The NSP tree lives outside the repo (orphaned commit c7f21b86, extracted to
 in every receipt. Verification must never break inference: any failure
 of the checker itself returns "nsp-unavailable", never an exception.
 """
+
 import json
 import os
 import sys
-import time
 
 try:
     from CORE.failure_ledger import note_failure
 except Exception:
+
     def note_failure(where, exc=None):
         pass
 
-NSP_SPEC = ("C:/Azazael/.build/nsp/Project_SHARDEX/neurosym_wsp"
-            "/specs/inference_router.json")
-NSP_VERIFIER = ("C:/Azazael/.build/nsp/Project_SHARDEX/neurosym_wsp"
-                "/verifier/smt_verifier.py")
+
+NSP_SPEC = (
+    "C:/Azazael/.build/nsp/Project_SHARDEX/neurosym_wsp" "/specs/inference_router.json"
+)
+NSP_VERIFIER = (
+    "C:/Azazael/.build/nsp/Project_SHARDEX/neurosym_wsp" "/verifier/smt_verifier.py"
+)
 
 
 def _load_verifier():
     import importlib.util
+
     if not os.path.isfile(NSP_VERIFIER) or not os.path.isfile(NSP_SPEC):
         return None
-    spec = importlib.util.spec_from_file_location("nsp_smt_verifier",
-                                                  NSP_VERIFIER)
+    spec = importlib.util.spec_from_file_location("nsp_smt_verifier", NSP_VERIFIER)
     mod = importlib.util.module_from_spec(spec)
     sys.modules["nsp_smt_verifier"] = mod
     spec.loader.exec_module(mod)
@@ -55,8 +59,11 @@ def verify_router_trace(events, spec_names=None):
             return "nsp-unavailable", "NSP tree or spec absent"
         with open(NSP_SPEC, encoding="utf-8") as f:
             full = json.load(f)
-        specs = [s for s in full.get("specs", [])
-                 if spec_names is None or s.get("name") in spec_names]
+        specs = [
+            s
+            for s in full.get("specs", [])
+            if spec_names is None or s.get("name") in spec_names
+        ]
         ver = mod.SMTVerifier("z3")
         outcomes = [ver._verify_spec(s, events) for s in specs]
         counts = {}
@@ -74,8 +81,10 @@ def verify_router_trace(events, spec_names=None):
             overall = "verified"
         else:
             overall = "present_but_unfalsified"
+
         class _Report:
             pass
+
         report = _Report()
         report.outcomes = outcomes
         report.overall = overall
@@ -83,10 +92,9 @@ def verify_router_trace(events, spec_names=None):
         for o in report.outcomes:
             name = getattr(o, "spec_name", "spec")
             res = getattr(getattr(o, "result", ""), "value", o.result)
-            parts.append("%s=%s" % (name, res))
-        overall = getattr(getattr(report, "overall", ""), "value",
-                          report.overall)
+            parts.append("{}={}".format(name, res))
+        overall = getattr(getattr(report, "overall", ""), "value", report.overall)
         return overall, "; ".join(parts)
     except Exception as e:
         note_failure("nsp_check:verify", e)
-        return "nsp-unavailable", "checker failed: %s" % e
+        return "nsp-unavailable", "checker failed: {}".format(e)

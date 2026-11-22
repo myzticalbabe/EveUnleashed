@@ -15,11 +15,12 @@ import statistics
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: Any = None) -> None:
         pass
 
@@ -27,13 +28,14 @@ except ImportError:                               # never break the host
 def _try_psutil() -> Any:
     try:
         import psutil  # type: ignore
+
         return psutil
     except ImportError as exc:
         note_failure("predictive_worms:psutil", exc)
         return None
 
 
-def _linear_regression(points: List[Tuple[float, float]]) -> Tuple[float, float]:
+def _linear_regression(points: list[tuple[float, float]]) -> tuple[float, float]:
     """Least-squares slope/intercept for (t, value) points. Returns (slope, intercept)."""
     n = len(points)
     if n < 2:
@@ -49,7 +51,9 @@ def _linear_regression(points: List[Tuple[float, float]]) -> Tuple[float, float]
     return slope, intercept
 
 
-def _forecast_value(slope: float, intercept: float, t_now: float, horizon_s: float) -> float:
+def _forecast_value(
+    slope: float, intercept: float, t_now: float, horizon_s: float
+) -> float:
     return intercept + slope * (t_now + horizon_s)
 
 
@@ -58,19 +62,23 @@ class Forecast:
     worm: str
     metric: str
     current: float
-    trend_slope: float          # units per second
-    predicted: float            # value at horizon
+    trend_slope: float  # units per second
+    predicted: float  # value at horizon
     horizon_s: float
     anomaly: bool
     anomaly_score: float
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
-            "worm": self.worm, "metric": self.metric,
-            "current": self.current, "trend_slope": self.trend_slope,
-            "predicted": self.predicted, "horizon_s": self.horizon_s,
-            "anomaly": self.anomaly, "anomaly_score": self.anomaly_score,
+            "worm": self.worm,
+            "metric": self.metric,
+            "current": self.current,
+            "trend_slope": self.trend_slope,
+            "predicted": self.predicted,
+            "horizon_s": self.horizon_s,
+            "anomaly": self.anomaly,
+            "anomaly_score": self.anomaly_score,
             "timestamp": self.timestamp,
         }
 
@@ -81,18 +89,18 @@ class PredictiveWorm:
     NAME = "predictive_worm"
     METRIC = "generic"
     SAMPLE_INTERVAL = 5.0
-    HORIZON_S = 300.0           # forecast 5 min ahead
-    WINDOW_S = 600.0            # keep 10 min of samples
-    ANOMALY_Z = 3.0             # z-score threshold for anomaly
+    HORIZON_S = 300.0  # forecast 5 min ahead
+    WINDOW_S = 600.0  # keep 10 min of samples
+    ANOMALY_Z = 3.0  # z-score threshold for anomaly
 
     def __init__(self, recorder=None):
         self.recorder = recorder
-        self._samples: List[Tuple[float, float]] = []  # (t, value)
-        self._thread: Optional[threading.Thread] = None
+        self._samples: list[tuple[float, float]] = []  # (t, value)
+        self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._running = threading.Event()
         self._lock = threading.Lock()
-        self.last_forecast: Optional[Forecast] = None
+        self.last_forecast: Forecast | None = None
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -102,7 +110,8 @@ class PredictiveWorm:
         try:
             self._stop.clear()
             self._thread = threading.Thread(
-                target=self._loop, name=f"{self.NAME}-worm", daemon=True)
+                target=self._loop, name=f"{self.NAME}-worm", daemon=True
+            )
             self._thread.start()
             self._running.set()
             return True
@@ -121,13 +130,13 @@ class PredictiveWorm:
     def is_running(self) -> bool:
         return self._running.is_set()
 
-    def forecast(self) -> Optional[Forecast]:
+    def forecast(self) -> Forecast | None:
         with self._lock:
             return self.last_forecast
 
     # -- sampling ------------------------------------------------------------
 
-    def _sample(self) -> Optional[float]:
+    def _sample(self) -> float | None:
         raise NotImplementedError
 
     def _record(self, forecast: Forecast) -> None:
@@ -135,6 +144,7 @@ class PredictiveWorm:
         if rec is None:
             try:
                 from CORE.PamsRecorder import get_recorder
+
                 rec = get_recorder()
             except Exception as exc:
                 note_failure(f"{self.NAME}:recorder", exc)
@@ -186,13 +196,19 @@ class PredictiveWorm:
                 score = abs(current - mean) / stdev
                 anomaly = score > self.ANOMALY_Z
         return Forecast(
-            worm=self.NAME, metric=self.METRIC, current=current,
-            trend_slope=slope, predicted=predicted, horizon_s=self.HORIZON_S,
-            anomaly=anomaly, anomaly_score=score,
+            worm=self.NAME,
+            metric=self.METRIC,
+            current=current,
+            trend_slope=slope,
+            predicted=predicted,
+            horizon_s=self.HORIZON_S,
+            anomaly=anomaly,
+            anomaly_score=score,
         )
 
 
 # -- Concrete worms -----------------------------------------------------------
+
 
 class SYSTEMZ(PredictiveWorm):
     """CPU/memory trend forecasting + anomaly detection."""
@@ -201,7 +217,7 @@ class SYSTEMZ(PredictiveWorm):
     METRIC = "cpu_percent"
     SAMPLE_INTERVAL = 5.0
 
-    def _sample(self) -> Optional[float]:
+    def _sample(self) -> float | None:
         psutil = _try_psutil()
         if psutil is None:
             return None
@@ -214,7 +230,7 @@ class DISKZ(PredictiveWorm):
     NAME = "DISKZ"
     METRIC = "disk_percent"
 
-    def _sample(self) -> Optional[float]:
+    def _sample(self) -> float | None:
         psutil = _try_psutil()
         if psutil is None:
             return None
@@ -234,10 +250,10 @@ class NETWORXZ(PredictiveWorm):
 
     def __init__(self, recorder=None):
         super().__init__(recorder)
-        self._last_counters: Optional[Any] = None
-        self._last_t: Optional[float] = None
+        self._last_counters: Any | None = None
+        self._last_t: float | None = None
 
-    def _sample(self) -> Optional[float]:
+    def _sample(self) -> float | None:
         psutil = _try_psutil()
         if psutil is None:
             return None
@@ -247,8 +263,10 @@ class NETWORXZ(PredictiveWorm):
             if self._last_counters is not None and self._last_t is not None:
                 dt = now - self._last_t
                 if dt > 0:
-                    bps = ((c.bytes_sent - self._last_counters.bytes_sent) +
-                           (c.bytes_recv - self._last_counters.bytes_recv)) / dt
+                    bps = (
+                        (c.bytes_sent - self._last_counters.bytes_sent)
+                        + (c.bytes_recv - self._last_counters.bytes_recv)
+                    ) / dt
                     self._last_counters = c
                     self._last_t = now
                     return bps
@@ -266,7 +284,7 @@ class PROCESSZ(PredictiveWorm):
     NAME = "PROCESSZ"
     METRIC = "process_count"
 
-    def _sample(self) -> Optional[float]:
+    def _sample(self) -> float | None:
         psutil = _try_psutil()
         if psutil is None:
             return None
@@ -283,7 +301,7 @@ class CLOCKZ(PredictiveWorm):
     NAME = "CLOCKZ"
     METRIC = "idle_percent"
 
-    def _sample(self) -> Optional[float]:
+    def _sample(self) -> float | None:
         psutil = _try_psutil()
         if psutil is None:
             return None
@@ -294,5 +312,13 @@ class CLOCKZ(PredictiveWorm):
             return None
 
 
-__all__ = ["PredictiveWorm", "Forecast", "SYSTEMZ", "DISKZ", "NETWORXZ",
-           "PROCESSZ", "CLOCKZ", "_linear_regression"]
+__all__ = [
+    "CLOCKZ",
+    "DISKZ",
+    "NETWORXZ",
+    "PROCESSZ",
+    "SYSTEMZ",
+    "Forecast",
+    "PredictiveWorm",
+    "_linear_regression",
+]

@@ -12,6 +12,7 @@ helper in __init__.py is the designated host-shell path; this module is
 the structured replacement for file/code execution.
 """
 
+import argparse
 import hashlib
 import os
 import re
@@ -20,21 +21,21 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-import argparse
-from typing import List, Optional
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
 
 try:
     from CORE.paths import get_project_root_safe as _get_project_root_safe
-except ImportError as exc:                               # never break the host
+except ImportError as exc:  # never break the host
     note_failure("sh_runner:core-paths-import", exc)
     _get_project_root_safe = None
+
 
 def _bash_flavor(bash_bin=""):
     """Which POSIX mapping the bash binary expects: 'wsl' or 'msys'.
@@ -69,12 +70,15 @@ def _to_bash_path(path, bash_bin=""):
         return p
     rest = m.group(2).replace(chr(92), "/")
     if _bash_flavor(bash_bin) == "wsl":
-        return "/mnt/%s/%s" % (m.group(1).lower(), rest)
-    return "/%s/%s" % (m.group(1).lower(), rest)
+        return "/mnt/{}/{}".format(m.group(1).lower(), rest)
+    return "/{}/{}".format(m.group(1).lower(), rest)
 
 
-_DEFAULT_ROOT = (str(_get_project_root_safe()) if _get_project_root_safe is not None
-                 else str(Path(__file__).resolve().parents[2]))
+_DEFAULT_ROOT = (
+    str(_get_project_root_safe())
+    if _get_project_root_safe is not None
+    else str(Path(__file__).resolve().parents[2])
+)
 
 AZAZAEL_ROOT = os.environ.get(
     "AZAZAEL_ROOT", os.environ.get("Azazael_ROOT", _DEFAULT_ROOT)
@@ -86,12 +90,13 @@ SH_BUILD_DIR.mkdir(parents=True, exist_ok=True)
 @dataclass
 class ShResult:
     """Result of a shell execution."""
+
     success: bool
     stdout: str = ""
     stderr: str = ""
     returncode: int = 0
     duration_ms: float = 0.0
-    errors: List[dict] = field(default_factory=list)
+    errors: list[dict] = field(default_factory=list)
     stderr_bytes: str = ""  # D7: raw stderr (latin-1) for forensics
 
 
@@ -112,8 +117,11 @@ class ShRunner:
         try:
             out = subprocess.run(
                 [self.bash_bin, "--version"],
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=15,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=15,
             )
             self.version = out.stdout.split("\n")[0].strip() if out.stdout else ""
         except Exception as e:
@@ -127,23 +135,36 @@ class ShRunner:
             errors=[{"type": "toolchain", "message": "bash missing"}],
         )
 
-    def _run(self, cmd: List[str], cwd: str, timeout: int) -> ShResult:
+    def _run(self, cmd: list[str], cwd: str, timeout: int) -> ShResult:
         # D7: capture raw bytes; display decodes with replace, but on
         # failure the raw hex is kept in stderr_raw_hex for forensics.
         try:
             start = time.time()
             result = subprocess.run(
-                cmd, cwd=cwd, capture_output=True, timeout=timeout,
+                cmd,
+                cwd=cwd,
+                capture_output=True,
+                timeout=timeout,
             )
-            stdout = result.stdout.decode("utf-8", errors="replace") if isinstance(result.stdout, (bytes, bytearray)) else (result.stdout or "")
-            stderr = result.stderr.decode("utf-8", errors="replace") if isinstance(result.stderr, (bytes, bytearray)) else (result.stderr or "")
-            errors: List[dict] = []
+            stdout = (
+                result.stdout.decode("utf-8", errors="replace")
+                if isinstance(result.stdout, (bytes, bytearray))
+                else (result.stdout or "")
+            )
+            stderr = (
+                result.stderr.decode("utf-8", errors="replace")
+                if isinstance(result.stderr, (bytes, bytearray))
+                else (result.stderr or "")
+            )
+            errors: list[dict] = []
             raw = ""
             if result.returncode != 0:
                 if isinstance(result.stderr, (bytes, bytearray)) and result.stderr:
                     raw = bytes(result.stderr[:4000]).decode("latin-1")
                 if stderr.strip():
-                    errors = [{"level": "error", "message": stderr.strip().split("\n")[0]}]
+                    errors = [
+                        {"level": "error", "message": stderr.strip().split("\n")[0]}
+                    ]
             return ShResult(
                 success=result.returncode == 0,
                 stdout=stdout,
@@ -158,16 +179,22 @@ class ShRunner:
             return ShResult(
                 success=False,
                 stderr=f"Execution timed out (>{timeout}s)",
-                errors=[{"type": "timeout", "message": f"Runtime exceeded {timeout} seconds"}],
+                errors=[
+                    {
+                        "type": "timeout",
+                        "message": f"Runtime exceeded {timeout} seconds",
+                    }
+                ],
             )
         except Exception as e:
             note_failure("sh_runner:exec", e)
             return ShResult(
-                success=False, stderr=str(e),
+                success=False,
+                stderr=str(e),
                 errors=[{"type": "exception", "message": str(e)}],
             )
 
-    def run_file(self, file_path: str, args: Optional[List[str]] = None) -> ShResult:
+    def run_file(self, file_path: str, args: list[str] | None = None) -> ShResult:
         """Run a .sh file via bash."""
         if not self.has_bash:
             return self._no_toolchain()
@@ -178,12 +205,13 @@ class ShRunner:
                 stderr=f"File not found: {file_path}",
                 errors=[{"type": "file", "message": f"Missing: {file_path}"}],
             )
-        return self._run([self.bash_bin,
-                          _to_bash_path(str(source), self.bash_bin)]
-                         + (args or []),
-                         cwd=str(source.parent), timeout=60)
+        return self._run(
+            [self.bash_bin, _to_bash_path(str(source), self.bash_bin)] + (args or []),
+            cwd=str(source.parent),
+            timeout=60,
+        )
 
-    def run_code(self, code: str, args: Optional[List[str]] = None) -> ShResult:
+    def run_code(self, code: str, args: list[str] | None = None) -> ShResult:
         """Run an inline script (written to a hashed temp file).
 
         D6 contract: args are literal argv strings, NO shell evaluation."""
@@ -192,18 +220,23 @@ class ShRunner:
         code_hash = hashlib.md5(code.encode()).hexdigest()[:12]
         source_path = SH_BUILD_DIR / f"azazael_{code_hash}.sh"
         source_path.write_text(code, encoding="utf-8")
-        return self._run([self.bash_bin,
-                          _to_bash_path(str(source_path), self.bash_bin)]
-                         + (args or []),
-                         cwd=str(SH_BUILD_DIR), timeout=60)
+        return self._run(
+            [self.bash_bin, _to_bash_path(str(source_path), self.bash_bin)]
+            + (args or []),
+            cwd=str(SH_BUILD_DIR),
+            timeout=60,
+        )
 
-    def run_command(self, argv: List[str], cwd: str = ".") -> ShResult:
+    def run_command(self, argv: list[str], cwd: str = ".") -> ShResult:
         """Run an explicit argv command (no shell interpretation)."""
         if not self.has_bash:
             return self._no_toolchain()
         if not argv:
-            return ShResult(success=False, stderr="Empty command.",
-                            errors=[{"type": "args", "message": "empty argv"}])
+            return ShResult(
+                success=False,
+                stderr="Empty command.",
+                errors=[{"type": "args", "message": "empty argv"}],
+            )
         return self._run(list(argv), cwd=cwd, timeout=60)
 
     def check_syntax(self, file_path: str) -> ShResult:
@@ -213,9 +246,11 @@ class ShRunner:
         source = Path(file_path)
         if not source.exists():
             return ShResult(success=False, stderr=f"File not found: {file_path}")
-        return self._run([self.bash_bin, "-n",
-                          _to_bash_path(str(source), self.bash_bin)],
-                         cwd=str(source.parent), timeout=30)
+        return self._run(
+            [self.bash_bin, "-n", _to_bash_path(str(source), self.bash_bin)],
+            cwd=str(source.parent),
+            timeout=30,
+        )
 
     def lint(self, file_path: str) -> ShResult:
         """shellcheck when installed; clean skip otherwise."""
@@ -226,13 +261,19 @@ class ShRunner:
             return ShResult(
                 success=False,
                 stderr="shellcheck not found; skipping lint.",
-                errors=[{"type": "toolchain", "message": "shellcheck missing (optional)"}],
+                errors=[
+                    {"type": "toolchain", "message": "shellcheck missing (optional)"}
+                ],
             )
-        return self._run([shellcheck, "-f", "gcc", _to_bash_path(str(file_path))],
-                         cwd=str(Path(file_path).parent), timeout=60)
+        return self._run(
+            [shellcheck, "-f", "gcc", _to_bash_path(str(file_path))],
+            cwd=str(Path(file_path).parent),
+            timeout=60,
+        )
 
 
 # --- CLI ---------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Azazael Shell Runner")

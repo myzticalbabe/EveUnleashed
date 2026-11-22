@@ -1,4 +1,5 @@
 """MellifluousML (MCML): lego blocks, perfectly-formed, golden-anchored, learning."""
+
 import sys
 from pathlib import Path
 
@@ -23,8 +24,14 @@ from eve_unleashed.well import aether_verify
 
 
 def _xor_net():
-    return Sequential([Dense(2, 4, seed=11), Activate("tanh"),
-                       Dense(4, 1, seed=12), Activate("sigmoid")])
+    return Sequential(
+        [
+            Dense(2, 4, seed=11),
+            Activate("tanh"),
+            Dense(4, 1, seed=12),
+            Activate("sigmoid"),
+        ]
+    )
 
 
 def test_seed_rebuild_is_bit_identical():
@@ -33,8 +40,16 @@ def test_seed_rebuild_is_bit_identical():
 
 def test_digest_sensitive_to_seed_and_tamper():
     a = digest(_xor_net())
-    b = digest(Sequential([Dense(2, 4, seed=13), Activate("tanh"),
-                           Dense(4, 1, seed=12), Activate("sigmoid")]))
+    b = digest(
+        Sequential(
+            [
+                Dense(2, 4, seed=13),
+                Activate("tanh"),
+                Dense(4, 1, seed=12),
+                Activate("sigmoid"),
+            ]
+        )
+    )
     assert a != b
     m = _xor_net()
     m.blocks[0].W[0][0] += 1e-6
@@ -71,8 +86,12 @@ def test_backward_matches_numeric_gradient():
 
 
 def test_xor_learns_end_to_end():
-    data = [([0.0, 0.0], [0.0]), ([0.0, 1.0], [1.0]),
-            ([1.0, 0.0], [1.0]), ([1.0, 1.0], [0.0])]
+    data = [
+        ([0.0, 0.0], [0.0]),
+        ([0.0, 1.0], [1.0]),
+        ([1.0, 0.0], [1.0]),
+        ([1.0, 1.0], [0.0]),
+    ]
     m = _xor_net()
     for _epoch in range(2000):
         total = 0.0
@@ -93,10 +112,9 @@ def test_xor_learns_end_to_end():
 
 def test_full_loop_sine_learn_digest_verify_ship(tmp_path):
     import math
-    data = [([x], [math.sin(x)])
-            for x in (-1 + 2 * i / 15 for i in range(16))]
-    m = Sequential([Dense(1, 8, seed=21), Activate("tanh"),
-                    Dense(8, 1, seed=22)])
+
+    data = [([x], [math.sin(x)]) for x in (-1 + 2 * i / 15 for i in range(16))]
+    m = Sequential([Dense(1, 8, seed=21), Activate("tanh"), Dense(8, 1, seed=22)])
     for _epoch in range(3000):
         m.zero_grad()
         for x, t in data:

@@ -20,13 +20,15 @@ OpenMono Integration:
 """
 
 import argparse
+import io
 import os
+import subprocess
 import sys
+from collections.abc import Callable
+
 # from typing import List  # removed — all names have native equivalents
 from dataclasses import dataclass
-from typing import Callable, List
-import io
-import subprocess
+from typing import List
 
 from INTERPRETERS.node_runner import NodeRunner
 from INTERPRETERS.pwsh_runner import PwshRunner
@@ -37,7 +39,8 @@ from INTERPRETERS.sh_runner import ShRunner
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -45,6 +48,7 @@ except ImportError:                               # never break the host
 @dataclass
 class RunResult:
     """Unified result from any language runner."""
+
     language: str
     success: bool
     stdout: str = ""
@@ -61,7 +65,7 @@ def run_python(code: str, args: list[str] | None = None) -> RunResult:
     D6 contract: args are literal strings exposed as sys.argv[1:] with NO
     shell evaluation; args containing spaces/quotes arrive intact."""
     import time
-    from contextlib import redirect_stdout, redirect_stderr
+    from contextlib import redirect_stderr, redirect_stdout
 
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
@@ -151,8 +155,10 @@ def run_shell_untrusted(command: str) -> RunResult:
     try:
         # D7: bytes capture; display via replace, evidence via stderr_bytes.
         result = subprocess.run(
-            command, shell=True,  # scanner:ignore -- run_shell_untrusted IS the designated shell path; input is user shell by contract
-            capture_output=True, timeout=30
+            command,
+            shell=True,  # scanner:ignore -- run_shell_untrusted IS the designated shell path; input is user shell by contract
+            capture_output=True,
+            timeout=30,
         )
         stdout = result.stdout.decode("utf-8", errors="replace")
         stderr = result.stderr.decode("utf-8", errors="replace")
@@ -262,7 +268,7 @@ def run_code(language: str, code: str, args: list[str] | None = None) -> RunResu
             language=language,
             success=False,
             stderr=f"Unsupported language: {language}. "
-                    f"Supported: {sorted(set(LANGUAGE_RUNNERS.keys()))}",
+            f"Supported: {sorted(set(LANGUAGE_RUNNERS.keys()))}",
             returncode=1,
         )
     return runner(code, args)
@@ -270,13 +276,11 @@ def run_code(language: str, code: str, args: list[str] | None = None) -> RunResu
 
 def supported_languages() -> list[str]:
     """Return list of supported languages."""
-    return sorted(set(
-        k for k in LANGUAGE_RUNNERS
-        if len(k) > 2  # Skip short aliases
-    ))
+    return sorted(set(k for k in LANGUAGE_RUNNERS if len(k) > 2))  # Skip short aliases
 
 
 # --- CLI ---------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(description="Azazael Multi-Language Interpreter")

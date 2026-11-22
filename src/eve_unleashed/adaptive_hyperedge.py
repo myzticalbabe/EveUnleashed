@@ -22,10 +22,10 @@ Each class is the smallest honest version of its paper:
 
 from __future__ import annotations
 
-import math
 import random
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Sequence, Tuple
+from collections.abc import Callable, Sequence
+from typing import Any
 
 
 # ------------------------------------------------------------------ 1. TDHNN
@@ -33,13 +33,13 @@ class DynamicHypergraph:
     """Hyperedges adapt in count and content to usage feedback."""
 
     def __init__(self, seed: int = 0) -> None:
-        self.edges: Dict[str, Dict[str, float]] = {}  # edge -> {node: weight}
-        self.use: Dict[str, int] = defaultdict(int)
+        self.edges: dict[str, dict[str, float]] = {}  # edge -> {node: weight}
+        self.use: dict[str, int] = defaultdict(int)
         self._next = 0  # monotonic: ids never recycled after prune
         self._rng = random.Random(seed)
 
     def add_edge(self, nodes: Sequence[str], weight: float = 1.0) -> str:
-        eid = "e%d" % self._next
+        eid = "e{:d}".format(self._next)
         self._next += 1
         self.edges[eid] = {n: weight for n in nodes}
         return eid
@@ -51,20 +51,19 @@ class DynamicHypergraph:
             for n in self.edges[eid]:
                 self.edges[eid][n] *= 0.9
 
-    def adapt(self, min_use: int = 1, split_above: int = 4) -> List[str]:
+    def adapt(self, min_use: int = 1, split_above: int = 4) -> list[str]:
         """Prune starved edges, split crowded ones. Returns live edge ids."""
-        for eid in [e for e, u in self.use.items()
-                    if u < min_use and e in self.edges]:
+        for eid in [e for e, u in self.use.items() if u < min_use and e in self.edges]:
             del self.edges[eid]
         for eid, members in list(self.edges.items()):
             if self.use[eid] >= split_above and len(members) > 2:
                 nodes = sorted(members)
-                half = nodes[len(nodes) // 2:]
+                half = nodes[len(nodes) // 2 :]
                 self.edges[eid] = {n: members[n] for n in nodes if n not in half}
                 self.add_edge(half)
         return sorted(self.edges)
 
-    def members(self, node: str) -> List[str]:
+    def members(self, node: str) -> list[str]:
         return sorted(e for e, m in self.edges.items() if node in m)
 
 
@@ -73,7 +72,7 @@ class FlexibleHyperedge:
     """One hyperedge whose per-node membership strengths are learned."""
 
     def __init__(self, nodes: Sequence[str], lr: float = 0.1) -> None:
-        self.strength: Dict[str, float] = {n: 1.0 for n in nodes}
+        self.strength: dict[str, float] = {n: 1.0 for n in nodes}
         self.lr = lr
 
     def update(self, node: str, reward: float) -> None:
@@ -81,7 +80,7 @@ class FlexibleHyperedge:
         if node in self.strength:
             self.strength[node] = max(0.0, self.strength[node] + self.lr * reward)
 
-    def members(self, threshold: float = 0.5) -> List[str]:
+    def members(self, threshold: float = 0.5) -> list[str]:
         return sorted(n for n, s in self.strength.items() if s >= threshold)
 
 
@@ -91,19 +90,22 @@ class MultiScaleHypergraph:
 
     def __init__(self, scales: Sequence[int] = (2, 4)) -> None:
         self.scales = tuple(scales)
-        self.levels: Dict[int, List[List[str]]] = {}
+        self.levels: dict[int, list[list[str]]] = {}
 
-    def build(self, nodes: Sequence[str],
-              key: Callable[[str], Any] = lambda n: n) -> Dict[int, List[List[str]]]:
+    def build(
+        self, nodes: Sequence[str], key: Callable[[str], Any] = lambda n: n
+    ) -> dict[int, list[list[str]]]:
         """Cluster similar nodes (by key) into scale-sized hyperedges."""
         ordered = sorted(nodes, key=lambda n: str(key(n)))
-        self.levels = {s: [ordered[i:i + s] for i in range(0, len(ordered), s)]
-                       for s in self.scales}
+        self.levels = {
+            s: [ordered[i : i + s] for i in range(0, len(ordered), s)]
+            for s in self.scales
+        }
         return self.levels
 
-    def context(self, node: str) -> List[str]:
+    def context(self, node: str) -> list[str]:
         """All scale-mates of a node across every level, nearest scale first."""
-        out: List[str] = []
+        out: list[str] = []
         for s in sorted(self.levels):
             for group in self.levels[s]:
                 if node in group:
@@ -119,7 +121,7 @@ class TaskAdaptiveTopology:
         self.penalty = sparsity_penalty
         self._rng = random.Random(seed)
 
-    def generate(self, agents: Sequence[str], difficulty: float) -> List[List[str]]:
+    def generate(self, agents: Sequence[str], difficulty: float) -> list[list[str]]:
         """difficulty in [0,1]; edge count scales with it, minus the penalty."""
         difficulty = min(1.0, max(0.0, difficulty))
         n = len(agents)
@@ -127,13 +129,13 @@ class TaskAdaptiveTopology:
         pool = list(agents)
         self._rng.shuffle(pool)
         size = max(2, n // max(1, want))
-        return [pool[i:i + size] for i in range(0, len(pool), size)][:want]
+        return [pool[i : i + size] for i in range(0, len(pool), size)][:want]
 
 
 # ------------------------------------------------------------------ 5. AdE
-def adaptive_expansion(hyperedges: Sequence[Sequence[str]],
-                       sim: Callable[[str, str], float] | None = None
-                       ) -> Dict[Tuple[str, str], float]:
+def adaptive_expansion(
+    hyperedges: Sequence[Sequence[str]], sim: Callable[[str, str], float] | None = None
+) -> dict[tuple[str, str], float]:
     """Expand hyperedges to weighted pairs via representatives + kernel.
 
     Two most-similar nodes anchor each hyperedge; the rest connect to the
@@ -141,13 +143,15 @@ def adaptive_expansion(hyperedges: Sequence[Sequence[str]],
     nodes inside one hyperedge bind tighter than distant ones.
     """
     sim = sim or (lambda a, b: 1.0 if a == b else 0.0)
-    weights: Dict[Tuple[str, str], float] = {}
+    weights: dict[tuple[str, str], float] = {}
     for edge in hyperedges:
         nodes = list(edge)
         if len(nodes) < 2:
             continue
-        scored = sorted(((sim(a, b), a, b) for i, a in enumerate(nodes)
-                         for b in nodes[i + 1:]), reverse=True)
+        scored = sorted(
+            ((sim(a, b), a, b) for i, a in enumerate(nodes) for b in nodes[i + 1 :]),
+            reverse=True,
+        )
         _, rep_a, rep_b = scored[0]
         anchors = (rep_a, rep_b)
         for node in nodes:
@@ -155,7 +159,9 @@ def adaptive_expansion(hyperedges: Sequence[Sequence[str]],
             if node == anchor:
                 continue
             pair = tuple(sorted((node, anchor)))
-            weights[pair] = weights.get(pair, 0.0) + 1.0 / (1.0 + abs(nodes.index(node) - nodes.index(anchor)))
+            weights[pair] = weights.get(pair, 0.0) + 1.0 / (
+                1.0 + abs(nodes.index(node) - nodes.index(anchor))
+            )
     return weights
 
 
@@ -164,8 +170,8 @@ class HeterophilyAware:
     """Same-label neighbors reinforce, different-label neighbors contrast."""
 
     def __init__(self) -> None:
-        self.label: Dict[str, Any] = {}
-        self.deviation: Dict[str, float] = defaultdict(float)
+        self.label: dict[str, Any] = {}
+        self.deviation: dict[str, float] = defaultdict(float)
 
     def observe(self, node: str, label: Any) -> None:
         self.label[node] = label

@@ -23,6 +23,7 @@ BUG FIX (2026-10-18, eve-verify-land lane):
   - A caught-and-fallback chain remains: interpreter chat -> direct server chat
     -> direct GGUF (llama.cpp) inference, each logged to the failure ledger.
 """
+
 from __future__ import annotations
 
 import glob
@@ -30,20 +31,24 @@ import json
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 #: Swallows recorded when the failure ledger is unavailable
 try:
     from CORE.failure_ledger import note_failure
 except ImportError:
+
     def note_failure(where: str, exc: Any = None) -> None:
         del exc
-        return None
 
 
 #: Substrings that identify a server-side "cannot compute logits / generation
 #: unsupported" failure (the exact llama.cpp message is reproduced below).
-LOGITS_UNSUPPORTED_SIGNATURES = ("logits computation", "embedding-only", "logits computation. skipping")
+LOGITS_UNSUPPORTED_SIGNATURES = (
+    "logits computation",
+    "embedding-only",
+    "logits computation. skipping",
+)
 
 #: Text fragments of common embedding-model identifiers (bert-style encoders).
 EMBED_MODEL_HINTS = (
@@ -79,8 +84,10 @@ class EveInterpreterBridge:
         self._eve = eve_arm
         self._interpreter = None
         self._available = False
-        self._probe_ports = tuple(probe_ports) if probe_ports is not None else self.PROBE_PORTS
-        self._last_probe: Dict[str, Any] = {}
+        self._probe_ports = (
+            tuple(probe_ports) if probe_ports is not None else self.PROBE_PORTS
+        )
+        self._last_probe: dict[str, Any] = {}
         self._init_interpreter()
 
     # ------------------------------------------------------------------
@@ -96,6 +103,7 @@ class EveInterpreterBridge:
         # consuming server responses before the direct-chat fallback runs.
         try:
             import interpreter as interpreter_pkg  # scanner:ignore (optional legacy pkg)
+
             note_failure("eve_interpreter:init", None)
         except ImportError as exc:
             note_failure("eve_interpreter:init", exc)
@@ -111,7 +119,7 @@ class EveInterpreterBridge:
     # ------------------------------------------------------------------
     # Server probing — /v1/models inspection instead of blind /health
     # ------------------------------------------------------------------
-    def _fetch_model_ids(self, base: str) -> Optional[List[str]]:
+    def _fetch_model_ids(self, base: str) -> list[str] | None:
         """Return model ids hosted at ``base`` via /v1/models, or None if unreachable."""
         url = base + "/v1/models"
         try:
@@ -120,7 +128,7 @@ class EveInterpreterBridge:
         except Exception as exc:
             note_failure("eve_interpreter:probe_models", exc)
             return None
-        ids: List[str] = []
+        ids: list[str] = []
         for item in payload.get("data") or []:
             mid = item.get("id") if isinstance(item, dict) else item
             if isinstance(mid, str) and mid:
@@ -140,7 +148,7 @@ class EveInterpreterBridge:
         lowered = (model_id or "").lower()
         return any(hint in lowered for hint in EMBED_MODEL_HINTS)
 
-    def _probe_servers(self, model_override: Optional[str] = None) -> List[Dict[str, Any]]:
+    def _probe_servers(self, model_override: str | None = None) -> list[dict[str, Any]]:
         """Probe candidate ports and return generation-capable server targets.
 
         Fills ``self._last_probe`` with a summary of everything observed, so
@@ -148,27 +156,31 @@ class EveInterpreterBridge:
         which models were found, and which servers were rejected as
         embedding-only.
         """
-        probed: List[Dict[str, Any]] = []
-        text_targets: List[Dict[str, Any]] = []
-        embedding_only: List[Dict[str, Any]] = []
+        probed: list[dict[str, Any]] = []
+        text_targets: list[dict[str, Any]] = []
+        embedding_only: list[dict[str, Any]] = []
         for port in self._probe_ports:
-            base = "http://localhost:%d" % port
+            base = "http://localhost:{:d}".format(port)
             model_ids = self._fetch_model_ids(base)
             if model_ids is None:
                 probed.append({"port": port, "reachable": False})
                 continue
-            info: Dict[str, Any] = {
+            info: dict[str, Any] = {
                 "port": port,
                 "reachable": True,
                 "models": model_ids,
             }
-            generation_ids = [mid for mid in model_ids if not self.is_embedding_model(mid)]
+            generation_ids = [
+                mid for mid in model_ids if not self.is_embedding_model(mid)
+            ]
             info["generation_capable"] = bool(generation_ids)
             probed.append(info)
             if generation_ids:
                 chosen = generation_ids if not model_override else [model_override]
                 for mid in chosen:
-                    text_targets.append({"base": base + "/v1", "port": port, "model": mid})
+                    text_targets.append(
+                        {"base": base + "/v1", "port": port, "model": mid}
+                    )
             else:
                 embedding_only.append(info)
         self._last_probe = {
@@ -241,8 +253,8 @@ class EveInterpreterBridge:
         base: str,
         model: str,
         prompt: str,
-        system: Optional[str] = None,
-        max_tokens: Optional[int] = None,
+        system: str | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """POST a plain chat-completion request to ``base`` and return the text.
 
@@ -251,7 +263,7 @@ class EveInterpreterBridge:
         are never sent — that is the protocol-level fix for the 500
         "the current context does not logits computation. skipping" failure.
         """
-        messages: List[Dict[str, str]] = []
+        messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
@@ -269,14 +281,20 @@ class EveInterpreterBridge:
         req = urllib.request.Request(
             base.rstrip("/") + "/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "User-Agent": "eve-interpreter-bridge/1.0"},
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "eve-interpreter-bridge/1.0",
+            },
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=self.CHAT_TIMEOUT) as resp:
             data = json.loads(resp.read().decode("utf-8", "replace") or "{}")
         choices = data.get("choices") or []
         if not choices:
-            raise ValueError("server returned no completion choices: %r" % (data.get("error") or data))
+            raise ValueError(
+                "server returned no completion choices: %r"
+                % (data.get("error") or data)
+            )
         first = choices[0] if isinstance(choices[0], dict) else {}
         message = first.get("message") or {}
         content = message.get("content") if isinstance(message, dict) else None
@@ -286,7 +304,7 @@ class EveInterpreterBridge:
             content = first.get("text")  # legacy completion-shaped responses
         return (content or "").strip().strip('"')
 
-    def _try_target(self, target: Dict[str, Any], prompt: str, system: Optional[str]):
+    def _try_target(self, target: dict[str, Any], prompt: str, system: str | None):
         """Run one generation attempt against one target server.
 
         Returns (result_dict, failure_dict). Exactly one of the two is None.
@@ -296,17 +314,29 @@ class EveInterpreterBridge:
             text = self._direct_chat(target["base"], target["model"], prompt, system)
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", "replace")[:300]
-            detail = "%s HTTP %s: %s" % (target["base"], exc.code, body)
+            detail = "{} HTTP {}: {}".format(target["base"], exc.code, body)
             note_failure("eve_interpreter:direct_chat", exc)
-            return None, {"server": target, "error": detail, "failure_class": self.classify_failure(detail)}
+            return None, {
+                "server": target,
+                "error": detail,
+                "failure_class": self.classify_failure(detail),
+            }
         except Exception as exc:
-            detail = "%s %s: %s" % (target["base"], type(exc).__name__, exc)
+            detail = "{} {}: {}".format(target["base"], type(exc).__name__, exc)
             note_failure("eve_interpreter:direct_chat", exc)
-            return None, {"server": target, "error": detail, "failure_class": self.classify_failure(detail)}
+            return None, {
+                "server": target,
+                "error": detail,
+                "failure_class": self.classify_failure(detail),
+            }
         if not text:
-            detail = "%s returned an empty completion" % target["base"]
+            detail = "{} returned an empty completion".format(target["base"])
             note_failure("eve_interpreter:direct_chat_empty", RuntimeError(detail))
-            return None, {"server": target, "error": detail, "failure_class": "empty_response"}
+            return None, {
+                "server": target,
+                "error": detail,
+                "failure_class": "empty_response",
+            }
         return (
             {
                 "status": "ok",
@@ -320,19 +350,26 @@ class EveInterpreterBridge:
     # ------------------------------------------------------------------
     # GGUF fallback — direct llama.cpp inference (no server needed)
     # ------------------------------------------------------------------
-    def _pick_text_gguf(self) -> Optional[str]:
+    def _pick_text_gguf(self) -> str | None:
         # The cradle is searched FIRST: models the operator dropped in
         # for Eve outrank the LM Studio library. Embeddings/mmproj never.
-        gguf_files: List[str] = []
+        gguf_files: list[str] = []
         try:
             cdir = Path.home() / ".azazael" / "cradle"
             if cdir.is_dir():
                 gguf_files += [str(p) for p in cdir.glob("*.gguf")]
-            gguf_files += glob.glob(str(Path.home() / ".lmstudio" / "models" / "**" / "*.gguf"), recursive=True)
+            gguf_files += glob.glob(
+                str(Path.home() / ".lmstudio" / "models" / "**" / "*.gguf"),
+                recursive=True,
+            )
         except Exception as exc:
             note_failure("eve_interpreter:gguf_scan", exc)
             return None
-        text_models = [f for f in gguf_files if "mmproj" not in f.lower() and "embed" not in f.lower()]
+        text_models = [
+            f
+            for f in gguf_files
+            if "mmproj" not in f.lower() and "embed" not in f.lower()
+        ]
         if not text_models:
             return None
         try:
@@ -342,7 +379,9 @@ class EveInterpreterBridge:
             return None
         return text_models[0]
 
-    def run_cradle(self, prompt: str, model: Optional[str] = None, max_tokens: Optional[int] = None) -> Dict[str, Any]:
+    def run_cradle(
+        self, prompt: str, model: str | None = None, max_tokens: int | None = None
+    ) -> dict[str, Any]:
         """Run a prompt on a cradle GGUF via a transient sidecar.
 
         The interpreter evolved into the .gguf: any adopted cradle model
@@ -353,13 +392,15 @@ class EveInterpreterBridge:
             from .cradle import resolve_model, run_gguf
         except ImportError as exc:
             note_failure("eve_interpreter:cradle_import", exc)
-            return {"status": "error", "error": "cradle unavailable: %s" % exc}
+            return {"status": "error", "error": "cradle unavailable: {}".format(exc)}
         try:
             path = resolve_model(model or "", None) if model else None
             if path is None:
                 from .cradle import list_cradle_models
-                found = [m["name"] for m in list_cradle_models()
-                         if m["framework"] == "gguf"]
+
+                found = [
+                    m["name"] for m in list_cradle_models() if m["framework"] == "gguf"
+                ]
                 if not found:
                     return {"status": "error", "error": "no gguf in cradle"}
                 path = resolve_model(found[0], None)
@@ -369,7 +410,12 @@ class EveInterpreterBridge:
             return {"status": "error", "error": str(exc)[:300]}
         if not text:
             return {"status": "error", "error": "cradle model answered empty"}
-        return {"status": "ok", "result": text, "provider": "cradle-sidecar", "model": str(path)}
+        return {
+            "status": "ok",
+            "result": text,
+            "provider": "cradle-sidecar",
+            "model": str(path),
+        }
 
     def _gguf_size_key(self, path: str) -> int:
         try:
@@ -377,10 +423,12 @@ class EveInterpreterBridge:
         except OSError:
             return 1 << 60
 
-    def _gguf_fallback(self, prompt: str, provider_tag: str) -> Optional[Dict[str, Any]]:
+    def _gguf_fallback(self, prompt: str, provider_tag: str) -> dict[str, Any] | None:
         """Direct GGUF inference, used when no server path succeeded."""
         try:
-            from llama_cpp import Llama  # scanner:ignore (optional heavy dep; llama-cpp-python is sdist-only and absent from py315t -- GGUF fallback stays lazy)
+            from llama_cpp import (
+                Llama,  # scanner:ignore (optional heavy dep; llama-cpp-python is sdist-only and absent from py315t -- GGUF fallback stays lazy)
+            )
         except ImportError as exc:
             note_failure("eve_interpreter:llama_cpp_import", exc)
             return None
@@ -394,12 +442,19 @@ class EveInterpreterBridge:
         except Exception as exc:
             note_failure("eve_interpreter:gguf_run", exc)
             return None
-        return {"status": "ok", "result": text, "model": model_path, "provider": provider_tag}
+        return {
+            "status": "ok",
+            "result": text,
+            "model": model_path,
+            "provider": provider_tag,
+        }
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def run_local(self, prompt: str, model: Optional[str] = None, system: Optional[str] = None) -> Dict[str, Any]:
+    def run_local(
+        self, prompt: str, model: str | None = None, system: str | None = None
+    ) -> dict[str, Any]:
         """Run a prompt through [Open Interpreter or] a local model server.
 
         Preference order per server target: Open Interpreter (if importable,
@@ -408,29 +463,46 @@ class EveInterpreterBridge:
         generation path succeeds, the GGUF fallback runs; when even that fails,
         an error dict carries every failure detail plus the probe summary.
         """
-        failures: List[Dict[str, Any]] = []
+        failures: list[dict[str, Any]] = []
         targets = self._probe_servers(model_override=model)
         for target in targets:
             if self._available and self._interpreter is not None:
-                configured = self._configure_interpreter_for_server(target["base"], target["model"])
+                configured = self._configure_interpreter_for_server(
+                    target["base"], target["model"]
+                )
                 if configured:
                     try:
                         result = self._interpreter.chat(prompt)
                     except Exception as exc:
                         note_failure("eve_interpreter:chat", exc)
                         failures.append(
-                            {"server": target, "error": "%s: %s" % (type(exc).__name__, exc), "failure_class": self.classify_failure(str(exc))}
+                            {
+                                "server": target,
+                                "error": "{}: {}".format(type(exc).__name__, exc),
+                                "failure_class": self.classify_failure(str(exc)),
+                            }
                         )
                         result = None
                     if result:
-                        return {"status": "ok", "result": result, "provider": "interpreter", "server": {"base": target["base"], "model": target["model"]}}
+                        return {
+                            "status": "ok",
+                            "result": result,
+                            "provider": "interpreter",
+                            "server": {
+                                "base": target["base"],
+                                "model": target["model"],
+                            },
+                        }
             attempt, fail = self._try_target(target, prompt, system)
             if attempt is None:
                 if fail is not None:
                     failures.append(fail)
                 continue
             return attempt
-        gguf = self._gguf_fallback(prompt, provider_tag="llama-cpp-python-direct" if targets else "llama-cpp-python")
+        gguf = self._gguf_fallback(
+            prompt,
+            provider_tag="llama-cpp-python-direct" if targets else "llama-cpp-python",
+        )
         if gguf:
             return gguf
         classification = "none"
@@ -438,7 +510,12 @@ class EveInterpreterBridge:
             classes = {f.get("failure_class", "unknown") for f in failures}
             classification = ";".join(sorted(classes))
             summary = "; ".join(f["error"] for f in failures)[:2000]
-            return {"status": "error", "error": summary, "failure_class": classification, "probe": self._last_probe}
+            return {
+                "status": "error",
+                "error": summary,
+                "failure_class": classification,
+                "probe": self._last_probe,
+            }
         return {
             "status": "error",
             "error": "no generation-capable model server or engine available",
@@ -446,7 +523,7 @@ class EveInterpreterBridge:
             "probe": self._last_probe,
         }
 
-    def drive_mesh_via_interpreter(self, instruction: str) -> Dict[str, Any]:
+    def drive_mesh_via_interpreter(self, instruction: str) -> dict[str, Any]:
         """Use Open Interpreter to drive the mesh based on a natural language instruction.
 
         Degraded mode (interpreter package unavailable) is reported by
@@ -467,10 +544,10 @@ class EveInterpreterBridge:
         )
         return self.run_local(instruction, system=context)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Bridge status incl. the latest server-probe summary, when probed."""
         mesh_drivable = self._available and self._eve is not None
-        status: Dict[str, Any] = {
+        status: dict[str, Any] = {
             "interpreter_available": self._available,
             "eve_arm_available": self._eve is not None,
             "mesh_drivable": mesh_drivable,

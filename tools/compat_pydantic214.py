@@ -9,6 +9,7 @@ Import this module BEFORE any `mcp` import on 3.16t. Fail-open by design:
 if pydantic is absent or already provides the name, this is a no-op.
 (MellifluousML rule: stdlib only, zero third-party wheels required.)
 """
+
 from __future__ import annotations
 
 try:

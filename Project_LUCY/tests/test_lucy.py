@@ -26,8 +26,7 @@ def test_eliza_reading_is_honest_without_graph():
 
 def test_empty_cues_say_so():
     r = lucy.eliza_reading({})
-    assert r == {"known": False,
-                 "reason": "no cues -- nothing to recognise"}
+    assert r == {"known": False, "reason": "no cues -- nothing to recognise"}
 
 
 def test_lucy_cli_runs():

@@ -33,23 +33,23 @@ Key specs:
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
-# from typing import Optional, Tuple  # removed — all names have native equivalents
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from typing import List
 from pathlib import Path
-import json
+
+# from typing import Optional, Tuple  # removed — all names have native equivalents
+import torch
+import torch.nn.functional as F
+from torch import nn
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -57,6 +57,7 @@ except ImportError:                               # never break the host
 @dataclass
 class Qwen35SSMConfig:
     """Configuration for Qwen35 SSM hybrid model."""
+
     vocab_size: int = 248064
     hidden_size: int = 2560
     intermediate_size: int = 9216
@@ -80,7 +81,7 @@ class Qwen35SSMConfig:
     full_attention_interval: int = 4
 
     @classmethod
-    def from_json(cls, path: str) -> "Qwen35SSMConfig":
+    def from_json(cls, path: str) -> Qwen35SSMConfig:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         ssm = data.get("ssm_config", {})
@@ -109,8 +110,10 @@ class Qwen35SSMConfig:
 
 # ── Core Layers ──────────────────────────────────────────────────────
 
+
 class RMSNorm(nn.Module):
     """Root Mean Square Layer Normalization."""
+
     def __init__(self, hidden_size: int, eps: float = 1e-6):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(hidden_size))
@@ -125,9 +128,12 @@ class RMSNorm(nn.Module):
 
 class RotaryEmbedding(nn.Module):
     """Rotary Position Embedding (RoPE)."""
+
     inv_freq: torch.Tensor  # buffer registered unconditionally in __init__
 
-    def __init__(self, dim: int, max_position_embeddings: int = 262144, theta: float = 10000000.0):
+    def __init__(
+        self, dim: int, max_position_embeddings: int = 262144, theta: float = 10000000.0
+    ):
         super().__init__()
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
@@ -135,8 +141,12 @@ class RotaryEmbedding(nn.Module):
         self.register_buffer("inv_freq", inv_freq, persistent=False)
 
     @torch.no_grad()
-    def forward(self, x: torch.Tensor, position_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        inv_freq_expanded = self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)
+    def forward(
+        self, x: torch.Tensor, position_ids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        inv_freq_expanded = (
+            self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)
+        )
         position_ids_expanded = position_ids[:, None, :].float()
         freqs = (inv_freq_expanded @ position_ids_expanded).transpose(1, 2)
         emb = torch.cat((freqs, freqs), dim=-1)
@@ -144,12 +154,13 @@ class RotaryEmbedding(nn.Module):
 
 
 def rotate_half(x: torch.Tensor) -> torch.Tensor:
-    x1, x2 = x[..., :x.shape[-1] // 2], x[..., x.shape[-1] // 2:]
+    x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
     return torch.cat((-x2, x1), dim=-1)
 
 
-def apply_rotary_pos_emb(q: torch.Tensor, k: torch.Tensor,
-                         cos: torch.Tensor, sin: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def apply_rotary_pos_emb(
+    q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
     cos = cos.unsqueeze(1)
     sin = sin.unsqueeze(1)
     q_embed = (q * cos) + (rotate_half(q) * sin)
@@ -159,8 +170,10 @@ def apply_rotary_pos_emb(q: torch.Tensor, k: torch.Tensor,
 
 # ── Attention Block ──────────────────────────────────────────────────
 
+
 class Qwen35Attention(nn.Module):
     """Grouped Query Attention (GQA) with RoPE."""
+
     def __init__(self, config: Qwen35SSMConfig):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -169,34 +182,63 @@ class Qwen35Attention(nn.Module):
         self.head_dim = config.hidden_size // config.num_attention_heads
         self.num_kv_groups = self.num_heads // self.num_kv_heads
 
-        self.q_proj = nn.Linear(config.hidden_size, self.num_heads * self.head_dim, bias=False)
-        self.k_proj = nn.Linear(config.hidden_size, self.num_kv_heads * self.head_dim, bias=False)
-        self.v_proj = nn.Linear(config.hidden_size, self.num_kv_heads * self.head_dim, bias=False)
-        self.o_proj = nn.Linear(self.num_heads * self.head_dim, config.hidden_size, bias=False)
+        self.q_proj = nn.Linear(
+            config.hidden_size, self.num_heads * self.head_dim, bias=False
+        )
+        self.k_proj = nn.Linear(
+            config.hidden_size, self.num_kv_heads * self.head_dim, bias=False
+        )
+        self.v_proj = nn.Linear(
+            config.hidden_size, self.num_kv_heads * self.head_dim, bias=False
+        )
+        self.o_proj = nn.Linear(
+            self.num_heads * self.head_dim, config.hidden_size, bias=False
+        )
         self.rotary = RotaryEmbedding(
             self.head_dim,
             config.max_position_embeddings,
             config.rope_theta,
         )
 
-    def forward(self, hidden_states: torch.Tensor,
-                position_ids: torch.Tensor,
-                attention_mask: (torch.Tensor | None) = None) -> torch.Tensor:
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        position_ids: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         bsz, q_len, _ = hidden_states.size()
 
-        q = self.q_proj(hidden_states).view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.k_proj(hidden_states).view(bsz, q_len, self.num_kv_heads, self.head_dim).transpose(1, 2)
-        v = self.v_proj(hidden_states).view(bsz, q_len, self.num_kv_heads, self.head_dim).transpose(1, 2)
+        q = (
+            self.q_proj(hidden_states)
+            .view(bsz, q_len, self.num_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        k = (
+            self.k_proj(hidden_states)
+            .view(bsz, q_len, self.num_kv_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        v = (
+            self.v_proj(hidden_states)
+            .view(bsz, q_len, self.num_kv_heads, self.head_dim)
+            .transpose(1, 2)
+        )
 
         cos, sin = self.rotary(hidden_states, position_ids)
         q, k = apply_rotary_pos_emb(q, k, cos, sin)
 
         # Expand KV heads for GQA
         if self.num_kv_groups > 1:
-            k = k[:, :, None, :, :].expand(-1, -1, self.num_kv_groups, -1, -1).reshape(
-                bsz, self.num_heads, q_len, self.head_dim)
-            v = v[:, :, None, :, :].expand(-1, -1, self.num_kv_groups, -1, -1).reshape(
-                bsz, self.num_heads, q_len, self.head_dim)
+            k = (
+                k[:, :, None, :, :]
+                .expand(-1, -1, self.num_kv_groups, -1, -1)
+                .reshape(bsz, self.num_heads, q_len, self.head_dim)
+            )
+            v = (
+                v[:, :, None, :, :]
+                .expand(-1, -1, self.num_kv_groups, -1, -1)
+                .reshape(bsz, self.num_heads, q_len, self.head_dim)
+            )
 
         # Causal attention mask
         if attention_mask is None:
@@ -217,6 +259,7 @@ class Qwen35Attention(nn.Module):
 
 # ── SSM (Mamba-inspired) Block ───────────────────────────────────────
 
+
 class Qwen35SSM(nn.Module):
     """Selective State Space Model layer (Mamba-style).
 
@@ -224,6 +267,7 @@ class Qwen35SSM(nn.Module):
     attention in 3 out of every 4 layers, reducing memory from O(n²)
     to O(n) for those layers.
     """
+
     def __init__(self, config: Qwen35SSMConfig):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -248,12 +292,17 @@ class Qwen35SSM(nn.Module):
 
         # Time-step projection
         self.dt_proj = nn.Linear(config.time_step_rank, config.inner_size, bias=False)
-        self.dt_rank_proj = nn.Linear(config.inner_size, config.time_step_rank, bias=False)
+        self.dt_rank_proj = nn.Linear(
+            config.inner_size, config.time_step_rank, bias=False
+        )
 
         # SSM parameters (A, B, C, D)
         self.A_log = nn.Parameter(
-            torch.log(torch.arange(1, config.state_size + 1, dtype=torch.float32)
-                     .view(1, config.state_size, 1).repeat(config.inner_size, 1, 1))
+            torch.log(
+                torch.arange(1, config.state_size + 1, dtype=torch.float32)
+                .view(1, config.state_size, 1)
+                .repeat(config.inner_size, 1, 1)
+            )
         )
         self.B_proj = nn.Linear(config.inner_size, config.state_size, bias=False)
         self.C_proj = nn.Linear(config.inner_size, config.state_size, bias=False)
@@ -262,9 +311,15 @@ class Qwen35SSM(nn.Module):
         # Output projection: inner_size → hidden
         self.out_proj = nn.Linear(config.inner_size, config.hidden_size, bias=False)
 
-    def _selective_scan(self, u: torch.Tensor, delta: torch.Tensor,
-                        A: torch.Tensor, B: torch.Tensor, C: torch.Tensor,
-                        D: torch.Tensor) -> torch.Tensor:
+    def _selective_scan(
+        self,
+        u: torch.Tensor,
+        delta: torch.Tensor,
+        A: torch.Tensor,
+        B: torch.Tensor,
+        C: torch.Tensor,
+        D: torch.Tensor,
+    ) -> torch.Tensor:
         """Parallel selective scan via cumprod/cumsum — vectorized over seq_len.
 
         Replaces the sequential Python for-loop with fully parallelized
@@ -336,13 +391,21 @@ class Qwen35SSM(nn.Module):
 
 # ── Feed-Forward Network ─────────────────────────────────────────────
 
+
 class Qwen35MLP(nn.Module):
     """SwiGLU Feed-Forward Network."""
+
     def __init__(self, config: Qwen35SSMConfig):
         super().__init__()
-        self.gate_proj = nn.Linear(config.hidden_size, config.intermediate_size, bias=False)
-        self.up_proj = nn.Linear(config.hidden_size, config.intermediate_size, bias=False)
-        self.down_proj = nn.Linear(config.intermediate_size, config.hidden_size, bias=False)
+        self.gate_proj = nn.Linear(
+            config.hidden_size, config.intermediate_size, bias=False
+        )
+        self.up_proj = nn.Linear(
+            config.hidden_size, config.intermediate_size, bias=False
+        )
+        self.down_proj = nn.Linear(
+            config.intermediate_size, config.hidden_size, bias=False
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         gate = F.silu(self.gate_proj(x))
@@ -352,12 +415,14 @@ class Qwen35MLP(nn.Module):
 
 # ── Decoder Layer ────────────────────────────────────────────────────
 
+
 class Qwen35DecoderLayer(nn.Module):
     """Single decoder layer — either SSM or Attention based on position."""
+
     def __init__(self, config: Qwen35SSMConfig, layer_idx: int):
         super().__init__()
         self.layer_idx = layer_idx
-        self.use_attention = (layer_idx % config.full_attention_interval == 0)
+        self.use_attention = layer_idx % config.full_attention_interval == 0
 
         self.input_norm = RMSNorm(config.hidden_size, config.rms_norm_eps)
         if self.use_attention:
@@ -368,9 +433,12 @@ class Qwen35DecoderLayer(nn.Module):
         self.post_attn_norm = RMSNorm(config.hidden_size, config.rms_norm_eps)
         self.mlp = Qwen35MLP(config)
 
-    def forward(self, hidden_states: torch.Tensor,
-                position_ids: torch.Tensor,
-                attention_mask: (torch.Tensor | None) = None) -> torch.Tensor:
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        position_ids: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         residual = hidden_states
         hidden_states = self.input_norm(hidden_states)
 
@@ -387,6 +455,7 @@ class Qwen35DecoderLayer(nn.Module):
 
 
 # ── Full Model ───────────────────────────────────────────────────────
+
 
 class Qwen35ForCausalLM(nn.Module):
     """Qwen35 SSM-Hybrid Causal Language Model.
@@ -406,20 +475,23 @@ class Qwen35ForCausalLM(nn.Module):
         self.config = config
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
-        self.layers = nn.ModuleList([
-            Qwen35DecoderLayer(config, i) for i in range(config.num_hidden_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [Qwen35DecoderLayer(config, i) for i in range(config.num_hidden_layers)]
+        )
         self.norm = RMSNorm(config.hidden_size, config.rms_norm_eps)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
         # Tie weights
         self.lm_head.weight = self.embed_tokens.weight
 
-    def forward(self, input_ids: torch.Tensor,
-                attention_mask: (torch.Tensor | None) = None) -> torch.Tensor:
+    def forward(
+        self, input_ids: torch.Tensor, attention_mask: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Forward pass returning logits."""
         bsz, seq_len = input_ids.shape
-        position_ids = torch.arange(seq_len, device=input_ids.device).unsqueeze(0).expand(bsz, -1)
+        position_ids = (
+            torch.arange(seq_len, device=input_ids.device).unsqueeze(0).expand(bsz, -1)
+        )
 
         hidden_states = self.embed_tokens(input_ids)
         for layer in self.layers:
@@ -428,16 +500,21 @@ class Qwen35ForCausalLM(nn.Module):
         return self.lm_head(hidden_states)
 
     @torch.no_grad()
-    def generate(self, input_ids: torch.Tensor, max_new_tokens: int = 128,
-                 temperature: float = 0.7, top_k: int = 50,
-                 eos_token_id: (int | None) = None) -> torch.Tensor:
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 128,
+        temperature: float = 0.7,
+        top_k: int = 50,
+        eos_token_id: int | None = None,
+    ) -> torch.Tensor:
         """Auto-regressive text generation."""
         if eos_token_id is None:
             eos_token_id = self.config.eos_token_id
 
         generated = input_ids.clone()
         for _ in range(max_new_tokens):
-            logits = self.forward(generated[:, -self.config.max_position_embeddings:])
+            logits = self.forward(generated[:, -self.config.max_position_embeddings :])
             next_logits = logits[:, -1, :] / temperature
 
             # Top-k filtering
@@ -457,7 +534,7 @@ class Qwen35ForCausalLM(nn.Module):
         return generated
 
 
-def create_qwen35_model(config_path: (str | None) = None) -> Qwen35ForCausalLM:
+def create_qwen35_model(config_path: str | None = None) -> Qwen35ForCausalLM:
     """Factory function to create a Qwen35 model from a config file.
 
     Args:
@@ -469,8 +546,12 @@ def create_qwen35_model(config_path: (str | None) = None) -> Qwen35ForCausalLM:
 
     if config_path is None:
         config_path = str(
-            Path(__file__).resolve().parents[3] / "workspace" / "projects"
-            / "eve-unleashed" / "eve_rebuild" / "config.json"
+            Path(__file__).resolve().parents[3]
+            / "workspace"
+            / "projects"
+            / "eve-unleashed"
+            / "eve_rebuild"
+            / "config.json"
         )
 
     config = Qwen35SSMConfig.from_json(config_path)

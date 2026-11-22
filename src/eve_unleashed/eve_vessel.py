@@ -13,6 +13,7 @@ weights are queued. This module implements the charter:
 The token engine behind `generate` is whichever backend the user selected.
 Eve answers; backends don't.
 """
+
 import inspect
 import json
 from pathlib import Path
@@ -37,26 +38,31 @@ def load_vessel() -> dict:
     d = cradle_dir()
     meta = d / VESSEL_FILES[1]
     if not meta.exists():
-        return {"ok": False,
-                "error": "no vessel in the cradle (~/.azazael/cradle/%s)"
-                         % VESSEL_FILES[1]}
+        return {
+            "ok": False,
+            "error": "no vessel in the cradle (~/.azazael/cradle/{})".format(
+                VESSEL_FILES[1]
+            ),
+        }
     try:
         spec = json.loads(meta.read_text(encoding="utf-8"))
     except Exception as e:
-        return {"ok": False, "error": "unreadable vessel: %s" % e}
+        return {"ok": False, "error": "unreadable vessel: {}".format(e)}
     missing = [f for f in VESSEL_FILES if not (d / f).exists()]
-    return {"ok": True, "spec": spec, "missing": missing,
-            "system": spec.get("system_prompt", VESSEL_SYSTEM)}
+    return {
+        "ok": True,
+        "spec": spec,
+        "missing": missing,
+        "system": spec.get("system_prompt", VESSEL_SYSTEM),
+    }
 
 
 def _call(modname: str, fnname: str, args: dict):
-    mod = __import__("eve_unleashed.%s" % modname,
-                     fromlist=[fnname])
+    mod = __import__("eve_unleashed.{}".format(modname), fromlist=[fnname])
     fn = getattr(mod, fnname)
     try:
         sig = inspect.signature(fn)
-        kwargs = {k: v for k, v in args.items()
-                  if k in sig.parameters}
+        kwargs = {k: v for k, v in args.items() if k in sig.parameters}
     except (ValueError, TypeError):
         kwargs = dict(args)
     return fn(**kwargs)
@@ -74,8 +80,7 @@ def _safe(obj, limit: int = 4000):
 # names are stable; aliases bridge to the modules' parameter names.
 NATIVE = {
     "foundry.build": ("soul_foundry", "build_all", {"out": "out_dir"}),
-    "morph.convert": ("morph", "convert_text",
-                       {"src": "src_path", "dst": "dst_path"}),
+    "morph.convert": ("morph", "convert_text", {"src": "src_path", "dst": "dst_path"}),
     "morph.report": ("morph", "morph_markdown", {"src": "state"}),
     "langs.check": ("langs", "check", {}),
     "langs.fmt": ("langs", "fmt", {}),
@@ -94,7 +99,7 @@ def parse_calls(text: str) -> list:
         s = line.strip()
         if not s.startswith("EVE_CALL:"):
             continue
-        rest = s[len("EVE_CALL:"):].strip()
+        rest = s[len("EVE_CALL:") :].strip()
         name, _, payload = rest.partition(" ")
         name = name.strip()
         try:
@@ -102,8 +107,7 @@ def parse_calls(text: str) -> list:
             if not isinstance(args, dict):
                 args = {"_arg": args}
         except Exception:
-            calls.append((name, {"_raw": payload,
-                                "_error": "args are not JSON"}))
+            calls.append((name, {"_raw": payload, "_error": "args are not JSON"}))
             continue
         calls.append((name, args))
     return calls
@@ -112,9 +116,13 @@ def parse_calls(text: str) -> list:
 def execute_call(name: str, args: dict) -> dict:
     """Run one native hand. Unknown functions are refused, never guessed."""
     if name not in NATIVE:
-        return {"ok": False, "function": name,
-                "error": "unknown native function %r (vessel lists: %s)"
-                         % (name, ", ".join(sorted(NATIVE)))}
+        return {
+            "ok": False,
+            "function": name,
+            "error": "unknown native function {!r} (vessel lists: {})".format(
+                name, ", ".join(sorted(NATIVE))
+            ),
+        }
     if "_error" in args:
         return {"ok": False, "function": name, "error": args["_error"]}
     modname, fnname, aliases = NATIVE[name]
@@ -126,8 +134,11 @@ def execute_call(name: str, args: dict) -> dict:
         result = _call(modname, fnname, args)
         return {"ok": True, "function": name, "result": _safe(result)}
     except Exception as e:
-        return {"ok": False, "function": name,
-                "error": "%s: %s" % (type(e).__name__, e)}
+        return {
+            "ok": False,
+            "function": name,
+            "error": "{}: {}".format(type(e).__name__, e),
+        }
 
 
 def explore() -> dict:
@@ -136,29 +147,35 @@ def explore() -> dict:
     Returns a JSON-serializable report."""
     import platform
     import shutil
+
     from eve_unleashed import dashboard as _web
     from eve_unleashed import model_picker as _mp
+
     rep: dict = {"vessel": load_vessel()["ok"]}
     try:
         st = _web.build_status()
-        rep.update({"python": st.get("python"),
-                    "platform": platform.system(),
-                    "cpu": st.get("cpu_count"),
-                    "mem_pct": (st.get("mem") or {}).get("pct"),
-                    "disk_pct": (st.get("disk") or {}).get("pct"),
-                    "llama_server": bool(st.get("llama_server")),
-                    "cradle_up": (st.get("cradle") or {}).get("running", False),
-                    "cradle_models": (st.get("cradle") or {}).get("models", []),
-                    "selection": st.get("selection")})
+        rep.update(
+            {
+                "python": st.get("python"),
+                "platform": platform.system(),
+                "cpu": st.get("cpu_count"),
+                "mem_pct": (st.get("mem") or {}).get("pct"),
+                "disk_pct": (st.get("disk") or {}).get("pct"),
+                "llama_server": bool(st.get("llama_server")),
+                "cradle_up": (st.get("cradle") or {}).get("running", False),
+                "cradle_models": (st.get("cradle") or {}).get("models", []),
+                "selection": st.get("selection"),
+            }
+        )
     except Exception as e:
         rep["status_error"] = str(e)
     tools: dict = {}
     try:
         from eve_unleashed import langs as _l
+
         for lang in ("python", "rust", "go"):
             try:
-                tools[lang] = {t: bool(p) for t, p in
-                               _l.have_tools(lang).items()}
+                tools[lang] = {t: bool(p) for t, p in _l.have_tools(lang).items()}
             except Exception:
                 tools[lang] = {}
     except Exception:
@@ -166,8 +183,10 @@ def explore() -> dict:
     rep["tools"] = tools
     try:
         from eve_unleashed.cradle import list_cradle_models
-        rep["cradle_files"] = [(m.get("name"), m.get("bytes", 0))
-                               for m in (list_cradle_models() or [])]
+
+        rep["cradle_files"] = [
+            (m.get("name"), m.get("bytes", 0)) for m in (list_cradle_models() or [])
+        ]
     except Exception:
         rep["cradle_files"] = []
     try:
@@ -199,9 +218,17 @@ def eve_answer(prompt: str, generate, max_rounds: int = MAX_ROUNDS) -> dict:
         for name, args in calls:
             out = execute_call(name, args)
             trace.append(out)
-            results.append("EVE_RESULT %s: %s"
-                           % (name, out.get("result", out.get("error"))))
-        turn = ("The native calls returned:\n" + "\n".join(results)
-                + "\nAnswer the user directly now, no more calls.")
-    return {"ok": True, "answer": reply.strip(), "trace": trace,
-            "note": "call budget spent; returning last reply"}
+            results.append(
+                "EVE_RESULT {}: {}".format(name, out.get("result", out.get("error")))
+            )
+        turn = (
+            "The native calls returned:\n"
+            + "\n".join(results)
+            + "\nAnswer the user directly now, no more calls."
+        )
+    return {
+        "ok": True,
+        "answer": reply.strip(),
+        "trace": trace,
+        "note": "call budget spent; returning last reply",
+    }

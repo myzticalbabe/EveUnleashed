@@ -5,13 +5,12 @@ Markdown report morphing from Eve's own bundles, and seeded deterministic
 byte mutation for harness self-testing (mutate an input, re-verify the
 output -- the harness evolving from each error as it happens).
 """
+
 import csv
 import io
 import json
 import random
 from pathlib import Path
-
-from .model_registry import note_failure
 
 
 def convert_text(src_path, dst_path):
@@ -32,30 +31,33 @@ def convert_text(src_path, dst_path):
         w.writerows(rows)
         dst.write_text(buf.getvalue(), encoding="utf-8")
         return len(rows)
-    raise ValueError("morph converts .csv<->.json only: %s -> %s"
-                     % (src.suffix, dst.suffix))
+    raise ValueError(
+        "morph converts .csv<->.json only: {} -> {}".format(src.suffix, dst.suffix)
+    )
 
 
 def morph_markdown(state, title="Eve report"):
     """Morph an Eve state/bundle dict into a Markdown report."""
-    lines = ["# %s" % title, ""]
+    lines = ["# {}".format(title), ""]
     if state.get("judgment"):
-        lines += ["**Judgment:** %s" % state["judgment"], ""]
+        lines += ["**Judgment:** {}".format(state["judgment"]), ""]
     rows = state.get("rows") or state.get("checks") or []
     if rows:
         keys = list(rows[0].keys())
         lines.append("| " + " | ".join(keys) + " |")
         lines.append("| " + " | ".join("---" for _ in keys) + " |")
         for r in rows:
-            lines.append("| " + " | ".join(str(r.get(k, ""))
-                                           for k in keys) + " |")
+            lines.append("| " + " | ".join(str(r.get(k, "")) for k in keys) + " |")
         lines.append("")
     manifest = state.get("evidence_manifest") or []
     for m in manifest:
-        lines.append("- evidence `%s` sha256 `%s`" % (
-            m.get("path"), (m.get("sha256") or "")[:16]))
+        lines.append(
+            "- evidence `{}` sha256 `{}`".format(
+                m.get("path"), (m.get("sha256") or "")[:16]
+            )
+        )
     if state.get("opinion"):
-        lines += ["", "> %s" % state["opinion"]]
+        lines += ["", "> {}".format(state["opinion"])]
     return "\n".join(lines) + "\n"
 
 
@@ -78,10 +80,12 @@ def mutate_file(src_path, out_dir, seed=7, count=3):
         pos = rng.randrange(len(variant))
         was = variant[pos]
         variant[pos] = (was + 1 + i) % 256
-        vp = out / ("%s.mut%d" % (name, i))
+        vp = out / ("{}.mut{:d}".format(name, i))
         vp.write_bytes(bytes(variant))
-        manifest.append({"variant": str(vp), "byte": pos,
-                         "was": was, "now": variant[pos]})
-    (out / "mutations.json").write_text(json.dumps(manifest, indent=2),
-                                        encoding="utf-8")
+        manifest.append(
+            {"variant": str(vp), "byte": pos, "was": was, "now": variant[pos]}
+        )
+    (out / "mutations.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8"
+    )
     return manifest

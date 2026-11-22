@@ -33,7 +33,8 @@ except ImportError:
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -47,9 +48,9 @@ def atomic_write_bytes(path: Path | str, payload: bytes, where: str) -> None:
     `where` names the caller for ledger notes (e.g. "morphed_trainers").
     """
     target = Path(path)
-    fd, tmp = tempfile.mkstemp(dir=str(target.parent),
-                                prefix="." + target.stem + ".",
-                                suffix=".tmp")
+    fd, tmp = tempfile.mkstemp(
+        dir=str(target.parent), prefix="." + target.stem + ".", suffix=".tmp"
+    )
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(payload)
@@ -69,8 +70,9 @@ def atomic_write_bytes(path: Path | str, payload: bytes, where: str) -> None:
 
 def atomic_write_json(path: Path | str, store: dict, where: str) -> None:
     """JSON-serializing thin wrapper over atomic_write_bytes."""
-    atomic_write_bytes(path, (json.dumps(store, indent=1) + "\n").encode("utf-8"),
-                       where)
+    atomic_write_bytes(
+        path, (json.dumps(store, indent=1) + "\n").encode("utf-8"), where
+    )
 
 
 #: In-process mutexes keyed by resolved lock path. msvcrt.locking
@@ -105,7 +107,7 @@ def file_lock(lock_path: Path | str, where: str):
     thread_lock = _thread_lock_for(str(lock.resolve()))
     thread_lock.acquire()
     try:
-        fh = open(str(lock), "ab")  # noqa: PTH123 -- lock handle, binary needs no encoding
+        fh = open(str(lock), "ab")
         lock_kind = "none"
         try:
             if fcntl is not None:

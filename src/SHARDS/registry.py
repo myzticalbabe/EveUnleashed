@@ -13,13 +13,12 @@ import sys
 import time
 from pathlib import Path
 
+from CORE.failure_ledger import note_failure
 from INTERPRETERS.go_runner import GoRunner
 from INTERPRETERS.node_runner import NodeRunner
 from INTERPRETERS.pwsh_runner import PwshRunner
 from INTERPRETERS.rust_runner import RustRunner
 from INTERPRETERS.sh_runner import ShRunner
-
-from CORE.failure_ledger import note_failure
 
 
 def _probe_toolchain_versions() -> dict:
@@ -61,39 +60,48 @@ def _current_versions() -> dict:
         _VERSION_CACHE["at"] = now
     return dict(_VERSION_CACHE.get("versions", {}))
 
+
 SHARDS: dict = {
     "gateway": {
         "paths": ["gateway-go/main.go", "gateway/src/main.rs"],
         "langs": ["go", "rust"],
         "canonical": "go",
         "notes": "Proven polyglot pair: identical OpenAI-front-end contract, "
-                 "two implementations. Template for all future dual-lang shards.",
+        "two implementations. Template for all future dual-lang shards.",
     },
     "interpreters": {
         "paths": ["src/INTERPRETERS/"],
         "langs": ["python", "go", "rust", "javascript", "powershell", "bash"],
         "canonical": "python",
         "notes": "Runner fleet. Python hosts; every other language executes "
-                 "through its dedicated runner module.",
+        "through its dedicated runner module.",
     },
     "antibodies": {
         "paths": ["src/SHARDS/antibodies.py"],
         "langs": ["python"],
         "canonical": "python",
         "notes": "Error-derived detectors. Each antibody is cloned from one "
-                 "observed instance and seeks every recurrence; status "
-                 "advances seeking->neutralized->immune on recorded evidence.",
+        "observed instance and seeks every recurrence; status "
+        "advances seeking->neutralized->immune on recorded evidence.",
     },
     "skills-core": {
-        "paths": ["azazael-conventions", "azazael-testing", "azazael-git",
-                  "azazael-sop", "azazael-mandates"],
+        "paths": [
+            "azazael-conventions",
+            "azazael-testing",
+            "azazael-git",
+            "azazael-sop",
+            "azazael-mandates",
+        ],
         "langs": ["doc"],
         "canonical": "doc",
         "notes": "Always-on discipline pack. Doc shard: SKILL.md is the artifact.",
     },
     "skills-inference": {
-        "paths": ["azazael-inference*", "azazael-inference-protocol",
-                  "azazael-inference-worms"],
+        "paths": [
+            "azazael-inference*",
+            "azazael-inference-protocol",
+            "azazael-inference-worms",
+        ],
         "langs": ["doc", "python"],
         "canonical": "doc",
         "notes": "Inference providers, protocol, worm integrations.",
@@ -111,8 +119,12 @@ SHARDS: dict = {
         "notes": "Chrome DevTools panels; JS snippets run via node_runner.",
     },
     "skills-ops": {
-        "paths": ["azazael-sync-*", "azazael-deploy", "azazael-exe-build",
-                  "azazael-tool-*"],
+        "paths": [
+            "azazael-sync-*",
+            "azazael-deploy",
+            "azazael-exe-build",
+            "azazael-tool-*",
+        ],
         "langs": ["doc", "python", "powershell", "bash"],
         "canonical": "doc",
         "notes": "Sync/deploy/tooling. pwsh+shell secondaries for host tasks.",
@@ -203,7 +215,8 @@ def _measured_order() -> list:
     spends canonical preference until a fresh --sweep re-earns it."""
     try:
         data = json.loads(
-            Path(__file__).with_name("sweep.json").read_text(encoding="utf-8"))
+            Path(__file__).with_name("sweep.json").read_text(encoding="utf-8")
+        )
         medians = data.get("medians_ms", {})
     except (OSError, ValueError):
         return list(LANG_ORDER)
@@ -252,10 +265,25 @@ def route_lang(shard_name: str, budget: str = "balanced") -> str:
 # Keyword router: task text -> shard name. First match wins; order matters.
 SHARD_KEYWORDS: dict = {
     "gateway": ["gateway", "llama-server", "upstream", "chat/completions"],
-    "interpreters": ["runner", "go_runner", "rust_runner", "node_runner",
-                     "pwsh_runner", "sh_runner", "polyglot"],
-    "antibodies": ["antibody", "antibodies", "immune", "seek",
-                   "drift", "work golden", "stale sweep", "regression"],
+    "interpreters": [
+        "runner",
+        "go_runner",
+        "rust_runner",
+        "node_runner",
+        "pwsh_runner",
+        "sh_runner",
+        "polyglot",
+    ],
+    "antibodies": [
+        "antibody",
+        "antibodies",
+        "immune",
+        "seek",
+        "drift",
+        "work golden",
+        "stale sweep",
+        "regression",
+    ],
     "skills-inference": ["inference", "provider", "nim", "llm"],
     "skills-worms": ["worm", "cluster", "registry"],
     "skills-devtools": ["devtools", "chrome", "lighthouse", "dom"],

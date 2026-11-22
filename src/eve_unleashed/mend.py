@@ -18,17 +18,19 @@ re-run is the proof; a fix with neither is a rumor.
 Eve mends the harness; the harness remembers the mending. Only
 you ship, file, or publish.
 """
+
 import json
 import subprocess
-import sys
 import time
 from pathlib import Path
 
 try:
     from CORE.failure_ledger import note_failure
 except Exception:
+
     def note_failure(where, exc=None):
         pass
+
 
 REPO = Path(__file__).resolve().parents[2]
 BAKE_PREFIX = "state/bake_harvest_freebuff_"
@@ -61,8 +63,7 @@ def scan():
     The bake lane is read only to prove it is readable (a fix recorded
     there is history). Only currently-failing node ids are issues.
     """
-    return [{**issue, "turf": turf_of(issue.get("item", ""))}
-            for issue in _scan_raw()]
+    return [{**issue, "turf": turf_of(issue.get("item", ""))} for issue in _scan_raw()]
 
 
 def _scan_raw():
@@ -73,8 +74,13 @@ def _scan_raw():
         try:
             failed = json.loads(cache.read_text(encoding="utf-8"))
             for node in sorted(failed):
-                issues.append({"source": "pytest-lastfailed",
-                               "item": node, "kind": "test_failure"})
+                issues.append(
+                    {
+                        "source": "pytest-lastfailed",
+                        "item": node,
+                        "kind": "test_failure",
+                    }
+                )
         except Exception as exc:
             note_failure("mend:cache", exc)
     try:
@@ -102,8 +108,12 @@ def plan(issues):
     by_root = {}
     for i in foreign:
         by_root.setdefault(i["turf"], []).append(i)
-    return {"own": own, "foreign": by_root,
-            "own_count": len(own), "foreign_count": len(foreign)}
+    return {
+        "own": own,
+        "foreign": by_root,
+        "own_count": len(own),
+        "foreign_count": len(foreign),
+    }
 
 
 def record_fix(title, body, item_id="mend"):
@@ -113,8 +123,13 @@ def record_fix(title, body, item_id="mend"):
     if not body or len(body.strip()) < 40:
         raise ValueError("body must carry substance (40+ chars)")
     lane = _bake_lane()
-    row = {"source": "eve-mend", "item_id": item_id, "title": title,
-           "body": body.strip(), "kind": "error_fix"}
+    row = {
+        "source": "eve-mend",
+        "item_id": item_id,
+        "title": title,
+        "body": body.strip(),
+        "kind": "error_fix",
+    }
     with open(lane, "a", encoding="utf-8") as f:
         f.write(json.dumps(row) + "\n")
     return row
@@ -123,28 +138,43 @@ def record_fix(title, body, item_id="mend"):
 def verify():
     """Re-run the eve test files. Returns per-file green/red."""
     import glob as _glob
+
     files = sorted(_glob.glob(str(REPO / "tests" / "test_eve_*.py")))
     results = []
     for path in files:
         name = Path(path).name
         try:
             proc = subprocess.run(
-                [PY315T, "-u", "-m", "pytest", path, "-q",
-                 "--timeout=120", "-p", "no:cacheprovider"],
-                capture_output=True, text=True, timeout=300,
-                cwd=str(REPO))
-            tail = (proc.stdout.strip().splitlines() or [""])[
-                -1][:120]
-            results.append({"file": name,
-                            "state": "green" if proc.returncode == 0
-                            else "red",
-                            "tail": tail})
+                [
+                    PY315T,
+                    "-u",
+                    "-m",
+                    "pytest",
+                    path,
+                    "-q",
+                    "--timeout=120",
+                    "-p",
+                    "no:cacheprovider",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=str(REPO),
+            )
+            tail = (proc.stdout.strip().splitlines() or [""])[-1][:120]
+            results.append(
+                {
+                    "file": name,
+                    "state": "green" if proc.returncode == 0 else "red",
+                    "tail": tail,
+                }
+            )
         except Exception as e:
             note_failure("mend:verify", e)
-            results.append({"file": name, "state": "error",
-                            "tail": str(e)[:120]})
-    return {"checked_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
-                                         time.gmtime()),
-            "files": results,
-            "green": sum(1 for r in results if r["state"] == "green"),
-            "total": len(results)}
+            results.append({"file": name, "state": "error", "tail": str(e)[:120]})
+    return {
+        "checked_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "files": results,
+        "green": sum(1 for r in results if r["state"] == "green"),
+        "total": len(results),
+    }

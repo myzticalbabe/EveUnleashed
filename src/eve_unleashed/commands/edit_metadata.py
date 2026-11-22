@@ -11,12 +11,17 @@ from pathlib import Path
 from typing import Any
 
 
-def edit_metadata(model_path: str, updates: dict[str, Any], dry_run: bool = False) -> int:
+def edit_metadata(
+    model_path: str, updates: dict[str, Any], dry_run: bool = False
+) -> int:
     """Edit GGUF model metadata."""
     try:
         import gguf
     except ImportError:
-        print("ERROR: gguf library not installed. Install with: pip install gguf", file=sys.stderr)
+        print(
+            "ERROR: gguf library not installed. Install with: pip install gguf",
+            file=sys.stderr,
+        )
         return 1
 
     path = Path(model_path)
@@ -60,7 +65,7 @@ def edit_metadata(model_path: str, updates: dict[str, Any], dry_run: bool = Fals
     try:
         # Create a new GGUF writer with updated metadata
         writer = gguf.GGUFWriter(str(path), "temp")
-        
+
         # Copy all existing fields
         for field in reader.fields.values():
             if field.name in updates:
@@ -98,7 +103,10 @@ def list_metadata(model_path: str) -> int:
     try:
         import gguf
     except ImportError:
-        print("ERROR: gguf library not installed. Install with: pip install gguf", file=sys.stderr)
+        print(
+            "ERROR: gguf library not installed. Install with: pip install gguf",
+            file=sys.stderr,
+        )
         return 1
 
     path = Path(model_path)
@@ -123,16 +131,18 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog="eve edit-metadata",
-        description="Edit GGUF model metadata"
+        prog="eve edit-metadata", description="Edit GGUF model metadata"
     )
     parser.add_argument("--model", "-m", required=True, help="Path to GGUF model")
-    parser.add_argument("--set", "-s", action="append", default=[],
-                        help="Key=value to set (repeatable)")
-    parser.add_argument("--list", "-l", action="store_true",
-                        help="List all metadata fields")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show changes without writing")
+    parser.add_argument(
+        "--set", "-s", action="append", default=[], help="Key=value to set (repeatable)"
+    )
+    parser.add_argument(
+        "--list", "-l", action="store_true", help="List all metadata fields"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show changes without writing"
+    )
 
     args = parser.parse_args()
 

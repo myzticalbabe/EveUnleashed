@@ -5,6 +5,7 @@ hands-on lab) that reuse Eve's own tools, and referrals to established
 women-in-STEM organizations. No invented mentors, no invented
 scholarships -- every referral is a real org with its real URL.
 """
+
 TRACKS = {
     "guided": [
         "STEP 1 -- NAME THE GOAL: one sentence (e.g. ship a Python CLI).",
@@ -46,10 +47,11 @@ def plan_track(style, goal):
     """Steps for a style toward a goal. Raises ValueError on unknown style."""
     style = (style or "").lower()
     if style not in TRACKS:
-        raise ValueError("unknown track %r (try: %s)"
-                         % (style, ", ".join(list_tracks())))
+        raise ValueError(
+            "unknown track {!r} (try: {})".format(style, ", ".join(list_tracks()))
+        )
     goal = (goal or "my first STEM build").strip()[:120]
-    return ["GOAL: %s" % goal] + list(TRACKS[style])
+    return ["GOAL: {}".format(goal)] + list(TRACKS[style])
 
 
 def referrals():

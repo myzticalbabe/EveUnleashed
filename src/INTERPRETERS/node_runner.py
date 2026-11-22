@@ -13,6 +13,7 @@ Subprocess-based Node.js runner mirroring the GoRunner/RustRunner shape:
 Toolchain absence is a structured error, never a crash.
 """
 
+import argparse
 import hashlib
 import os
 import shutil
@@ -20,24 +21,26 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-import argparse
-from typing import List, Optional
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
 
 try:
     from CORE.paths import get_project_root_safe as _get_project_root_safe
-except ImportError as exc:                               # never break the host
+except ImportError as exc:  # never break the host
     note_failure("node_runner:core-paths-import", exc)
     _get_project_root_safe = None
 
-_DEFAULT_ROOT = (str(_get_project_root_safe()) if _get_project_root_safe is not None
-                 else str(Path(__file__).resolve().parents[2]))
+_DEFAULT_ROOT = (
+    str(_get_project_root_safe())
+    if _get_project_root_safe is not None
+    else str(Path(__file__).resolve().parents[2])
+)
 
 AZAZAEL_ROOT = os.environ.get(
     "AZAZAEL_ROOT", os.environ.get("Azazael_ROOT", _DEFAULT_ROOT)
@@ -50,12 +53,13 @@ NODE_BUILD_DIR.mkdir(parents=True, exist_ok=True)
 @dataclass
 class NodeResult:
     """Result of a Node.js execution."""
+
     success: bool
     stdout: str = ""
     stderr: str = ""
     returncode: int = 0
     duration_ms: float = 0.0
-    errors: List[dict] = field(default_factory=list)
+    errors: list[dict] = field(default_factory=list)
     # D7: raw stderr bytes (latin-1 round-trips every byte) for forensics.
     # Display uses stderr (errors=replace); evidence uses stderr_bytes.
     stderr_bytes: str = ""
@@ -78,8 +82,11 @@ class NodeRunner:
         try:
             out = subprocess.run(
                 [self.node_bin, "--version"],
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=15,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=15,
             )
             self.version = out.stdout.strip()
         except Exception as e:
@@ -93,40 +100,48 @@ class NodeRunner:
             errors=[{"type": "toolchain", "message": "node missing"}],
         )
 
-    def _parse_errors(self, stderr: str) -> List[dict]:
+    def _parse_errors(self, stderr: str) -> list[dict]:
         """Parse node/V8 error output into structured records."""
-        errors: List[dict] = []
+        errors: list[dict] = []
         for line in stderr.split("\n"):
             line = line.strip()
             if not line:
                 continue
             # V8 stack frame: at fn (/path/file.js:line:col)
             if line.startswith("at ") and "(" in line and line.endswith(")"):
-                inner = line[line.rfind("(") + 1:-1]
+                inner = line[line.rfind("(") + 1 : -1]
                 parts = inner.split(":")
-                if len(parts) >= 3 and parts[0].strip().endswith((".js", ".ts", ".mjs", ".cjs")):
-                    errors.append({
-                        "level": "error",
-                        "file": parts[0].strip(),
-                        "line": parts[-2].strip(),
-                        "col": parts[-1].strip(),
-                        "message": line,
-                    })
+                if len(parts) >= 3 and parts[0].strip().endswith(
+                    (".js", ".ts", ".mjs", ".cjs")
+                ):
+                    errors.append(
+                        {
+                            "level": "error",
+                            "file": parts[0].strip(),
+                            "line": parts[-2].strip(),
+                            "col": parts[-1].strip(),
+                            "message": line,
+                        }
+                    )
                     continue
-            if line.startswith(("SyntaxError", "ReferenceError", "TypeError",
-                                "Error", "RangeError")):
+            if line.startswith(
+                ("SyntaxError", "ReferenceError", "TypeError", "Error", "RangeError")
+            ):
                 errors.append({"level": "error", "message": line})
             elif errors and line.startswith(("at ", "    at ")):
                 errors.append({"level": "trace", "message": line})
         return errors
 
-    def _run(self, cmd: List[str], cwd: str, timeout: int) -> NodeResult:
+    def _run(self, cmd: list[str], cwd: str, timeout: int) -> NodeResult:
         try:
             start = time.time()
             # D7: capture bytes, decode manually — display degrades via
             # replace, but stderr_bytes keeps every byte for forensics.
             result = subprocess.run(
-                cmd, cwd=cwd, capture_output=True, timeout=timeout,
+                cmd,
+                cwd=cwd,
+                capture_output=True,
+                timeout=timeout,
             )
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
@@ -144,16 +159,22 @@ class NodeRunner:
             return NodeResult(
                 success=False,
                 stderr=f"Execution timed out (>{timeout}s)",
-                errors=[{"type": "timeout", "message": f"Runtime exceeded {timeout} seconds"}],
+                errors=[
+                    {
+                        "type": "timeout",
+                        "message": f"Runtime exceeded {timeout} seconds",
+                    }
+                ],
             )
         except Exception as e:
             note_failure("node_runner:exec", e)
             return NodeResult(
-                success=False, stderr=str(e),
+                success=False,
+                stderr=str(e),
                 errors=[{"type": "exception", "message": str(e)}],
             )
 
-    def run_file(self, file_path: str, args: Optional[List[str]] = None) -> NodeResult:
+    def run_file(self, file_path: str, args: list[str] | None = None) -> NodeResult:
         """Run a .js/.mjs/.cjs file using node."""
         if not self.has_node:
             return self._no_toolchain()
@@ -167,7 +188,7 @@ class NodeRunner:
         cmd = [self.node_bin, str(source)] + (args or [])
         return self._run(cmd, cwd=str(source.parent), timeout=60)
 
-    def run_code(self, code: str, args: Optional[List[str]] = None) -> NodeResult:
+    def run_code(self, code: str, args: list[str] | None = None) -> NodeResult:
         """Run inline JavaScript (written to a hashed temp file)."""
         if not self.has_node:
             return self._no_toolchain()
@@ -184,8 +205,9 @@ class NodeRunner:
         source = Path(file_path)
         if not source.exists():
             return NodeResult(success=False, stderr=f"File not found: {file_path}")
-        return self._run([self.node_bin, "--check", str(source)],
-                         cwd=str(source.parent), timeout=30)
+        return self._run(
+            [self.node_bin, "--check", str(source)], cwd=str(source.parent), timeout=30
+        )
 
     def test(self, target: str = ".", verbose: bool = False) -> NodeResult:
         """Run the built-in test runner (`node --test`) on a file or dir."""
@@ -205,13 +227,19 @@ class NodeRunner:
             return NodeResult(
                 success=False,
                 stderr="prettier not found; skipping format.",
-                errors=[{"type": "toolchain", "message": "prettier missing (optional)"}],
+                errors=[
+                    {"type": "toolchain", "message": "prettier missing (optional)"}
+                ],
             )
-        return self._run([prettier, "--write", str(file_path)],
-                         cwd=str(Path(file_path).parent), timeout=30)
+        return self._run(
+            [prettier, "--write", str(file_path)],
+            cwd=str(Path(file_path).parent),
+            timeout=30,
+        )
 
 
 # --- CLI ---------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Azazael Node Interpreter Runner")

@@ -15,8 +15,10 @@ from urllib.parse import urlparse
 try:
     from CORE.failure_ledger import note_failure
 except Exception:
+
     def note_failure(where, exc=None):
         pass
+
 
 from .live_log import read_events
 
@@ -30,8 +32,11 @@ def _host(url):
 
 
 def _fetch_rows(log_path):
-    return [r for r in read_events(log_path)["records"]
-            if r.get("phase") == "fetch" and r.get("event") == "answer"]
+    return [
+        r
+        for r in read_events(log_path)["records"]
+        if r.get("phase") == "fetch" and r.get("event") == "answer"
+    ]
 
 
 def intuit(url, log_path=None):
@@ -41,25 +46,37 @@ def intuit(url, log_path=None):
         raise ValueError("nothing to intuit: empty url")
     host = _host(url)
     if not host:
-        return {"state": "unknown", "confidence": 0.0,
-                "predicted_rung": None,
-                "provenance": ["unparseable url"]}
+        return {
+            "state": "unknown",
+            "confidence": 0.0,
+            "predicted_rung": None,
+            "provenance": ["unparseable url"],
+        }
     rows = _fetch_rows(log_path)
     memo = [r for r in rows if r.get("url") == url]
     if memo:
         last = memo[-1]
         if last.get("state") == "ok":
-            return {"state": "guess", "confidence": 0.9,
-                    "predicted_rung": last.get("rung"),
-                    "provenance": ["memo:%s" % last.get("rung")]}
-        return {"state": "blocked", "confidence": 0.7,
+            return {
+                "state": "guess",
+                "confidence": 0.9,
                 "predicted_rung": last.get("rung"),
-                "provenance": ["memo:wall %s" % last.get("kind")]}
+                "provenance": ["memo:{}".format(last.get("rung"))],
+            }
+        return {
+            "state": "blocked",
+            "confidence": 0.7,
+            "predicted_rung": last.get("rung"),
+            "provenance": ["memo:wall {}".format(last.get("kind"))],
+        }
     host_rows = [r for r in rows if _host(r.get("url", "")) == host]
     if not host_rows:
-        return {"state": "unknown", "confidence": 0.0,
-                "predicted_rung": None,
-                "provenance": ["no memo, no host prior"]}
+        return {
+            "state": "unknown",
+            "confidence": 0.0,
+            "predicted_rung": None,
+            "provenance": ["no memo, no host prior"],
+        }
     ok = [r for r in host_rows if r.get("state") == "ok"]
     rate = len(ok) / len(host_rows)
     modal = None
@@ -68,11 +85,14 @@ def intuit(url, log_path=None):
         for r in ok:
             counts[r.get("rung")] = counts.get(r.get("rung"), 0) + 1
         modal = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
-    return {"state": "guess" if rate >= 0.5 else "blocked",
-            "confidence": round(min(0.75, rate), 3),
-            "predicted_rung": modal,
-            "provenance": ["host:%s %d/%d answered" % (host, len(ok),
-                                                       len(host_rows))]}
+    return {
+        "state": "guess" if rate >= 0.5 else "blocked",
+        "confidence": round(min(0.75, rate), 3),
+        "predicted_rung": modal,
+        "provenance": [
+            "host:{} {:d}/{:d} answered".format(host, len(ok), len(host_rows))
+        ],
+    }
 
 
 def dream(log_path=None):
@@ -82,17 +102,24 @@ def dream(log_path=None):
     all recomputed from the stream -- no stored weights to go stale.
     """
     recs = read_events(log_path)["records"]
-    guesses = [r for r in recs if r.get("phase") == "fetch"
-               and r.get("event") == "intuition" and r.get("url")]
-    answers = [r for r in recs if r.get("phase") == "fetch"
-               and r.get("event") == "answer" and r.get("url")]
+    guesses = [
+        r
+        for r in recs
+        if r.get("phase") == "fetch" and r.get("event") == "intuition" and r.get("url")
+    ]
+    answers = [
+        r
+        for r in recs
+        if r.get("phase") == "fetch" and r.get("event") == "answer" and r.get("url")
+    ]
     by_url = {}
     for a in answers:
         by_url.setdefault(a["url"], []).append(a)
     pairs, hits, by_rung = 0, 0, {}
     for g in guesses:
-        later = [a for a in by_url.get(g["url"], [])
-                 if a.get("ts", 0) >= g.get("ts", 0)]
+        later = [
+            a for a in by_url.get(g["url"], []) if a.get("ts", 0) >= g.get("ts", 0)
+        ]
         if not later:
             continue
         pairs += 1
@@ -101,13 +128,15 @@ def dream(log_path=None):
         # wall. Guesses without a recorded verdict fall back to the old
         # rule (ok + rung match) so old logs still read.
         if g.get("guess") is None:
-            won = later[0].get("rung") == g.get("predicted") and \
-                later[0].get("state") == "ok"
+            won = (
+                later[0].get("rung") == g.get("predicted")
+                and later[0].get("state") == "ok"
+            )
         else:
-            agree = (g.get("guess") == "guess") == \
-                (later[0].get("state") == "ok")
-            won = agree and (g.get("predicted") is None or
-                             later[0].get("rung") == g.get("predicted"))
+            agree = (g.get("guess") == "guess") == (later[0].get("state") == "ok")
+            won = agree and (
+                g.get("predicted") is None or later[0].get("rung") == g.get("predicted")
+            )
         hits += 1 if won else 0
         key = str(g.get("predicted"))
         cell = by_rung.setdefault(key, {"pairs": 0, "hits": 0})
@@ -116,27 +145,30 @@ def dream(log_path=None):
     hosts = {}
     for a in answers:
         h = _host(a.get("url", ""))
-        cell = hosts.setdefault(h, {"fetches": 0, "answered": 0,
-                                    "salience": 0.0})
+        cell = hosts.setdefault(h, {"fetches": 0, "answered": 0, "salience": 0.0})
         cell["fetches"] += 1
         cell["answered"] += 1 if a.get("state") == "ok" else 0
         # Salience: weight outcomes by surprise, not recency. A blocked
         # answer carries more weight than an ok one, so the dream
         # prioritises learning from failures (L4-b).
         cell["salience"] += 2.0 if a.get("state") != "ok" else 1.0
-    return {"pairs": pairs, "hits": hits,
-            "hit_rate": round(hits / pairs, 3) if pairs else 0.0,
-            "by_rung": by_rung, "hosts": hosts}
+    return {
+        "pairs": pairs,
+        "hits": hits,
+        "hit_rate": round(hits / pairs, 3) if pairs else 0.0,
+        "by_rung": by_rung,
+        "hosts": hosts,
+    }
 
 
 def inhibited_rungs(host, log_path=None, threshold=0.5):
-    '''Rungs that keep failing for this host and should be skipped.
+    """Rungs that keep failing for this host and should be skipped.
 
     Inhibition (L4-a): if a host's answer rate is below ``threshold``,
     every rung that has produced a blocked answer for that host is
     inhibited.  Returns a set of rung names.  Empty set means nothing
     to skip.
-    '''
+    """
     host = str(host or "").strip()
     if not host:
         return set()
@@ -149,8 +181,9 @@ def inhibited_rungs(host, log_path=None, threshold=0.5):
     if rate >= threshold:
         return set()
     # Inhibit rungs that have produced blocked answers for this host.
-    blocked_rungs = {r.get("rung") for r in host_rows
-                     if r.get("state") != "ok" and r.get("rung")}
+    blocked_rungs = {
+        r.get("rung") for r in host_rows if r.get("state") != "ok" and r.get("rung")
+    }
     return blocked_rungs
 
 
@@ -187,7 +220,9 @@ def consolidate(log_path=None):
             merged[rung] = {
                 "count": counts["total"],
                 "dominant_state": dominant,
-                "rate": round(counts["ok"] / counts["total"], 3) if counts["total"] else 0.0,
+                "rate": (
+                    round(counts["ok"] / counts["total"], 3) if counts["total"] else 0.0
+                ),
             }
         result[h] = merged
     return result
@@ -202,14 +237,16 @@ def incubate(url, log_path=None):
     """
     url = str(url or "").strip()
     if not url:
-        return {"original_rung": None, "alternative": None,
-                "reason": "empty url"}
+        return {"original_rung": None, "alternative": None, "reason": "empty url"}
     host = _host(url)
     rows = _fetch_rows(log_path)
     host_rows = [r for r in rows if _host(r.get("url", "")) == host]
     if not host_rows:
-        return {"original_rung": None, "alternative": "plain",
-                "reason": "no history for host; try plain"}
+        return {
+            "original_rung": None,
+            "alternative": "plain",
+            "reason": "no history for host; try plain",
+        }
     # Find the rung that failed most for this host.
     blocked_rungs = {}
     for r in host_rows:
@@ -218,8 +255,11 @@ def incubate(url, log_path=None):
             if rung:
                 blocked_rungs[rung] = blocked_rungs.get(rung, 0) + 1
     if not blocked_rungs:
-        return {"original_rung": None, "alternative": None,
-                "reason": "no blocked rungs for host"}
+        return {
+            "original_rung": None,
+            "alternative": None,
+            "reason": "no blocked rungs for host",
+        }
     worst = max(blocked_rungs, key=blocked_rungs.get)
     # Suggest the first rung not in blocked_rungs.
     all_rungs = ["plain", "browser-headers", "tls-impersonation", "render"]
@@ -230,9 +270,12 @@ def incubate(url, log_path=None):
             break
     if alternative is None:
         alternative = "plain"
-    return {"original_rung": worst, "alternative": alternative,
-            "reason": "rung %s blocked %d time(s); try %s" % (
-                worst, blocked_rungs[worst], alternative)}
+    return {
+        "original_rung": worst,
+        "alternative": alternative,
+        "reason": "rung %s blocked %d time(s); try %s"
+        % (worst, blocked_rungs[worst], alternative),
+    }
 
 
 def prime(url, log_path=None):
@@ -246,13 +289,16 @@ def prime(url, log_path=None):
         return {"primed_rung": None, "source": "empty url"}
     host = _host(url)
     rows = _fetch_rows(log_path)
-    host_ok = [r for r in rows if _host(r.get("url", "")) == host
-               and r.get("state") == "ok"]
+    host_ok = [
+        r for r in rows if _host(r.get("url", "")) == host and r.get("state") == "ok"
+    ]
     if not host_ok:
         return {"primed_rung": None, "source": "no prior success for host"}
     last = host_ok[-1]
-    return {"primed_rung": last.get("rung"),
-            "source": "last success: %s" % last.get("rung")}
+    return {
+        "primed_rung": last.get("rung"),
+        "source": "last success: {}".format(last.get("rung")),
+    }
 
 
 def prospective_memory(url, trigger, log_path=None):
@@ -266,9 +312,10 @@ def prospective_memory(url, trigger, log_path=None):
     trigger = str(trigger or "").strip()
     if not url or not trigger:
         return {"error": "url and trigger required"}
-    return {"intention": {"url": url, "trigger": trigger,
-                          "host": _host(url)},
-            "status": "held"}
+    return {
+        "intention": {"url": url, "trigger": trigger, "host": _host(url)},
+        "status": "held",
+    }
 
 
 def counterfactual_replay(url, log_path=None):
@@ -282,10 +329,20 @@ def counterfactual_replay(url, log_path=None):
     if not url:
         return []
     recs = read_events(log_path)["records"]
-    guesses = [r for r in recs if r.get("phase") == "fetch"
-               and r.get("event") == "intuition" and r.get("url") == url]
-    answers = [r for r in recs if r.get("phase") == "fetch"
-               and r.get("event") == "answer" and r.get("url") == url]
+    guesses = [
+        r
+        for r in recs
+        if r.get("phase") == "fetch"
+        and r.get("event") == "intuition"
+        and r.get("url") == url
+    ]
+    answers = [
+        r
+        for r in recs
+        if r.get("phase") == "fetch"
+        and r.get("event") == "answer"
+        and r.get("url") == url
+    ]
     results = []
     for g in guesses:
         later = [a for a in answers if a.get("ts", 0) >= g.get("ts", 0)]
@@ -298,9 +355,15 @@ def counterfactual_replay(url, log_path=None):
         # Counterfactual: what if we had tried the next rung instead?
         counterfactual = None
         if not match and actual:
-            counterfactual = "if %s had been tried, outcome might differ" % actual
-        results.append({"predicted": predicted, "actual": actual,
-                        "match": match, "counterfactual": counterfactual})
+            counterfactual = "if {} had been tried, outcome might differ".format(actual)
+        results.append(
+            {
+                "predicted": predicted,
+                "actual": actual,
+                "match": match,
+                "counterfactual": counterfactual,
+            }
+        )
     return results
 
 

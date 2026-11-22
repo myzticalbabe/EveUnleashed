@@ -21,14 +21,17 @@ from eve_unleashed.dodeca_recall import SHAPES
 # exist, and the fallback contract is asserted everywhere instead.
 requires_cython = pytest.mark.skipif(
     native_replay.BACKEND != "cython",
-    reason="compiled replay kernel is not built here (%s)"
-           % native_replay.fallback_reason())
+    reason="compiled replay kernel is not built here ({})".format(
+        native_replay.fallback_reason()
+    ),
+)
 requires_native_forensics = pytest.mark.skipif(
-    resilience.ENGINE != "native",
-    reason="compiled forensic kernel is not built here")
+    resilience.ENGINE != "native", reason="compiled forensic kernel is not built here"
+)
 requires_free_threading = pytest.mark.skipif(
     getattr(sys, "_is_gil_enabled", lambda: True)() is not False,
-    reason="not a free-threaded (PEP 703) interpreter")
+    reason="not a free-threaded (PEP 703) interpreter",
+)
 
 
 @requires_cython
@@ -60,13 +63,10 @@ def test_replay_parity():
     ans_rung = [0, 1, 0, 2, 3, 0, 0, 5]
     ans_ok = [1, 1, 0, 1, 0, 0, 1, 1]
     n_rungs = 6
-    expected = native_replay.py_score(
-        pred_rung, pred_kind, ans_rung, ans_ok, n_rungs)
-    got = native_replay._native_score(
-        pred_rung, pred_kind, ans_rung, ans_ok, n_rungs)
+    expected = native_replay.py_score(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs)
+    got = native_replay._native_score(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs)
     assert tuple(got) == tuple(expected)
-    out = native_replay.score_columns(
-        pred_rung, pred_kind, ans_rung, ans_ok)
+    out = native_replay.score_columns(pred_rung, pred_kind, ans_rung, ans_ok)
     assert out[-1] == "cython"
     assert out[:-1] == tuple(expected)
 

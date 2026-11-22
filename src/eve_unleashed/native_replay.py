@@ -18,6 +18,7 @@ predictions. A guess with predicted=None still counts globally (legacy rule)
 but has no numeric cell; dream() files it under "None". Global hits/pairs
 are identical either way.
 """
+
 from __future__ import annotations
 
 _NATIVE_WHY = "not attempted"
@@ -30,7 +31,7 @@ for _mod in ("eve_unleashed._replay_cy", "_replay_cy"):
     except Exception as exc:
         # The fallback is recorded, not silent: backend() reports it, so a
         # run that silently drops to Python reads as Python-with-a-reason.
-        _NATIVE_WHY = "%s: %s: %s" % (_mod, type(exc).__name__, exc)
+        _NATIVE_WHY = "{}: {}: {}".format(_mod, type(exc).__name__, exc)
         _native_score = None
 
 BACKEND = "cython" if _native_score is not None else "python"
@@ -64,17 +65,24 @@ def fallback_reason() -> str:
 
 def pair_columns(records):
     """Parallel int columns for paired guesses/answers. Mirrors dream()."""
-    guesses = [r for r in records if r.get("phase") == "fetch"
-               and r.get("event") == "intuition" and r.get("url")]
-    answers = [r for r in records if r.get("phase") == "fetch"
-               and r.get("event") == "answer" and r.get("url")]
+    guesses = [
+        r
+        for r in records
+        if r.get("phase") == "fetch" and r.get("event") == "intuition" and r.get("url")
+    ]
+    answers = [
+        r
+        for r in records
+        if r.get("phase") == "fetch" and r.get("event") == "answer" and r.get("url")
+    ]
     by_url = {}
     for a in answers:
         by_url.setdefault(a["url"], []).append(a)
     pred_rung, pred_kind, ans_rung, ans_ok = [], [], [], []
     for g in guesses:
-        later = [a for a in by_url.get(g["url"], [])
-                 if a.get("ts", 0) >= g.get("ts", 0)]
+        later = [
+            a for a in by_url.get(g["url"], []) if a.get("ts", 0) >= g.get("ts", 0)
+        ]
         if not later:
             continue
         a = later[0]
@@ -100,8 +108,9 @@ def py_score(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs):
         if pred_kind[i] == 0:
             won = (ans_rung[i] == pred_rung[i]) and (ans_ok[i] == 1)
         else:
-            won = ((pred_kind[i] == 1) == (ans_ok[i] == 1)) and \
-                (pred_rung[i] < 0 or ans_rung[i] == pred_rung[i])
+            won = ((pred_kind[i] == 1) == (ans_ok[i] == 1)) and (
+                pred_rung[i] < 0 or ans_rung[i] == pred_rung[i]
+            )
         if won:
             hits += 1
         r = pred_rung[i]
@@ -117,16 +126,16 @@ def score_columns(pred_rung, pred_kind, ans_rung, ans_ok):
     n_rungs = max([r for r in pred_rung if r >= 0] + [0]) + 1
     if _native_score is not None:
         try:
-            out = _native_score(pred_rung, pred_kind, ans_rung,
-                                ans_ok, n_rungs)
+            out = _native_score(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs)
         except Exception as exc:
             global _NATIVE_WHY
-            _NATIVE_WHY = "call failed (%s: %s), pure python" % (
-                type(exc).__name__, exc)
+            _NATIVE_WHY = "call failed ({}: {}), pure python".format(
+                type(exc).__name__,
+                exc,
+            )
         else:
             return tuple(out) + ("cython",)
-    return py_score(pred_rung, pred_kind, ans_rung, ans_ok,
-                    n_rungs) + ("python",)
+    return py_score(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs) + ("python",)
 
 
 def rung_rates(records):
@@ -136,8 +145,11 @@ def rung_rates(records):
     by_rung = {}
     for r, (p, h) in enumerate(zip(rung_pairs, rung_hits)):
         if p:
-            by_rung[str(r)] = {"pairs": p, "hits": h,
-                               "rate": round(h / p, 3)}
-    return {"pairs": pairs, "hits": hits,
-            "hit_rate": round(hits / pairs, 3) if pairs else 0.0,
-            "by_rung": by_rung, "backend": backend}
+            by_rung[str(r)] = {"pairs": p, "hits": h, "rate": round(h / p, 3)}
+    return {
+        "pairs": pairs,
+        "hits": hits,
+        "hit_rate": round(hits / pairs, 3) if pairs else 0.0,
+        "by_rung": by_rung,
+        "backend": backend,
+    }

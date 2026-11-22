@@ -43,8 +43,11 @@ POP_FILE = os.path.join(HERE, "population_exe.json")
 OUT_DIR = os.path.join(ROOT, "dist", "gamora")
 
 BASE_FLAGS = [
-    "--standalone", "--onefile", "--assume-yes-for-downloads",
-    "--jobs=16", "--include-package=eve_unleashed",
+    "--standalone",
+    "--onefile",
+    "--assume-yes-for-downloads",
+    "--jobs=16",
+    "--include-package=eve_unleashed",
     "--output-dir=" + OUT_DIR,
 ]
 GENES = {
@@ -68,30 +71,35 @@ def flags_for(genome, tag):
         flags.append("--nofollow-import-to=numpy")
     if nf in ("z3", "both"):
         flags.append("--nofollow-import-to=z3-solver")
-    flags.append("--output-filename=Gamora-evo-%s.exe" % tag)
+    flags.append("--output-filename=Gamora-evo-{}.exe".format(tag))
     flags.append(os.path.join("Project_GAMORA", "gamora.py"))
     return flags
 
 
 def build(genome, tag):
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.path.join(ROOT, "src") + ";" + os.path.join(ROOT, "Project_LUCY")
+    env["PYTHONPATH"] = (
+        os.path.join(ROOT, "src") + ";" + os.path.join(ROOT, "Project_LUCY")
+    )
     t0 = time.perf_counter()
     try:
         p = subprocess.run(
             [PY316T, "-m", "nuitka"] + flags_for(genome, tag),
-            cwd=ROOT, env=env, capture_output=True, text=True,
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
             timeout=BUILD_TIMEOUT_S,
         )
         ok = p.returncode == 0
         tail = (p.stderr or "")[-2000:]
     except subprocess.TimeoutExpired:
-        ok, tail = False, "TIMEOUT after %ss" % BUILD_TIMEOUT_S
+        ok, tail = False, "TIMEOUT after {}s".format(BUILD_TIMEOUT_S)
     return ok, time.perf_counter() - t0, tail
 
 
 def measure(tag):
-    exe = os.path.join(OUT_DIR, "Gamora-evo-%s.exe" % tag)
+    exe = os.path.join(OUT_DIR, "Gamora-evo-{}.exe".format(tag))
     if not os.path.exists(exe):
         return None
     size = os.path.getsize(exe)
@@ -99,28 +107,45 @@ def measure(tag):
     try:
         p = subprocess.run([exe, "doctor"], capture_output=True, text=True, timeout=300)
     except (subprocess.TimeoutExpired, OSError) as e:
-        return {"feasible": False, "reason": "doctor run failed: %s" % e}
+        return {"feasible": False, "reason": "doctor run failed: {}".format(e)}
     cold = time.perf_counter() - t0
     out = p.stdout or ""
     ready = "doctor: READY" in out
     audit_ok = ("frozen in" in out) and ("therapy (lucy)" in out)
     if p.returncode != 0 or not ready or not audit_ok:
-        return {"feasible": False, "reason": "doctor rc=%s ready=%s audit=%s" % (p.returncode, ready, audit_ok),
-                "size_bytes": size, "cold_start_s": round(cold, 2)}
+        return {
+            "feasible": False,
+            "reason": "doctor rc={} ready={} audit={}".format(
+                p.returncode, ready, audit_ok
+            ),
+            "size_bytes": size,
+            "cold_start_s": round(cold, 2),
+        }
     return {"feasible": True, "size_bytes": size, "cold_start_s": round(cold, 2)}
 
 
 def evaluate(genome, tag):
     ok, build_s, tail = build(genome, tag)
-    rec = {"tag": tag, "genome": dict(genome), "build_ok": ok,
-           "build_s": round(build_s, 1)}
+    rec = {
+        "tag": tag,
+        "genome": dict(genome),
+        "build_ok": ok,
+        "build_s": round(build_s, 1),
+    }
     if not ok:
-        rec.update({"feasible": False, "reason": "build failed: %s" % tail[-300:],
-                    "fitness": 0.0})
+        rec.update(
+            {
+                "feasible": False,
+                "reason": "build failed: {}".format(tail[-300:]),
+                "fitness": 0.0,
+            }
+        )
         return rec
     m = measure(tag)
     if m is None:
-        rec.update({"feasible": False, "reason": "exe missing post-build", "fitness": 0.0})
+        rec.update(
+            {"feasible": False, "reason": "exe missing post-build", "fitness": 0.0}
+        )
         return rec
     rec.update(m)
     if not m["feasible"]:
@@ -184,15 +209,17 @@ def run(generations=2, pop_size=3, seed=31616):
         pop = [p["genome"] for p in prior["population"][:pop_size]]
         start_gen = prior.get("generation", 0)
     else:
-        pop = [dict(BASELINE),
-               {"lto": "yes", "compress": "on", "nofollow": "none"},
-               {"lto": "no", "compress": "on", "nofollow": "both"}]
+        pop = [
+            dict(BASELINE),
+            {"lto": "yes", "compress": "on", "nofollow": "none"},
+            {"lto": "no", "compress": "on", "nofollow": "both"},
+        ]
         start_gen = 0
     history = prior.get("history", []) if prior else []
     for gen in range(start_gen, start_gen + generations):
         recs = []
         for i, genome in enumerate(pop):
-            tag = "g%dm%d" % (gen, i)
+            tag = "g{:d}m{:d}".format(gen, i)
             rec = evaluate(genome, tag)
             recs.append(rec)
             save_pop({"generation": gen, "population": recs, "history": history})
@@ -203,8 +230,12 @@ def run(generations=2, pop_size=3, seed=31616):
         if feas and len(feas) > 1:
             mean = sum(feas) / len(feas)
             var = sum((f - mean) ** 2 for f in feas) / len(feas)
-            if var ** 0.5 < 0.01:
-                print("EARLY STOP gen %d: flat gradient stddev=%.4f (E2R-6)" % (gen, var ** 0.5), flush=True)
+            if var**0.5 < 0.01:
+                print(
+                    "EARLY STOP gen %d: flat gradient stddev=%.4f (E2R-6)"
+                    % (gen, var**0.5),
+                    flush=True,
+                )
                 history.append({"generation": gen, "results": recs, "early_stop": True})
                 save_pop({"generation": gen, "population": recs, "history": history})
                 break
@@ -215,7 +246,9 @@ def run(generations=2, pop_size=3, seed=31616):
             child = crossover(tournament(recs, rng), tournament(recs, rng), rng)
             nxt.append(mutate(child, rng))
         pop = nxt
-    save_pop({"generation": start_gen + generations, "population": recs, "history": history})
+    save_pop(
+        {"generation": start_gen + generations, "population": recs, "history": history}
+    )
     best = max(recs, key=lambda r: (r.get("fitness") or 0.0))
     print("WINNER: " + json.dumps(best), flush=True)
     return best

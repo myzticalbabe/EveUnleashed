@@ -22,30 +22,33 @@ hunches boost live decisions via effective_confidence. The dreams write DNA.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import random
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from . import intuition as _i
 from . import live_log as _l
 from . import websearch as _w
 from .honey import sha_file
 from .self_modifying_worms import (
-    GeneticAlgorithm,
     HUNCH_CAP,
+    GeneticAlgorithm,
     WormDNA,
     WormFitness,
 )
+
 try:
     from azazael.tools.defaults_profile import read_default
 except ImportError:  # standalone exe: azazael repo not bundled; fallbacks rule
+
     def read_default(dotted, fallback=None):
         return fallback
+
 
 DEFAULT_URLS = [
     "https://example.com",
@@ -63,8 +66,13 @@ HUNCH_BOOST = 0.05  # ancestral-rung confidence boost, capped at 0.99
 DREAM_HIT_MIN = 2  # a rung must hit this often to enter the seed pool
 DREAM_SEED_TOP = 4  # ...and only the top-N winners seed fresh genomes
 #: Numeric genes the teacher may pull. mutation_rate is Lillith's, never his.
-TEACH_GENES = ("aggressiveness", "min_confidence", "cooldown_s",
-               "scan_interval_s", "resource_budget_mb")
+TEACH_GENES = (
+    "aggressiveness",
+    "min_confidence",
+    "cooldown_s",
+    "scan_interval_s",
+    "resource_budget_mb",
+)
 
 # Read evolution config from defaults
 EVOLUTION_MODE = read_default("evolution.mode", "live")
@@ -90,13 +98,14 @@ class TrainConfig:
     seed: int = 316
     fresh: bool = False
     calibrate: bool = True  # H-09: trust measured rung hit-rates over priors
-    urls: List[str] = field(default_factory=lambda: list(DEFAULT_URLS))
+    urls: list[str] = field(default_factory=lambda: list(DEFAULT_URLS))
     log_path: str = DEFAULT_LOG
     pop_path: str = DEFAULT_POP
     cap_s: float = DEFAULT_CAP_S
-    fixture: Optional[str] = None  # replay path; live network untouched
-    fixture_data: Optional[Dict[str, Dict[str, Any]]] = field(
-        default=None, repr=False)  # url -> {state, rung, kind}
+    fixture: str | None = None  # replay path; live network untouched
+    fixture_data: dict[str, dict[str, Any]] | None = field(
+        default=None, repr=False
+    )  # url -> {state, rung, kind}
 
 
 class LillithTuner:
@@ -119,14 +128,14 @@ class LillithTuner:
     def __init__(self, width: float = 0.15, window: int = 3) -> None:
         self.width = max(self.MIN_W, min(self.MAX_W, width))
         self.window = max(2, window)
-        self.history: List[float] = []
+        self.history: list[float] = []
 
-    def observe(self, best: float) -> Dict[str, Any]:
+    def observe(self, best: float) -> dict[str, Any]:
         """Feed one generation's best fitness; returns the tuning decision."""
         self.history.append(float(best))
         w = self.width
         reason = "hold: warming up"
-        pts = self.history[-self.window:]
+        pts = self.history[-self.window :]
         if len(pts) >= self.window:
             span = max(pts) - min(pts)
             if span < self.STALL_EPS:
@@ -138,8 +147,11 @@ class LillithTuner:
             else:
                 reason = f"hold: span {span:.4f}, no climb"
         self.width = w
-        return {"width": w, "reason": reason,
-                "history": list(self.history[-self.window:])}
+        return {
+            "width": w,
+            "reason": reason,
+            "history": list(self.history[-self.window :]),
+        }
 
     def apply(self, ga: GeneticAlgorithm) -> None:
         """Set the whole population's mutation rate to the tuned width."""
@@ -147,8 +159,7 @@ class LillithTuner:
             d.mutation_rate = max(self.MIN_W, min(self.MAX_W, self.width))
 
 
-def effective_confidence(base: float, rung: Optional[str],
-                         hunches: List[str]) -> float:
+def effective_confidence(base: float, rung: str | None, hunches: list[str]) -> float:
     """Ancestral trust: a guessed rung that won before gets +HUNCH_BOOST.
 
     Pure, tested. This is inspiration with a behavioral edge -- the lineage
@@ -158,21 +169,26 @@ def effective_confidence(base: float, rung: Optional[str],
     return float(base)
 
 
-def dream_seed_hunches(log_path: str) -> List[str]:
+def dream_seed_hunches(log_path: str) -> list[str]:
     """Dream-to-gene flow: recurring winning rungs become seed material.
 
     Reads the dream log (missing log -> no seeds, never an error) and
     returns the top winning rungs. Fresh genomes seeded with these carry
     ancestral intuitions from generation zero."""
     dr = _i.dream(log_path=log_path)
-    ranked = sorted(dr.get("by_rung", {}).items(),
-                    key=lambda kv: kv[1].get("hits", 0), reverse=True)
-    return [r for r, c in ranked[:DREAM_SEED_TOP]
-            if r and r != "None" and c.get("hits", 0) >= DREAM_HIT_MIN]
+    ranked = sorted(
+        dr.get("by_rung", {}).items(), key=lambda kv: kv[1].get("hits", 0), reverse=True
+    )
+    return [
+        r
+        for r, c in ranked[:DREAM_SEED_TOP]
+        if r and r != "None" and c.get("hits", 0) >= DREAM_HIT_MIN
+    ]
 
 
-def teacher_bias(ga: GeneticAlgorithm, teacher: WormDNA,
-                 strength: float = TEACH_STRENGTH) -> int:
+def teacher_bias(
+    ga: GeneticAlgorithm, teacher: WormDNA, strength: float = TEACH_STRENGTH
+) -> int:
     """Pull every genome except the teacher a fraction toward his genes.
 
     In place, re-clamped via __post_init__. Returns the inspired count.
@@ -182,44 +198,51 @@ def teacher_bias(ga: GeneticAlgorithm, teacher: WormDNA,
         if d is teacher:
             continue
         for gene in TEACH_GENES:
-            setattr(d, gene, getattr(d, gene)
-                    + strength * (getattr(teacher, gene) - getattr(d, gene)))
+            setattr(
+                d,
+                gene,
+                getattr(d, gene)
+                + strength * (getattr(teacher, gene) - getattr(d, gene)),
+            )
         d.__post_init__()
         n += 1
     return n
 
 
 def _capped(fn: Callable, cap_s: float, *a):
-    box: Dict[str, Any] = {}
+    box: dict[str, Any] = {}
     t = threading.Thread(target=lambda: box.update(r=fn(*a)), daemon=True)
     t.start()
     t.join(timeout=cap_s)
     if "r" in box:
         return box["r"]
-    return {"state": "blocked", "rung": "train-cap",
-            "kind": "per-fetch cap %ss" % cap_s}
+    return {
+        "state": "blocked",
+        "rung": "train-cap",
+        "kind": "per-fetch cap {}s".format(cap_s),
+    }
 
 
-def _memory_rungs(url: str) -> Dict[str, Any]:
+def _memory_rungs(url: str) -> dict[str, Any]:
     body, _snap, aerr = _w._archive_fallback(url)
     if not aerr:
         return {"state": "ok", "rung": "archive", "text": body[:20000]}
     cbody, _cid, cerr = _w._commoncrawl_fetch(url)
     if not cerr:
-        return {"state": "ok", "rung": "commoncrawl",
-                "text": (cbody or "")[:20000]}
+        return {"state": "ok", "rung": "commoncrawl", "text": (cbody or "")[:20000]}
     return {"state": "blocked", "rung": "commoncrawl", "detail": "wall held"}
 
 
-def _load_fixture(path: str) -> Dict[str, Dict[str, Any]]:
+def _load_fixture(path: str) -> dict[str, dict[str, Any]]:
     """Read a frozen oracle file. Returns url -> {state, rung, kind}."""
     with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
     return dict(doc.get("outcomes", {}))
 
 
-def freeze_fixture(urls: List[str], path: str,
-                   cap_s: float = DEFAULT_CAP_S) -> Dict[str, Any]:
+def freeze_fixture(
+    urls: list[str], path: str, cap_s: float = DEFAULT_CAP_S
+) -> dict[str, Any]:
     """Pin the oracle: fetch each URL live once, record the outcome.
 
     Replay (fixture_data) substitutes these pinned outcomes for every
@@ -228,14 +251,21 @@ def freeze_fixture(urls: List[str], path: str,
     outcomes = {}
     for u in urls:
         res = _capped(_w.fetch_visible, cap_s, u)
-        outcomes[u] = {"state": res.get("state"),
-                       "rung": res.get("rung"), "kind": res.get("kind")}
-    doc = {"urls": list(urls), "frozen_at": time.time(), "cap_s": cap_s,
-           "outcomes": outcomes}
+        outcomes[u] = {
+            "state": res.get("state"),
+            "rung": res.get("rung"),
+            "kind": res.get("kind"),
+        }
+    doc = {
+        "urls": list(urls),
+        "frozen_at": time.time(),
+        "cap_s": cap_s,
+        "outcomes": outcomes,
+    }
     return _write_fixture_doc(doc, path)
 
 
-def _write_fixture_doc(doc: Dict[str, Any], path: str) -> Dict[str, Any]:
+def _write_fixture_doc(doc: dict[str, Any], path: str) -> dict[str, Any]:
     """Write the fixture so the bytes on disk are the bytes hashed.
 
     Windows text-mode translates LF to CRLF after the hash was computed,
@@ -252,49 +282,78 @@ def _write_fixture_doc(doc: Dict[str, Any], path: str) -> Dict[str, Any]:
     return doc
 
 
-def run_url(dna: WormDNA, url: str, log_path: str,
-            cap_s: float = DEFAULT_CAP_S,
-            calib: Dict[str, float] = None,
-            fixture: Dict[str, Dict[str, Any]] = None):
+def run_url(
+    dna: WormDNA,
+    url: str,
+    log_path: str,
+    cap_s: float = DEFAULT_CAP_S,
+    calib: dict[str, float] = None,
+    fixture: dict[str, dict[str, Any]] = None,
+):
     """One scored fetch: intuition guesses, policy decides live-vs-memory.
 
     calib maps rung -> measured hit-rate (H-09): a rung the dream log has
     graded outranks the intuition prior for the skip-live decision."""
     g = _i.intuit(url, log_path=log_path)
-    _l.emit("fetch", "intuition", path=log_path, url=url,
-            guess=g["state"], confidence=g["confidence"],
-            predicted=g.get("predicted_rung"))
+    _l.emit(
+        "fetch",
+        "intuition",
+        path=log_path,
+        url=url,
+        guess=g["state"],
+        confidence=g["confidence"],
+        predicted=g.get("predicted_rung"),
+    )
     base = g["confidence"]
     if calib and g.get("predicted_rung") in calib:
         base = calib[g.get("predicted_rung")]
     conf = effective_confidence(base, g.get("predicted_rung"), dna.hunches)
-    skip_live = (g["state"] == "blocked"
-                 and conf >= dna.min_confidence
-                 and dna.aggressiveness < 0.5)
+    skip_live = (
+        g["state"] == "blocked"
+        and conf >= dna.min_confidence
+        and dna.aggressiveness < 0.5
+    )
     t0 = time.perf_counter()
     replay = False
     if fixture is not None and url in fixture:
         res = dict(fixture[url])
         replay = True
     else:
-        res = (_capped(_memory_rungs, cap_s, url) if skip_live
-               else _capped(_w.fetch_visible, cap_s, url))
+        res = (
+            _capped(_memory_rungs, cap_s, url)
+            if skip_live
+            else _capped(_w.fetch_visible, cap_s, url)
+        )
     if res["state"] != "ok" and dna.aggressiveness >= 0.75 and not skip_live:
         res = _capped(_w.fetch_visible, cap_s, url)
     dt = time.perf_counter() - t0
-    _l.emit("fetch", "answer", path=log_path, url=url, rung=res.get("rung"),
-            state=res["state"], kind=res.get("kind"), replay=replay)
+    _l.emit(
+        "fetch",
+        "answer",
+        path=log_path,
+        url=url,
+        rung=res.get("rung"),
+        state=res["state"],
+        kind=res.get("kind"),
+        replay=replay,
+    )
     actual_ok = res["state"] == "ok"
-    hit = ((g["state"] == "guess" and actual_ok)
-           or (g["state"] == "blocked" and not actual_ok))
+    hit = (g["state"] == "guess" and actual_ok) or (
+        g["state"] == "blocked" and not actual_ok
+    )
     hunch = g.get("predicted_rung") if (hit and g.get("predicted_rung")) else None
     return actual_ok, hit, dt, hunch
 
 
 def save_pop(ga: GeneticAlgorithm, path: str) -> None:
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump({"generation": ga.generation,
-                   "genomes": [d.to_dict() for d in ga.population]}, fh)
+        json.dump(
+            {
+                "generation": ga.generation,
+                "genomes": [d.to_dict() for d in ga.population],
+            },
+            fh,
+        )
 
 
 def load_pop(ga: GeneticAlgorithm, path: str) -> None:
@@ -307,33 +366,46 @@ def load_pop(ga: GeneticAlgorithm, path: str) -> None:
         ga.seed([WormDNA.from_dict(d) for d in saved])
 
 
-def load_or_seed(ga: GeneticAlgorithm, cfg: TrainConfig,
-                 rng: random.Random) -> int:
+def load_or_seed(ga: GeneticAlgorithm, cfg: TrainConfig, rng: random.Random) -> int:
     """Seed a fresh population or resume from the pop file. Returns start gen."""
     if not cfg.fresh and os.path.exists(cfg.pop_path):
         load_pop(ga, cfg.pop_path)
         return ga.generation
     seeds = dream_seed_hunches(cfg.log_path)
-    ga.seed([WormDNA(worm_id=f"t1-{i}", worm_type="fetcher",
-                     aggressiveness=rng.uniform(0.1, 0.9),
-                     min_confidence=rng.uniform(0.5, 0.95),
-                     cooldown_s=rng.uniform(0.1, 3.0),
-                     mutation_rate=0.15, hunches=list(seeds))
-             for i in range(ga.population_size)])
+    ga.seed(
+        [
+            WormDNA(
+                worm_id=f"t1-{i}",
+                worm_type="fetcher",
+                aggressiveness=rng.uniform(0.1, 0.9),
+                min_confidence=rng.uniform(0.5, 0.95),
+                cooldown_s=rng.uniform(0.1, 3.0),
+                mutation_rate=0.15,
+                hunches=list(seeds),
+            )
+            for i in range(ga.population_size)
+        ]
+    )
     return 1
 
 
-def score_genome(dna: WormDNA, cfg: TrainConfig,
-                 calib: Dict[str, float] = None) -> WormFitness:
+def score_genome(
+    dna: WormDNA, cfg: TrainConfig, calib: dict[str, float] = None
+) -> WormFitness:
     """Score one genome over every URL. No selection, no tuning, no breed.
 
     The shared scoring core: one_generation and null_control both call
     it, so the baseline and the lineage are graded by the same ruler."""
     ok = hits = wall = 0.0
     for u in cfg.urls:
-        o, h, dt, hunch = run_url(dna, u, cfg.log_path, cfg.cap_s,
-                                 calib=calib if cfg.calibrate else None,
-                                 fixture=cfg.fixture_data)
+        o, h, dt, hunch = run_url(
+            dna,
+            u,
+            cfg.log_path,
+            cfg.cap_s,
+            calib=calib if cfg.calibrate else None,
+            fixture=cfg.fixture_data,
+        )
         ok += o
         hits += h
         wall += dt
@@ -343,13 +415,19 @@ def score_genome(dna: WormDNA, cfg: TrainConfig,
         time.sleep(min(dna.cooldown_s, 1.0))
     n = len(cfg.urls)
     return WormFitness(
-        worm_id=dna.worm_id, worm_type=dna.worm_type, generation=dna.generation,
+        worm_id=dna.worm_id,
+        worm_type=dna.worm_type,
+        generation=dna.generation,
         resource_usage=min(1.0, wall / (n * 2 * 12.0)),
-        insight_quality=hits / n, error_rate=(n - ok) / n,
-        uptime_s=wall, actions_taken=n, actions_succeeded=int(ok))
+        insight_quality=hits / n,
+        error_rate=(n - ok) / n,
+        uptime_s=wall,
+        actions_taken=n,
+        actions_succeeded=int(ok),
+    )
 
 
-def null_control(cfg: TrainConfig, budget: int) -> Dict[str, Any]:
+def null_control(cfg: TrainConfig, budget: int) -> dict[str, Any]:
     """Random-search baseline: N fresh genomes, scored once each, no evolution.
 
     No dream seeds, no teacher, no Lillith, no calibrate -- pure chance
@@ -359,24 +437,34 @@ def null_control(cfg: TrainConfig, budget: int) -> Dict[str, Any]:
     rng = random.Random(cfg.seed)
     scores = []
     for i in range(budget):
-        d = WormDNA(worm_id="null-%d" % i, worm_type="fetcher",
-                    aggressiveness=rng.uniform(0.1, 0.9),
-                    min_confidence=rng.uniform(0.5, 0.95),
-                    cooldown_s=rng.uniform(0.0, 0.2),
-                    mutation_rate=0.15, hunches=[])
+        d = WormDNA(
+            worm_id="null-{:d}".format(i),
+            worm_type="fetcher",
+            aggressiveness=rng.uniform(0.1, 0.9),
+            min_confidence=rng.uniform(0.5, 0.95),
+            cooldown_s=rng.uniform(0.0, 0.2),
+            mutation_rate=0.15,
+            hunches=[],
+        )
         f = score_genome(d, cfg, calib=None)
         s = round(f.score(), 4)
         scores.append(s)
         print("null %d/%d: score=%.4f" % (i + 1, budget, s), flush=True)
-    return {"budget": budget,
-            "best": round(max(scores), 4) if scores else 0.0,
-            "mean": round(sum(scores) / len(scores), 4) if scores else 0.0,
-            "scores": scores}
+    return {
+        "budget": budget,
+        "best": round(max(scores), 4) if scores else 0.0,
+        "mean": round(sum(scores) / len(scores), 4) if scores else 0.0,
+        "scores": scores,
+    }
 
 
-def one_generation(ga: GeneticAlgorithm, gnum: int, cfg: TrainConfig,
-                   tuner: LillithTuner,
-                   calib: Dict[str, float]) -> Dict[str, Any]:
+def one_generation(
+    ga: GeneticAlgorithm,
+    gnum: int,
+    cfg: TrainConfig,
+    tuner: LillithTuner,
+    calib: dict[str, float],
+) -> dict[str, Any]:
     """Score every genome live, tune, evolve. Returns the gen summary.
 
     calib carries last generation's measured rung hit-rates into this
@@ -387,32 +475,54 @@ def one_generation(ga: GeneticAlgorithm, gnum: int, cfg: TrainConfig,
     best = max(ga.population, key=lambda d: scores[d.worm_id])
     dr = _i.dream(log_path=cfg.log_path)
     decision = tuner.observe(scores[best.worm_id])
-    _l.emit("tuner", "lillith", path=cfg.log_path, gen=gnum,
-            width=decision["width"], reason=decision["reason"],
-            best=round(scores[best.worm_id], 4))
-    summary = {"gen": gnum, "best": round(scores[best.worm_id], 4),
-               "mean": round(sum(scores.values()) / len(scores), 4),
-               "dream_pairs": dr["pairs"],
-               "dream_hit": round(dr["hit_rate"], 3),
-               "best_id": best.worm_id[:8],
-               "aggr": round(best.aggressiveness, 2),
-               "conf": round(best.min_confidence, 2),
-               "mutw": round(decision["width"], 3),
-               "tune": decision["reason"]}
-    print("gen {gen}: best={best:.4f} mean={mean:.4f} "
-          "dream_pairs={dream_pairs} dream_hit={dream_hit:.3f} "
-          "best={best_id} aggr={aggr:.2f} conf={conf:.2f} "
-          "mutw={mutw:.3f} [{tune}]".format(**summary), flush=True)
+    _l.emit(
+        "tuner",
+        "lillith",
+        path=cfg.log_path,
+        gen=gnum,
+        width=decision["width"],
+        reason=decision["reason"],
+        best=round(scores[best.worm_id], 4),
+    )
+    summary = {
+        "gen": gnum,
+        "best": round(scores[best.worm_id], 4),
+        "mean": round(sum(scores.values()) / len(scores), 4),
+        "dream_pairs": dr["pairs"],
+        "dream_hit": round(dr["hit_rate"], 3),
+        "best_id": best.worm_id[:8],
+        "aggr": round(best.aggressiveness, 2),
+        "conf": round(best.min_confidence, 2),
+        "mutw": round(decision["width"], 3),
+        "tune": decision["reason"],
+    }
+    print(
+        "gen {gen}: best={best:.4f} mean={mean:.4f} "
+        "dream_pairs={dream_pairs} dream_hit={dream_hit:.3f} "
+        "best={best_id} aggr={aggr:.2f} conf={conf:.2f} "
+        "mutw={mutw:.3f} [{tune}]".format(**summary),
+        flush=True,
+    )
     if cfg.calibrate:
         calib.clear()
-        calib.update({r: c["hits"] / c["pairs"]
-                      for r, c in dr.get("by_rung", {}).items()
-                      if c.get("pairs", 0) >= 2})
+        calib.update(
+            {
+                r: c["hits"] / c["pairs"]
+                for r, c in dr.get("by_rung", {}).items()
+                if c.get("pairs", 0) >= 2
+            }
+        )
     ga.evolve()
     inspired = teacher_bias(ga, best)
-    _l.emit("evolve", "inspire", path=cfg.log_path, gen=gnum,
-            teacher=best.worm_id[:8], strength=TEACH_STRENGTH,
-            inspired=inspired)
+    _l.emit(
+        "evolve",
+        "inspire",
+        path=cfg.log_path,
+        gen=gnum,
+        teacher=best.worm_id[:8],
+        strength=TEACH_STRENGTH,
+        inspired=inspired,
+    )
     summary["insp"] = inspired
     tuner.apply(ga)
     return summary
@@ -425,7 +535,7 @@ def _ensure_fixture(cfg: TrainConfig) -> None:
         cfg.fixture_data = _load_fixture(cfg.fixture)
 
 
-def run(cfg: TrainConfig) -> List[Dict[str, Any]]:
+def run(cfg: TrainConfig) -> list[dict[str, Any]]:
     """Test/evolve cycling: live-score, tune, breed, repeat. Returns summaries."""
     _ensure_fixture(cfg)
     rng = random.Random(cfg.seed)
@@ -435,11 +545,13 @@ def run(cfg: TrainConfig) -> List[Dict[str, Any]]:
     start = load_or_seed(ga, cfg, rng)
     tuner = LillithTuner()
     out = []
-    calib: Dict[str, float] = {}
+    calib: dict[str, float] = {}
     for g in range(start, start + cfg.gens):
         out.append(one_generation(ga, g, cfg, tuner, calib))
     save_pop(ga, cfg.pop_path)
-    print("DONE gens %d-%d final_gen=%d pop_saved=%s tuner=lillith mutw=%.3f"
-          % (start, start + cfg.gens - 1, ga.generation,
-             cfg.pop_path, tuner.width), flush=True)
+    print(
+        "DONE gens %d-%d final_gen=%d pop_saved=%s tuner=lillith mutw=%.3f"
+        % (start, start + cfg.gens - 1, ga.generation, cfg.pop_path, tuner.width),
+        flush=True,
+    )
     return out

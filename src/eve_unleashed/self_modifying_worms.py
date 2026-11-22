@@ -12,19 +12,19 @@ Fail-open: evolution degrades to static genomes if PAMS/bridge/spawner unavailab
 
 from __future__ import annotations
 
-import math
 import random
 import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from .dodeca_recall import SHAPES  # recall never imports worms, so no cycle
 
 try:
     from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: Any = None) -> None:
         pass
 
@@ -33,18 +33,18 @@ except ImportError:                               # never break the host
 HUNCH_CAP = 8
 
 
-def splice_hunches(a: List[str], b: List[str],
-                   rng: Optional[random.Random] = None,
-                   cap: int = HUNCH_CAP) -> List[str]:
+def splice_hunches(
+    a: list[str], b: list[str], rng: random.Random | None = None, cap: int = HUNCH_CAP
+) -> list[str]:
     """Crossover of intuitions: head of a's hunches + tail of b's.
 
     Deduped in order, Nones dropped, capped. Pure, tested."""
     if rng is None:
         rng = random.Random()
     _ = rng  # order is positional, not random: head-meets-tail splice
-    ahead = (a or [])[:(len(a or []) + 1) // 2]
-    btail = (b or [])[len(b or []) // 2:]
-    out: List[str] = []
+    ahead = (a or [])[: (len(a or []) + 1) // 2]
+    btail = (b or [])[len(b or []) // 2 :]
+    out: list[str] = []
     for h in list(ahead) + list(btail):
         if h and h not in out:
             out.append(h)
@@ -59,15 +59,15 @@ class WormDNA:
     worm_id: str
     worm_type: str
     scan_interval_s: float = 60.0
-    aggressiveness: float = 0.5          # 0.0 conservative -> 1.0 aggressive
+    aggressiveness: float = 0.5  # 0.0 conservative -> 1.0 aggressive
     resource_budget_mb: float = 256.0
-    mutation_rate: float = 0.1           # probability of mutation per gene
-    min_confidence: float = 0.7          # act only above this confidence
-    enabled_metrics: List[str] = field(default_factory=lambda: ["cpu", "mem"])
+    mutation_rate: float = 0.1  # probability of mutation per gene
+    min_confidence: float = 0.7  # act only above this confidence
+    enabled_metrics: list[str] = field(default_factory=lambda: ["cpu", "mem"])
     cooldown_s: float = 30.0
     generation: int = 1
-    parent_ids: List[str] = field(default_factory=list)
-    hunches: List[str] = field(default_factory=list)  # ancestral winning rungs
+    parent_ids: list[str] = field(default_factory=list)
+    hunches: list[str] = field(default_factory=list)  # ancestral winning rungs
     shape: str = "dodecahedron"  # the solid this lineage recalls on (H-01)
 
     def __post_init__(self) -> None:
@@ -83,15 +83,20 @@ class WormDNA:
         if self.shape not in SHAPES:
             self.shape = "dodecahedron"
 
-    def mutate(self, rng: Optional[random.Random] = None) -> "WormDNA":
+    def mutate(self, rng: random.Random | None = None) -> WormDNA:
         if rng is None:
             rng = random.Random()
         d = asdict(self)
         d["worm_id"] = str(uuid.uuid4())
         d["generation"] = self.generation + 1
         d["parent_ids"] = [self.worm_id]
-        genes = ["scan_interval_s", "aggressiveness", "resource_budget_mb",
-                 "min_confidence", "cooldown_s"]
+        genes = [
+            "scan_interval_s",
+            "aggressiveness",
+            "resource_budget_mb",
+            "min_confidence",
+            "cooldown_s",
+        ]
         for gene in genes:
             if rng.random() < self.mutation_rate:
                 cur = d[gene]
@@ -103,8 +108,9 @@ class WormDNA:
                     d[gene] = max(64.0, cur * rng.uniform(0.7, 1.4))
                 elif gene == "min_confidence":
                     d[gene] = max(0.5, min(0.99, cur + rng.uniform(-0.1, 0.1)))
-        d["mutation_rate"] = max(0.01, min(0.5, self.mutation_rate *
-                                           rng.uniform(0.8, 1.2)))
+        d["mutation_rate"] = max(
+            0.01, min(0.5, self.mutation_rate * rng.uniform(0.8, 1.2))
+        )
         if rng.random() < 0.05:  # rare morph: try another solid (H-01)
             d["shape"] = rng.choice(sorted(SHAPES))
         return WormDNA(**d)
@@ -112,37 +118,44 @@ class WormDNA:
     #: A child recalls on the fitter parent's solid (H-01): selection
     #: pressure on shapes, not just genes. Unknown fitter -> coin flip.
     @staticmethod
-    def crossover(a: "WormDNA", b: "WormDNA",
-                  rng: Optional[random.Random] = None,
-                  fitter: Optional["WormDNA"] = None) -> "WormDNA":
+    def crossover(
+        a: WormDNA,
+        b: WormDNA,
+        rng: random.Random | None = None,
+        fitter: WormDNA | None = None,
+    ) -> WormDNA:
         if rng is None:
             rng = random.Random()
         child = asdict(a)
         child["worm_id"] = str(uuid.uuid4())
         child["generation"] = max(a.generation, b.generation) + 1
         child["parent_ids"] = [a.worm_id, b.worm_id]
-        for gene in ("scan_interval_s", "aggressiveness", "resource_budget_mb",
-                     "min_confidence", "cooldown_s"):
+        for gene in (
+            "scan_interval_s",
+            "aggressiveness",
+            "resource_budget_mb",
+            "min_confidence",
+            "cooldown_s",
+        ):
             child[gene] = getattr(a, gene) if rng.random() < 0.5 else getattr(b, gene)
         child["mutation_rate"] = (a.mutation_rate + b.mutation_rate) / 2
         child["hunches"] = splice_hunches(a.hunches, b.hunches, rng=rng)
         if fitter is a:
             child["shape"] = a.shape
-        elif fitter is b:
-            child["shape"] = b.shape
-        elif rng.random() < 0.5:
+        elif fitter is b or rng.random() < 0.5:
             child["shape"] = b.shape
         enabled = set(a.enabled_metrics) | set(b.enabled_metrics)
         child["enabled_metrics"] = sorted(enabled)
         return WormDNA(**child)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @staticmethod
-    def from_dict(d: Dict[str, Any]) -> "WormDNA":
-        return WormDNA(**{k: v for k, v in d.items()
-                          if k in WormDNA.__dataclass_fields__})
+    def from_dict(d: dict[str, Any]) -> WormDNA:
+        return WormDNA(
+            **{k: v for k, v in d.items() if k in WormDNA.__dataclass_fields__}
+        )
 
 
 @dataclass
@@ -152,9 +165,9 @@ class WormFitness:
     worm_id: str
     worm_type: str
     generation: int
-    resource_usage: float = 0.0        # 0..1 (lower is better)
-    insight_quality: float = 0.0       # 0..1 (higher is better)
-    error_rate: float = 0.0            # 0..1 (lower is better)
+    resource_usage: float = 0.0  # 0..1 (lower is better)
+    insight_quality: float = 0.0  # 0..1 (higher is better)
+    error_rate: float = 0.0  # 0..1 (lower is better)
     uptime_s: float = 0.0
     actions_taken: int = 0
     actions_succeeded: int = 0
@@ -162,43 +175,50 @@ class WormFitness:
 
     def score(self) -> float:
         """Composite fitness 0..1; higher = more effective."""
-        success_rate = (self.actions_succeeded / max(1, self.actions_taken))
+        success_rate = self.actions_succeeded / max(1, self.actions_taken)
         resource_penalty = min(1.0, self.resource_usage)
-        return (0.4 * self.insight_quality
-                + 0.3 * success_rate
-                + 0.2 * (1.0 - resource_penalty)
-                + 0.1 * (1.0 - self.error_rate))
+        return (
+            0.4 * self.insight_quality
+            + 0.3 * success_rate
+            + 0.2 * (1.0 - resource_penalty)
+            + 0.1 * (1.0 - self.error_rate)
+        )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 class GeneticAlgorithm:
     """Breed successful worm genomes, cull underperformers."""
 
-    def __init__(self, population_size: int = 8, elite_keep: int = 2,
-                 rng: Optional[random.Random] = None):
+    def __init__(
+        self,
+        population_size: int = 8,
+        elite_keep: int = 2,
+        rng: random.Random | None = None,
+    ):
         self.population_size = max(2, population_size)
         self.elite_keep = max(1, min(elite_keep, self.population_size - 1))
         self.rng = rng or random.Random()
-        self.population: List[WormDNA] = []
-        self.fitness: Dict[str, WormFitness] = {}
+        self.population: list[WormDNA] = []
+        self.fitness: dict[str, WormFitness] = {}
         self.generation = 0
         self._lock = threading.Lock()
 
-    def seed(self, dnas: List[WormDNA]) -> None:
+    def seed(self, dnas: list[WormDNA]) -> None:
         with self._lock:
             self.population = list(dnas[: self.population_size])
             while len(self.population) < self.population_size:
-                self.population.append(WormDNA(worm_id=str(uuid.uuid4()),
-                                               worm_type="generic"))
+                self.population.append(
+                    WormDNA(worm_id=str(uuid.uuid4()), worm_type="generic")
+                )
             self.generation = 1
 
     def record_fitness(self, fitness: WormFitness) -> None:
         with self._lock:
             self.fitness[fitness.worm_id] = fitness
 
-    def evolve(self) -> List[WormDNA]:
+    def evolve(self) -> list[WormDNA]:
         """One generation: select elites, breed children, cull weaklings.
         Returns the new population."""
         with self._lock:
@@ -214,15 +234,18 @@ class GeneticAlgorithm:
         scored.sort(key=lambda x: x[1], reverse=True)
 
         elites = [d for d, _ in scored[: self.elite_keep]]
-        cull_threshold = scored[self.elite_keep][1] if len(scored) > self.elite_keep else 0.0
+        cull_threshold = (
+            scored[self.elite_keep][1] if len(scored) > self.elite_keep else 0.0
+        )
 
-        new_pop: List[WormDNA] = list(elites)
+        new_pop: list[WormDNA] = list(elites)
         while len(new_pop) < self.population_size:
             p1, p2 = self._select(scored), self._select(scored)
             s1 = fit[p1.worm_id].score() if fit.get(p1.worm_id) else 0.3
             s2 = fit[p2.worm_id].score() if fit.get(p2.worm_id) else 0.3
-            child = WormDNA.crossover(p1, p2, rng=self.rng,
-                                      fitter=p1 if s1 >= s2 else p2)
+            child = WormDNA.crossover(
+                p1, p2, rng=self.rng, fitter=p1 if s1 >= s2 else p2
+            )
             if self.rng.random() < 0.7:
                 child = child.mutate(rng=self.rng)
             new_pop.append(child)
@@ -231,7 +254,7 @@ class GeneticAlgorithm:
         self.generation += 1
         return list(self.population)
 
-    def _select(self, scored: List[tuple]) -> WormDNA:
+    def _select(self, scored: list[tuple]) -> WormDNA:
         # Fitness-proportionate selection with a floor so weak genomes survive.
         total = max(0.01, sum(s for _, s in scored))
         pick = self.rng.random() * total
@@ -242,11 +265,11 @@ class GeneticAlgorithm:
                 return d
         return scored[-1][0]
 
-    def best(self) -> Optional[WormDNA]:
+    def best(self) -> WormDNA | None:
         with self._lock:
             return self._best_unlocked()
 
-    def _best_unlocked(self) -> Optional[WormDNA]:
+    def _best_unlocked(self) -> WormDNA | None:
         if not self.population:
             return None
         scored = []
@@ -255,7 +278,7 @@ class GeneticAlgorithm:
             scored.append((d, f.score() if f is not None else 0.3))
         return max(scored, key=lambda x: x[1])[0]
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         with self._lock:
             best = self._best_unlocked()
             return {
@@ -271,13 +294,13 @@ class EvolutionaryWormManager:
     """Orchestrates propose -> validate (CurativePool/HYDRA) -> approve (InferenceBridge)
     -> spawn via MetaWormSpawner for each evolved genome."""
 
-    def __init__(self, spawner=None, ga: Optional[GeneticAlgorithm] = None):
+    def __init__(self, spawner=None, ga: GeneticAlgorithm | None = None):
         self.spawner = spawner
         self.ga = ga or GeneticAlgorithm()
         self._bridge = None
         self._governor = None
         self._recorder = None
-        self.evolution_history: List[Dict[str, Any]] = []
+        self.evolution_history: list[dict[str, Any]] = []
         self._lock = threading.Lock()
 
     # -- subsystem access (fail-open) --------------------------------------
@@ -287,6 +310,7 @@ class EvolutionaryWormManager:
             return self._bridge
         try:
             from META.InferenceBridge import InferenceBridge
+
             self._bridge = InferenceBridge()
             return self._bridge
         except Exception as exc:
@@ -298,6 +322,7 @@ class EvolutionaryWormManager:
             return self._governor
         try:
             from META.MetaWormSpawner import CurativePool
+
             self._governor = CurativePool()
             return self._governor
         except Exception as exc:
@@ -309,6 +334,7 @@ class EvolutionaryWormManager:
             return self._recorder
         try:
             from CORE.PamsRecorder import get_recorder
+
             self._recorder = get_recorder()
             return self._recorder
         except Exception as exc:
@@ -320,6 +346,7 @@ class EvolutionaryWormManager:
             return self.spawner
         try:
             from META.MetaWormSpawner import MetaWormSpawner
+
             self.spawner = MetaWormSpawner()
             return self.spawner
         except Exception as exc:
@@ -328,7 +355,7 @@ class EvolutionaryWormManager:
 
     # -- evolution cycle ---------------------------------------------------
 
-    def propose_mutation(self, dna: WormDNA) -> Dict[str, Any]:
+    def propose_mutation(self, dna: WormDNA) -> dict[str, Any]:
         """Propose a mutated worm: validate then approve -> spawn."""
         mutated = dna.mutate(rng=self.ga.rng)
         proposal = {
@@ -344,15 +371,18 @@ class EvolutionaryWormManager:
         if governor is not None:
             try:
                 decision = governor.evaluate_action(
-                    {"context": f"spawn mutant {mutated.worm_type}"},
-                    proposal, [], [])
+                    {"context": f"spawn mutant {mutated.worm_type}"}, proposal, [], []
+                )
             except Exception as exc:
                 note_failure("evo_worms:govern_eval", exc)
                 decision = {"decision": "allowed"}
 
         if decision.get("decision") != "allowed":
-            return {"status": "blocked", "reason": "governor_rejected",
-                    "genome": mutated.to_dict()}
+            return {
+                "status": "blocked",
+                "reason": "governor_rejected",
+                "genome": mutated.to_dict(),
+            }
 
         # 2) Approve via InferenceBridge (LLM sanity check on the genome).
         bridge = self._get_bridge()
@@ -362,43 +392,54 @@ class EvolutionaryWormManager:
                 if not bridge_status.get("llama_available", False):
                     decision = {"decision": "allowed"}  # degrade, don't block
                 else:
-                    prompt = ("Review this proposed worm genome for safety. "
-                              "Reply ONLY with 'APPROVE' or 'REJECT'.\n"
-                              f"{mutated.to_dict()}\n")
+                    prompt = (
+                        "Review this proposed worm genome for safety. "
+                        "Reply ONLY with 'APPROVE' or 'REJECT'.\n"
+                        f"{mutated.to_dict()}\n"
+                    )
                     verdict = bridge.send_to_llama(prompt).strip().upper()
-                    decision = {"decision": "allowed" if "APPROVE" in verdict
-                                else "rejected"}
+                    decision = {
+                        "decision": "allowed" if "APPROVE" in verdict else "rejected"
+                    }
             except Exception as exc:
                 note_failure("evo_worms:bridge_approve", exc)
                 decision = {"decision": "allowed"}  # fail-open
 
         if decision.get("decision") != "allowed":
-            return {"status": "blocked", "reason": "bridge_rejected",
-                    "genome": mutated.to_dict()}
+            return {
+                "status": "blocked",
+                "reason": "bridge_rejected",
+                "genome": mutated.to_dict(),
+            }
 
         # 3) Spawn via MetaWormSpawner.
         spawner = self._get_spawner()
         entry = None
         if spawner is not None:
             try:
-                entry = spawner.spawn(f"evo_{mutated.worm_type}",
-                                      mutated.worm_type, priority=5,
-                                      request={"context": "evolutionary spawn"},
-                                      _interactive=False)
+                entry = spawner.spawn(
+                    f"evo_{mutated.worm_type}",
+                    mutated.worm_type,
+                    priority=5,
+                    request={"context": "evolutionary spawn"},
+                    _interactive=False,
+                )
             except Exception as exc:
                 note_failure("evo_worms:spawn", exc)
 
-        result = {"status": "spawned" if entry else "spawn_failed",
-                  "genome": mutated.to_dict(),
-                  "worm_id": mutated.worm_id,
-                  "entry_id": entry.id if entry else None,
-                  "generation": mutated.generation}
+        result = {
+            "status": "spawned" if entry else "spawn_failed",
+            "genome": mutated.to_dict(),
+            "worm_id": mutated.worm_id,
+            "entry_id": entry.id if entry else None,
+            "generation": mutated.generation,
+        }
         with self._lock:
             self.evolution_history.append(result)
         self._record(result)
         return result
 
-    def run_generation(self) -> Dict[str, Any]:
+    def run_generation(self) -> dict[str, Any]:
         """Evolve one generation and propose top genome for spawning."""
         new_pop = self.ga.evolve()
         best = self.ga.best()
@@ -412,23 +453,30 @@ class EvolutionaryWormManager:
         self.ga.record_fitness(fitness)
         self._record({"type": "fitness", "data": fitness.to_dict()})
 
-    def _record(self, payload: Dict[str, Any]) -> None:
+    def _record(self, payload: dict[str, Any]) -> None:
         rec = self._get_recorder()
         if rec is None:
             return
         try:
-            rec.record_event(event_type="worm_evolution", data=payload,
-                             source="evolutionary_worm_manager",
-                             severity="info")
+            rec.record_event(
+                event_type="worm_evolution",
+                data=payload,
+                source="evolutionary_worm_manager",
+                severity="info",
+            )
         except Exception as exc:
             note_failure("evo_worms:record", exc)
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         return {
             "ga": self.ga.snapshot(),
             "evolution_history": list(self.evolution_history[-50:]),
         }
 
 
-__all__ = ["WormDNA", "WormFitness", "GeneticAlgorithm",
-           "EvolutionaryWormManager"]
+__all__ = [
+    "EvolutionaryWormManager",
+    "GeneticAlgorithm",
+    "WormDNA",
+    "WormFitness",
+]
