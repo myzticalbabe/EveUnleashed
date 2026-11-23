@@ -70,6 +70,8 @@ This project is licensed under the **SOUL FORGE License v1.0** — see [LICENSE]
 | [cradle](https://github.com/myzticalbabe/cradle) | Composition over FLAMING SWORD, REAPER, GRIMOIRE |
 | [esquire-admissibility](https://github.com/myzticalbabe/esquire-admissibility) | AI-evidence admissibility gates |
 | [nurse-ratchet](https://github.com/myzticalbabe/nurse-ratchet) | Behavioural package: person state modelled |
+| [wasm-education](https://github.com/myzticalbabe/wasm-education) | WASM Education Platform |
+| [myzticalbabe.github.io](https://github.com/myzticalbabe/myzticalbabe.github.io) | Landing Hub + Domain Atlas |
 
 ## Contributing
 

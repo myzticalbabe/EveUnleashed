@@ -1,0 +1,105 @@
+# SBOM Generation Workflow
+# Generates CycloneDX SBOM and publishes to GitHub Dependency Graph
+
+name: SBOM Generation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly Sunday 2AM
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
+
+jobs:
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet cyclonedx-bom
+          pip install --quiet .
+
+      - name: Generate CycloneDX SBOM (JSON)
+        uses: CycloneDX/github-action@v1
+        with:
+          output-format: json
+          output-file: sbom.json
+
+      - name: Generate CycloneDX SBOM (XML)
+        uses: CycloneDX/github-action@v1
+        with:
+          output-format: xml
+          output-file: sbom.xml
+
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            sbom.xml
+          retention-days: 90
+
+      - name: Upload SBOM to GitHub Dependency Graph
+        uses: github/dependency-submission-action@v4
+        with:
+          sbom-file: sbom.json
+
+      - name: Validate SBOM
+        run: |
+          # Basic validation - check required fields
+          python -c "
+import json, sys
+with open('sbom.json') as f:
+    sbom = json.load(f)
+assert 'bomFormat' in sbom and sbom['bomFormat'] == 'CycloneDX'
+assert 'specVersion' in sbom
+assert 'serialNumber' in sbom
+assert 'version' in sbom
+assert 'metadata' in sbom
+assert 'components' in sbom
+print('SBOM validation: PASSED')
+print(f\"Components: {len(sbom.get('components', []))}\")
+print(f\"Version: {sbom['metadata'].get('component', {}).get('version', 'unknown')}\")
+"
+
+      - name: Comment on PR with SBOM summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('sbom.json')) {
+              const sbom = JSON.parse(fs.readFileSync('sbom.json', 'utf8'));
+              const components = sbom.components?.length || 0;
+              const version = sbom.metadata?.component?.version || 'unknown';
+              const body = `## 📦 SBOM Generated\n\n` +
+                `**Version**: ${version}\n` +
+                `**Components**: ${components}\n` +
+                `**Format**: CycloneDX JSON + XML\n` +
+                `**Uploaded to**: GitHub Dependency Graph\n\n` +
+                `Artifacts available in workflow run.`;
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
