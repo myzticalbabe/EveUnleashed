@@ -28,7 +28,7 @@ def test_inject_carries_trace_and_drive():
 
 def test_inject_recorded_flag_is_honest():
     # Regression: _record_span once returned True while the ledger got
-    # nothing (in-tree CORE mirror shadowed the span writer). True must
+    # nothing (in-tree core mirror shadowed the span writer). True must
     # mean the span row exists.
     out = jaeger_inject.inject(
         "honesty probe", capability="t.honest", arm_id="t.arm", max_push=False

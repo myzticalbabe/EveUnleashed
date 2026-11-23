@@ -550,7 +550,7 @@ def main(argv=None) -> int:
         return int(args.fn(args) or 0)
     except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         try:
-            from CORE.failure_ledger import note_failure
+            from core.failure_ledger import note_failure
         except Exception:  # noqa: BLE001 -- logged below, guard broad
 
             def note_failure(where, exc=None):

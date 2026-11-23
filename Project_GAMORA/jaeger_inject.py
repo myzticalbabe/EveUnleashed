@@ -7,7 +7,7 @@ whether the delegation was right. This module wraps any prompt with a
 Jaeger trace header plus a max push/drive directive block, and records
 the delegation as one span through the tree's own tracer
 (AOA.core.delegation_tracer.emit_delegation) backed by the SDK-free
-SQLiteSpanExporter (src/CORE/cd3_exporter.py).
+SQLiteSpanExporter (src/core/cd3_exporter.py).
 
 "Max push/drive" is explicit, not hype: the injected block states the
 goal (produce the change, not describe it), the constraints (stdlib

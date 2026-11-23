@@ -21,12 +21,12 @@ outcome to the span table AOA already has, so the answer survives the process.
 
 WHY NOT THE OTel SDK
 --------------------
-``CORE.cd3_exporter`` shipped a ``SpanExporter`` and a
+``core.cd3_exporter`` shipped a ``SpanExporter`` and a
 ``configure_otel_tracing()`` helper, and neither has a production caller; the SDK
 is not installed on the production interpreter, so no span was ever produced
 (``otel_spans``: 0 rows in the live ``telemetry_store.db``). Rather than make
 telemetry depend on an install that does not exist, this module uses
-``CORE.cd3_exporter.record_span`` -- the direct, SDK-free writer that targets the
+``core.cd3_exporter.record_span`` -- the direct, SDK-free writer that targets the
 same table ``export()`` does. If the SDK is installed later, its spans and these
 land in the same rows and ``query_trace_by_id`` reads both.
 
@@ -56,13 +56,13 @@ from typing import Any, Dict, List, Optional
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:                               # never break the host
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
 try:
-    from CORE.cd3_exporter import query_trace_by_id, record_span
+    from core.cd3_exporter import query_trace_by_id, record_span
 except ImportError as _cd3_missing:               # src not on sys.path
     note_failure("delegation_tracer:cd3-import", _cd3_missing)
     record_span = None                            # type: ignore[assignment]
