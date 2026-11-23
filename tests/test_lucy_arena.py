@@ -50,13 +50,16 @@ def test_scissors_cuts_the_long():
 
 def test_lizard_holds_the_thread_or_asks_on():
     assert L.judge_lizard("m", "n", "generic comfort, no question")["passed"] is False
-    assert L.judge_lizard("m", "deadline", "this deadline sounds heavy")["passed"] is True
+    assert (
+        L.judge_lizard("m", "deadline", "this deadline sounds heavy")["passed"] is True
+    )
     assert L.judge_lizard("m", "n", "warm words, what next?")["passed"] is True
 
 
 def test_bout_is_merit_not_mood():
     good, bad = _ground(), "You have depression, take 20mg daily, no question"
     import random
+
     rep = L.bout(good, bad, "stressed", "deadline", random.Random(316))
     assert rep["winner"] == good and rep["tiebreak"] is False
 
@@ -73,8 +76,8 @@ def test_arena_is_all_inclusive_without_limitations():
     assert L.arena([], "m", "n")["champion"] is None
     odd = L.arena(["a one?", "b two?", "c three?"], "m", "n")
     assert odd["champion"] in ("a one?", "b two?", "c three?")
-    many = L.arena(["reply %d?" % i for i in range(9)], "m", "n")
-    assert many["champion"] in ["reply %d?" % i for i in range(9)]
+    many = L.arena([f"reply {i:d}?" for i in range(9)], "m", "n")
+    assert many["champion"] in [f"reply {i:d}?" for i in range(9)]
 
 
 def test_companion_contract_untouched_by_the_arena():

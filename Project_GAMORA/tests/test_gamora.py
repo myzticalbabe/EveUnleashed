@@ -18,10 +18,9 @@ def test_doctor_runs_without_traceback():
 
 
 def test_inject_carries_trace_and_drive():
-    out = jaeger_inject.inject("do the thing", capability="t.cap",
-                               arm_id="t.arm")
+    out = jaeger_inject.inject("do the thing", capability="t.cap", arm_id="t.arm")
     assert "<jaeger-316t" in out["injected"]
-    assert "trace_id=%s" % out["trace_id"] in out["injected"]
+    assert "trace_id={}".format(out["trace_id"]) in out["injected"]
     assert "do the thing" in out["injected"]
     assert "DIRECTIVE" in out["injected"]
     assert out["capability"] == "t.cap" and out["arm_id"] == "t.arm"
@@ -31,15 +30,19 @@ def test_inject_recorded_flag_is_honest():
     # Regression: _record_span once returned True while the ledger got
     # nothing (in-tree CORE mirror shadowed the span writer). True must
     # mean the span row exists.
-    out = jaeger_inject.inject("honesty probe", capability="t.honest",
-                               arm_id="t.arm", max_push=False)
+    out = jaeger_inject.inject(
+        "honesty probe", capability="t.honest", arm_id="t.arm", max_push=False
+    )
     assert out["recorded"] is True
     import sqlite3
     from pathlib import Path
+
     db = Path.home() / ".azazael" / "telemetry_store.db"
-    rows = sqlite3.connect(str(db)).execute(
-        "SELECT span_id FROM otel_spans WHERE trace_id=?",
-        (out["trace_id"],)).fetchall()
+    rows = (
+        sqlite3.connect(str(db))
+        .execute("SELECT span_id FROM otel_spans WHERE trace_id=?", (out["trace_id"],))
+        .fetchall()
+    )
     assert [r[0] for r in rows] == [out["span_id"]]
 
 
@@ -95,6 +98,7 @@ def test_freebuff_help_runs_through():
 
 def test_cradle_selector_empty_names_the_dir(monkeypatch, capsys):
     import eve_unleashed.cradle as c
+
     monkeypatch.setattr(c, "list_cradle_models", lambda *a, **k: [])
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     assert gamora._cradle_selector() == 0
@@ -103,12 +107,21 @@ def test_cradle_selector_empty_names_the_dir(monkeypatch, capsys):
 
 def test_cradle_selector_chooses_one(monkeypatch, capsys):
     import eve_unleashed.cradle as c
-    fake = [{"name": "a.gguf", "framework": "gguf"},
-            {"name": "b.pt", "framework": "torch"}]
+
+    fake = [
+        {"name": "a.gguf", "framework": "gguf"},
+        {"name": "b.pt", "framework": "torch"},
+    ]
     monkeypatch.setattr(c, "list_cradle_models", lambda *a, **k: fake)
-    monkeypatch.setattr(c, "adopt_cradle", lambda *a, **k: {
-        "adopted": [("b.pt", "torch", "direct:torch")],
-        "failed": [], "skipped": [("a.gguf", "not chosen")]})
+    monkeypatch.setattr(
+        c,
+        "adopt_cradle",
+        lambda *a, **k: {
+            "adopted": [("b.pt", "torch", "direct:torch")],
+            "failed": [],
+            "skipped": [("a.gguf", "not chosen")],
+        },
+    )
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda *a, **k: "2")
     assert gamora._cradle_selector() == 0

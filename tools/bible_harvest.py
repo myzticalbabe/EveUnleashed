@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 """Harvest every recorded error, fix, decision and measurement into one ledger.
 
 The Book of the Tree is meant to be the authoritative guide for bleeding-edge
@@ -27,6 +26,7 @@ it is snapshotted at the highest observation id it held: the gate reports how
 many observations have landed since that snapshot rather than failing, because a
 gate that goes red every time someone records a bug fix gets switched off.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,8 +36,8 @@ import re
 import sqlite3
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 BIBLE_DIR = REPO / "docs" / "bible"
@@ -47,7 +47,7 @@ SCHEMA = "azazael.harvest/1"
 #: Declared surfaces, in the order a reader should meet them. `kind` decides the
 #: extractor, never the file name: two documents with the same shape are the
 #: same surface even when one is a log and the other is a memory file.
-SURFACES: Tuple[Tuple[str, str, str], ...] = (
+SURFACES: tuple[tuple[str, str, str], ...] = (
     ("ERROR_LOG.md", "error", "numbered"),
     ("LESSONS_MASTER.md", "lesson", "numbered"),
     ("MEMORIES.md", "memory", "sectioned"),
@@ -67,17 +67,28 @@ ENGRAM_DB = Path.home() / ".engram" / "engram.db"
 #: Only these observation types carry a cause, a remedy or a reason. `task` and
 #: `session_summary` are work records; harvesting them would fill the ledger with
 #: status prose that no verse can cite.
-ENGRAM_TYPES = ("bugfix", "decision", "lesson", "learning", "discovery", "pattern",
-                "architecture", "config")
+ENGRAM_TYPES = (
+    "bugfix",
+    "decision",
+    "lesson",
+    "learning",
+    "discovery",
+    "pattern",
+    "architecture",
+    "config",
+)
 
 HEADING = re.compile(r"^(#{2,3})\s+(?:Error\s+)?#?(\d+)?\s*(?:[.—:-]\s*)?(.+?)\s*$")
 #: Sections that are a table of contents, an index, or a divider rather than a
 #: finding. Harvesting them records the shape of a document as if it were a fact.
-INDEX_TITLES = re.compile(r"^(table of contents|by [a-z]+|contents|index|summary|toc)$",
-                          re.I)
+INDEX_TITLES = re.compile(
+    r"^(table of contents|by [a-z]+|contents|index|summary|toc)$", re.IGNORECASE
+)
 LIMITATION_TITLE = re.compile(
     r"limitation|negative result|known issue|open problem|caveat|not supported|"
-    r"what this is not|does not", re.I)
+    r"what this is not|does not",
+    re.IGNORECASE,
+)
 FIELD = re.compile(r"^\*\*([A-Za-z0-9 _/()'.-]{2,40}?):\*\*\s*(.*)$")
 BULLET = re.compile(r"^\s*(?:[-*+]|\d+\.)\s+")
 FENCE = re.compile(r"^\s*(```|~~~)")
@@ -89,7 +100,7 @@ def _clean(text: str, limit: int = MAX_FIELD) -> str:
     """One line, bold markers removed, bounded. Deterministic by construction.
 
     Only `**` is stripped. Stripping `__` as well turned every dunder module name
-    in the corpus into a wrong path (`CORE/paths/__init__.py` -> `init.py`), which
+    in the corpus into a wrong path (`core/paths/__init__.py` -> `init.py`), which
     is the kind of quiet corruption a provenance ledger must never introduce.
     """
     text = BULLET.sub("", text.strip())
@@ -120,13 +131,13 @@ def _sha(path: Path) -> str:
     return _sha_bytes(path.read_bytes())
 
 
-def _blocks(lines: List[str]) -> Iterable[Tuple[int, str, List[str]]]:
+def _blocks(lines: list[str]) -> Iterable[tuple[int, str, list[str]]]:
     """Yield (line number, heading, body lines) for each level-2/3 heading.
 
     Fenced code is skipped: an ERROR_LOG entry quotes tracebacks, and a traceback
     line that begins with `#` is a comment inside a program, not a heading.
     """
-    current: Optional[Tuple[int, str, List[str]]] = None
+    current: tuple[int, str, list[str]] | None = None
     in_fence = False
     for number, line in enumerate(lines, start=1):
         if FENCE.match(line):
@@ -146,16 +157,16 @@ def _blocks(lines: List[str]) -> Iterable[Tuple[int, str, List[str]]]:
         yield current
 
 
-def _fields(body: List[str]) -> Dict[str, str]:
+def _fields(body: list[str]) -> dict[str, str]:
     """The bold-labelled fields an entry carries, lowercased and bounded.
 
     A field's value may sit on the lines *after* its label: `**Prevention:**` is
     routinely followed by a numbered list, and a reader that only took the rest
     of the label's own line recorded every such remedy as empty.
     """
-    found: Dict[str, str] = {}
-    key: Optional[str] = None
-    buffer: List[str] = []
+    found: dict[str, str] = {}
+    key: str | None = None
+    buffer: list[str] = []
 
     def flush() -> None:
         if key and buffer:
@@ -182,22 +193,25 @@ def _fields(body: List[str]) -> Dict[str, str]:
     return found
 
 
-def _first_paragraph(body: List[str]) -> str:
+def _first_paragraph(body: list[str]) -> str:
     """The first run of prose, which is where these documents state the finding.
 
     Bullets are skipped rather than read: an error entry often opens with a list
     of files the session touched, and taking that as the symptom recorded the
     edits instead of the defect.
     """
-    paragraph: List[str] = []
+    paragraph: list[str] = []
     for line in body:
         stripped = line.strip()
         if not stripped:
             if paragraph:
                 break
             continue
-        if (stripped.startswith("#") or stripped.startswith("|")
-                or FENCE.match(stripped) or BULLET.match(stripped)):
+        if (
+            stripped.startswith(("#", "|"))
+            or FENCE.match(stripped)
+            or BULLET.match(stripped)
+        ):
             if paragraph:
                 break
             continue
@@ -209,22 +223,26 @@ def _first_paragraph(body: List[str]) -> str:
     return _clean(" ".join(paragraph))
 
 
-def _is_index_block(body: List[str]) -> bool:
+def _is_index_block(body: list[str]) -> bool:
     """True when a block is a list of pointers or a divider, not a finding."""
     text = [line.strip() for line in body if line.strip()]
     if not text:
         return True
     table = sum(1 for line in text if line.startswith("|"))
     rules = sum(1 for line in text if set(line) <= {"-", "=", "*", "_"})
-    words = sum(1 for line in text if re.search(r"[A-Za-z]{3,}", line) and not line.startswith("|"))
+    words = sum(
+        1
+        for line in text
+        if re.search(r"[A-Za-z]{3,}", line) and not line.startswith("|")
+    )
     if rules and words <= 1:
         return True
     return bool(text) and table + rules >= len(text) * 0.6
 
 
-def _records_for(path: Path, kind: str, mode: str) -> List[Dict]:
+def _records_for(path: Path, kind: str, mode: str) -> list[dict]:
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    records: List[Dict] = []
+    records: list[dict] = []
     # Relative to the repository where that is possible, to the file's own name
     # otherwise: a checker run against a temporary tree must produce ids, not a
     # ValueError about subpaths, or the extractor cannot be tested at all.
@@ -247,28 +265,47 @@ def _records_for(path: Path, kind: str, mode: str) -> List[Dict]:
             record_kind = "limitation"
         fields = _fields(body)
         record = {
-            "id": "%s-L%d" % (slug, line_number),
+            "id": f"{slug}-L{line_number:d}",
             "surface": relative,
             "line": line_number,
             "kind": record_kind,
             "title": title,
         }
         cause = fields.get("cause") or fields.get("root cause") or ""
-        remedy = (fields.get("prevention") or fields.get("fix") or fields.get("remedy")
-                  or fields.get("resolution") or "")
-        rationale = (fields.get("why") or fields.get("reason") or
-                     fields.get("decision") or fields.get("learned") or "")
+        remedy = (
+            fields.get("prevention")
+            or fields.get("fix")
+            or fields.get("remedy")
+            or fields.get("resolution")
+            or ""
+        )
+        rationale = (
+            fields.get("why")
+            or fields.get("reason")
+            or fields.get("decision")
+            or fields.get("learned")
+            or ""
+        )
         finding = _first_paragraph(body)
-        record["symptom"] = (fields.get("symptom") or fields.get("problem")
-                             or fields.get("issue") or finding or title)
+        record["symptom"] = (
+            fields.get("symptom")
+            or fields.get("problem")
+            or fields.get("issue")
+            or finding
+            or title
+        )
         # The cause is only a cause when the document names one. Falling back to
         # the opening paragraph copies the symptom into both fields and lets a
         # distillation claim a diagnosis the record never made.
         record["cause"] = cause
         record["remedy"] = remedy
         record["rationale"] = rationale
-        for key, source_key in (("severity", "severity"), ("date", "timestamp"),
-                                ("date", "discovered"), ("files", "file(s)")):
+        for key, source_key in (
+            ("severity", "severity"),
+            ("date", "timestamp"),
+            ("date", "discovered"),
+            ("files", "file(s)"),
+        ):
             if fields.get(source_key) and key not in record:
                 record[key] = fields[source_key]
         # A heading is the claim; a body that never says what went wrong is a
@@ -279,23 +316,29 @@ def _records_for(path: Path, kind: str, mode: str) -> List[Dict]:
     return records
 
 
-def engram_records(db: Path = ENGRAM_DB, project: str = "azazael") -> Tuple[List[Dict], int]:
+def engram_records(
+    db: Path = ENGRAM_DB, project: str = "azazael"
+) -> tuple[list[dict], int]:
     """Observations, snapshotted. Returns (records, highest id seen)."""
     if not db.exists():
         return [], 0
     try:
-        connection = sqlite3.connect("file:%s?mode=ro" % db, uri=True)
+        connection = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     except sqlite3.Error:
         return [], 0
     try:
-        rows = list(connection.execute(
-            "SELECT id, type, title, content, created_at FROM observations "
-            "WHERE project = ? AND deleted_at IS NULL AND type IN (%s) "
-            "ORDER BY id" % ",".join("?" * len(ENGRAM_TYPES)),
-            (project, *ENGRAM_TYPES)))
+        rows = list(
+            connection.execute(
+                "SELECT id, type, title, content, created_at FROM observations "
+                "WHERE project = ? AND deleted_at IS NULL AND type IN ({}) "
+                "ORDER BY id".format(",".join("?" * len(ENGRAM_TYPES))),
+                (project, *ENGRAM_TYPES),
+            )
+        )
         newest = connection.execute(
             "SELECT COALESCE(MAX(id), 0) FROM observations WHERE project = ?",
-            (project,)).fetchone()[0]
+            (project,),
+        ).fetchone()[0]
     except sqlite3.Error:
         return [], 0
     finally:
@@ -303,37 +346,45 @@ def engram_records(db: Path = ENGRAM_DB, project: str = "azazael") -> Tuple[List
     records = []
     for identifier, kind, title, content, created in rows:
         body = _clean(content or "")
-        what = re.search(r"\*\*What\*\*:\s*(.+?)(?=\*\*[A-Z][a-z]+\*\*:|$)", content or "",
-                         re.S)
-        learned = re.search(r"\*\*Learned\*\*:\s*(.+?)(?=\*\*[A-Z][a-z]+\*\*:|$)",
-                            content or "", re.S)
-        records.append({
-            "id": "engram-%d" % identifier,
-            "surface": "~/.engram/engram.db",
-            "line": identifier,
-            "kind": "engram:" + (kind or "manual"),
-            "title": _clean(title or "", MAX_TITLE),
-            "symptom": _clean(what.group(1)) if what else body[:MAX_FIELD],
-            # Only a named `Learned` is a cause. Copying the body into both
-            # fields made every observation look diagnosed when it was not.
-            "cause": _clean(learned.group(1)) if learned else "",
-            "remedy": "",
-            "rationale": body[:MAX_FIELD],
-            "date": (created or "")[:10],
-        })
+        what = re.search(
+            r"\*\*What\*\*:\s*(.+?)(?=\*\*[A-Z][a-z]+\*\*:|$)", content or "", re.DOTALL
+        )
+        learned = re.search(
+            r"\*\*Learned\*\*:\s*(.+?)(?=\*\*[A-Z][a-z]+\*\*:|$)",
+            content or "",
+            re.DOTALL,
+        )
+        records.append(
+            {
+                "id": f"engram-{identifier:d}",
+                "surface": "~/.engram/engram.db",
+                "line": identifier,
+                "kind": "engram:" + (kind or "manual"),
+                "title": _clean(title or "", MAX_TITLE),
+                "symptom": _clean(what.group(1)) if what else body[:MAX_FIELD],
+                # Only a named `Learned` is a cause. Copying the body into both
+                # fields made every observation look diagnosed when it was not.
+                "cause": _clean(learned.group(1)) if learned else "",
+                "remedy": "",
+                "rationale": body[:MAX_FIELD],
+                "date": (created or "")[:10],
+            }
+        )
     return records, newest
 
 
-def harvest(root: Path = REPO, db: Path = ENGRAM_DB) -> Dict:
-    surfaces: List[Dict] = []
-    records: List[Dict] = []
+def harvest(root: Path = REPO, db: Path = ENGRAM_DB) -> dict:
+    surfaces: list[dict] = []
+    records: list[dict] = []
     seen = set()
     for relative, kind, mode in SURFACES:
         path = Path(root) / relative
         if not path.exists():
             continue
         extracted = _records_for(path, kind, mode)
-        surfaces.append({"path": relative, "sha": _sha(path), "records": len(extracted)})
+        surfaces.append(
+            {"path": relative, "sha": _sha(path), "records": len(extracted)}
+        )
         records.extend(extracted)
         seen.add(relative)
     for path in sorted(Path(root).glob(README_GLOB)):
@@ -341,7 +392,9 @@ def harvest(root: Path = REPO, db: Path = ENGRAM_DB) -> Dict:
         if relative in seen:
             continue
         extracted = _records_for(path, "limitation", "sectioned")
-        surfaces.append({"path": relative, "sha": _sha(path), "records": len(extracted)})
+        surfaces.append(
+            {"path": relative, "sha": _sha(path), "records": len(extracted)}
+        )
         records.extend(extracted)
     memory, newest = engram_records(db)
     records.extend(memory)
@@ -349,27 +402,33 @@ def harvest(root: Path = REPO, db: Path = ENGRAM_DB) -> Dict:
         "schema": SCHEMA,
         "note": "Evidence, not doctrine. Regenerate with --write; cite by id.",
         "surfaces": surfaces,
-        "engram": {"path": "~/.engram/engram.db", "as_of_id": newest,
-                   "records": len(memory), "types": list(ENGRAM_TYPES)},
-        "totals": {"records": len(records),
-                   "surfaces": len(surfaces),
-                   "by_kind": _counts(record["kind"] for record in records)},
+        "engram": {
+            "path": "~/.engram/engram.db",
+            "as_of_id": newest,
+            "records": len(memory),
+            "types": list(ENGRAM_TYPES),
+        },
+        "totals": {
+            "records": len(records),
+            "surfaces": len(surfaces),
+            "by_kind": _counts(record["kind"] for record in records),
+        },
         "records": records,
     }
 
 
-def _counts(values: Iterable[str]) -> Dict[str, int]:
-    counts: Dict[str, int] = {}
+def _counts(values: Iterable[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
     for value in values:
         counts[value] = counts.get(value, 0) + 1
     return dict(sorted(counts.items()))
 
 
-def render(data: Dict) -> str:
+def render(data: dict) -> str:
     return json.dumps(data, indent=1, ensure_ascii=False, sort_keys=True) + "\n"
 
 
-def _sha_committed(root: Path, relative: str) -> Optional[str]:
+def _sha_committed(root: Path, relative: str) -> str | None:
     """The sha of the blob that will be in the commit: the index, then HEAD.
 
     Neither the worktree nor HEAD alone is right. Judging the worktree made one
@@ -380,24 +439,28 @@ def _sha_committed(root: Path, relative: str) -> Optional[str]:
     old HEAD. The index is the changeset under review, so it is the first thing
     asked; HEAD is the fallback for a file this commit is not touching.
     """
-    answer: Optional[str] = None
+    answer: str | None = None
     for ref in (":" + relative, "HEAD:" + relative):
         try:
             completed = subprocess.run(
                 ["git", "-C", str(root), "show", ref],
-                capture_output=True, timeout=20)
-        except (OSError, subprocess.SubprocessError):   # no git, or too slow
+                capture_output=True,
+                timeout=20,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):  # no git, or too slow
             break
         if completed.returncode == 0:
             answer = _sha_bytes(completed.stdout)
             break
-    if answer is None:                                 # untracked, or no repository
+    if answer is None:  # untracked, or no repository
         return None
     return answer
 
 
-def stale(root: Path = REPO, ledger_path: Path = LEDGER,
-          notes: Optional[List[str]] = None) -> Tuple[List[str], int]:
+def stale(
+    root: Path = REPO, ledger_path: Path = LEDGER, notes: list[str] | None = None
+) -> tuple[list[str], int]:
     """(stale file surfaces, observations newer than the snapshot).
 
     `notes` collects what is *not* a failure but changes how a reading should be
@@ -407,40 +470,109 @@ def stale(root: Path = REPO, ledger_path: Path = LEDGER,
     if not ledger_path.exists():
         return ["docs/bible/harvest.json is absent; run --write"], 0
     data = json.loads(ledger_path.read_text(encoding="utf-8"))
-    stale_paths: List[str] = []
+    stale_paths: list[str] = []
     for surface in data.get("surfaces", []):
         path = Path(root) / surface["path"]
         if not path.exists():
-            stale_paths.append("%s is gone; the ledger still cites it" % surface["path"])
+            stale_paths.append(
+                "{} is gone; the ledger still cites it".format(surface["path"])
+            )
             continue
         committed = _sha_committed(root, surface["path"])
         judged = committed if committed is not None else _sha(path)
         if judged != surface.get("sha"):
-            stale_paths.append("%s moved since the harvest%s"
-                               % (surface["path"],
-                                  " (committed blob)" if committed else ""))
+            stale_paths.append(
+                "{} moved since the harvest{}".format(
+                    surface["path"], " (committed blob)" if committed else ""
+                )
+            )
         elif notes is not None and _sha(path) != committed:
-            notes.append("%s differs from the commit under review: worktree-only "
-                         "edit, not gating; stage it with a regenerated ledger"
-                         % surface["path"])
+            notes.append(
+                "{} differs from the commit under review: worktree-only "
+                "edit, not gating; stage it with a regenerated ledger".format(
+                    surface["path"]
+                )
+            )
     newest = data.get("engram", {}).get("as_of_id", 0)
     _, live = engram_records(ENGRAM_DB)
     return stale_paths, max(0, live - newest)
 
 
-def themes(data: Dict, width: int = 14) -> List[Tuple[str, int]]:
+def themes(data: dict, width: int = 14) -> list[tuple[str, int]]:
     """The vocabulary the ledger actually speaks, so distillation is not guesswork."""
-    stop = {"the", "and", "for", "that", "was", "with", "not", "you", "its", "this",
-            "from", "are", "but", "had", "has", "have", "were", "then", "than", "into",
-            "when", "which", "would", "could", "should", "one", "two", "all", "any",
-            "his", "her", "they", "them", "their", "there", "here", "what", "who",
-            "why", "how", "now", "out", "off", "per", "via", "use", "used", "using",
-            "our", "own", "also", "more", "most", "some", "such", "only", "just",
-            "each", "other", "same", "because", "before", "after", "over", "under"}
-    counts: Dict[str, int] = {}
+    stop = {
+        "the",
+        "and",
+        "for",
+        "that",
+        "was",
+        "with",
+        "not",
+        "you",
+        "its",
+        "this",
+        "from",
+        "are",
+        "but",
+        "had",
+        "has",
+        "have",
+        "were",
+        "then",
+        "than",
+        "into",
+        "when",
+        "which",
+        "would",
+        "could",
+        "should",
+        "one",
+        "two",
+        "all",
+        "any",
+        "his",
+        "her",
+        "they",
+        "them",
+        "their",
+        "there",
+        "here",
+        "what",
+        "who",
+        "why",
+        "how",
+        "now",
+        "out",
+        "off",
+        "per",
+        "via",
+        "use",
+        "used",
+        "using",
+        "our",
+        "own",
+        "also",
+        "more",
+        "most",
+        "some",
+        "such",
+        "only",
+        "just",
+        "each",
+        "other",
+        "same",
+        "because",
+        "before",
+        "after",
+        "over",
+        "under",
+    }
+    counts: dict[str, int] = {}
     for record in data["records"]:
-        text = " ".join(str(record.get(key, "")) for key in
-                        ("title", "symptom", "cause", "remedy", "rationale"))
+        text = " ".join(
+            str(record.get(key, ""))
+            for key in ("title", "symptom", "cause", "remedy", "rationale")
+        )
         for word in re.findall(r"[a-z][a-z0-9_-]{3,}", text.lower()):
             if word in stop or len(word) < 5:
                 continue
@@ -448,60 +580,77 @@ def themes(data: Dict, width: int = 14) -> List[Tuple[str, int]]:
     return sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:width]
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--write", action="store_true",
-                        help="regenerate docs/bible/harvest.json")
-    parser.add_argument("--check", action="store_true",
-                        help="exit 1 when a harvested file moved")
-    parser.add_argument("--themes", action="store_true",
-                        help="the recurring vocabulary, with counts")
+    parser.add_argument(
+        "--write", action="store_true", help="regenerate docs/bible/harvest.json"
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="exit 1 when a harvested file moved"
+    )
+    parser.add_argument(
+        "--themes", action="store_true", help="the recurring vocabulary, with counts"
+    )
     parser.add_argument("--show", metavar="ID", help="print one record in full")
     parser.add_argument("--json", action="store_true", help="the whole ledger")
     args = parser.parse_args(argv)
 
     if args.check:
-        notes: List[str] = []
+        notes: list[str] = []
         stale_paths, newer = stale(notes=notes)
         for note in notes:
             print("note: " + note)
         for problem in stale_paths:
             print("STALE: " + problem)
         if newer:
-            print("note: %d observation(s) recorded since the snapshot (as_of id %d); "
-                  "re-run --write to fold them in" % (
-                      newer, json.loads(LEDGER.read_text(encoding="utf-8"))
-                      .get("engram", {}).get("as_of_id", 0)))
-        print("clean" if not stale_paths else "%d stale surface(s)" % len(stale_paths))
+            print(
+                "note: {:d} observation(s) recorded since the snapshot (as_of id {:d}); "
+                "re-run --write to fold them in".format(
+                    newer,
+                    json.loads(LEDGER.read_text(encoding="utf-8"))
+                    .get("engram", {})
+                    .get("as_of_id", 0),
+                )
+            )
+        print("clean" if not stale_paths else f"{len(stale_paths):d} stale surface(s)")
         return 0 if not stale_paths else 1
 
     data = harvest()
     if args.write:
         BIBLE_DIR.mkdir(parents=True, exist_ok=True)
         LEDGER.write_text(render(data), encoding="utf-8", newline="\n")
-        print("wrote %s (%d records from %d file surfaces + %d observations)"
-              % (LEDGER.relative_to(REPO), data["totals"]["records"],
-                 data["totals"]["surfaces"], data["engram"]["records"]))
+        print(
+            "wrote {} ({:d} records from {:d} file surfaces + {:d} observations)".format(
+                LEDGER.relative_to(REPO),
+                data["totals"]["records"],
+                data["totals"]["surfaces"],
+                data["engram"]["records"],
+            )
+        )
         return 0
     if args.show:
         for record in data["records"]:
             if record["id"] == args.show:
                 print(json.dumps(record, indent=1, ensure_ascii=False))
                 return 0
-        print("no record with id %r" % args.show, file=sys.stderr)
+        print(f"no record with id {args.show!r}", file=sys.stderr)
         return 1
     if args.themes:
         for word, count in themes(data):
-            print("%-20s %d" % (word, count))
+            print(f"{word:<20} {count:d}")
         return 0
     if args.json:
         print(render(data), end="")
         return 0
     for surface in data["surfaces"]:
-        print("%-46s %5d record(s)" % (surface["path"], surface["records"]))
-    print("%-46s %5d record(s)" % ("~/.engram/engram.db", data["engram"]["records"]))
-    print("%-46s %5d" % ("total", data["totals"]["records"]))
-    print("%-46s %s" % ("kinds", data["totals"]["by_kind"]))
+        print("{:<46} {:5d} record(s)".format(surface["path"], surface["records"]))
+    print(
+        "{:<46} {:5d} record(s)".format(
+            "~/.engram/engram.db", data["engram"]["records"]
+        )
+    )
+    print("{:<46} {:5d}".format("total", data["totals"]["records"]))
+    print("{:<46} {}".format("kinds", data["totals"]["by_kind"]))
     return 0
 
 

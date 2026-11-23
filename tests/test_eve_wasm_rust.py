@@ -16,10 +16,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from eve_unleashed import wasm_tutorial as _w
 
-STATE = {"total": 2, "answered": 1, "summary": "ABLATION: probe",
-         "rows": [{"provider": "a", "verdict": "ANSWERED", "detail": "d1"},
-                  {"provider": "b", "verdict": "REFUSED", "detail": "d2"}],
-         "nsp": "judged"}
+STATE = {
+    "total": 2,
+    "answered": 1,
+    "summary": "ABLATION: probe",
+    "rows": [
+        {"provider": "a", "verdict": "ANSWERED", "detail": "d1"},
+        {"provider": "b", "verdict": "REFUSED", "detail": "d2"},
+    ],
+    "nsp": "judged",
+}
 
 
 def test_generate_writes_crate_sources(tmp_path):
@@ -46,7 +52,8 @@ def test_have_toolchain_covers_rust_tier():
 
 needs_rust_tier = pytest.mark.skipif(
     not (shutil.which("wasm-pack") and shutil.which("node")),
-    reason="wasm-pack+node toolchains required for Rust compile+execute")
+    reason="wasm-pack+node toolchains required for Rust compile+execute",
+)
 
 
 @needs_rust_tier

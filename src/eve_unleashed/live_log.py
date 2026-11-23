@@ -14,18 +14,19 @@ import threading
 import time
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
+
 
 _LOCK = threading.Lock()
 
 
 def default_path():
     """Where events go unless a caller names a path."""
-    return os.environ.get("EVE_LIVE_LOG",
-                           os.path.join("state", "eve_live.jsonl"))
+    return os.environ.get("EVE_LIVE_LOG", os.path.join("state", "eve_live.jsonl"))
 
 
 def emit(phase, event, path=None, session=None, **fields):
@@ -42,8 +43,8 @@ def emit(phase, event, path=None, session=None, **fields):
             os.makedirs(parent, exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(line + "\n")
-    flat = " ".join("%s=%s" % (k, v) for k, v in fields.items())
-    print("LIVE [%s] %s %s" % (phase, event, flat), flush=True)
+    flat = " ".join(f"{k}={v}" for k, v in fields.items())
+    print(f"LIVE [{phase}] {event} {flat}", flush=True)
     return rec
 
 

@@ -10,24 +10,25 @@ Subprocess-based Rust code runner with:
     - Error parsing and formatting
 """
 
+import argparse
+import hashlib
 import os
 import shutil
-import hashlib
 import subprocess
 import time
-from pathlib import Path
+
 # from typing import Dict, List, Optional  # removed — all names have native equivalents
 from dataclasses import dataclass, field
 from enum import Enum
-import argparse
-from typing import List, Optional
+from pathlib import Path
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -35,8 +36,8 @@ except ImportError:                               # never break the host
 # --- Configuration -----------------------------------------------------------
 
 try:
-    from CORE.paths import get_project_root_safe as _get_project_root_safe
-except ImportError as exc:                               # never break the host
+    from core.paths import get_project_root_safe as _get_project_root_safe
+except ImportError as exc:  # never break the host
     note_failure("rust_runner:core-paths-import", exc)
     _get_project_root_safe = None
 
@@ -44,9 +45,12 @@ except ImportError as exc:                               # never break the host
 #: `Path.home() / "azazael"` -- a DIFFERENT, stale checkout from this repo -- so with
 #: AZAZAEL_ROOT unset this runner resolved the WRONG tree and forwarded it to the child
 #: process it spawns. `parents[2]` (this file's own tree) answers only the case where
-#: CORE.paths is unimportable.
-_DEFAULT_ROOT = (str(_get_project_root_safe()) if _get_project_root_safe is not None
-                 else str(Path(__file__).resolve().parents[2]))
+#: core.paths is unimportable.
+_DEFAULT_ROOT = (
+    str(_get_project_root_safe())
+    if _get_project_root_safe is not None
+    else str(Path(__file__).resolve().parents[2])
+)
 
 AZAZAEL_ROOT = os.environ.get(
     "AZAZAEL_ROOT", os.environ.get("Azazael_ROOT", _DEFAULT_ROOT)
@@ -66,12 +70,13 @@ class RustEdition(Enum):
 @dataclass
 class RustResult:
     """Result of a Rust code execution."""
+
     success: bool
     stdout: str = ""
     stderr: str = ""
     returncode: int = 0
     duration_ms: float = 0.0
-    binary_path: (str | None) = None
+    binary_path: str | None = None
     errors: list[dict] = field(default_factory=list)
     stderr_bytes: str = ""  # D7: raw stderr (latin-1) for forensics
 
@@ -79,8 +84,12 @@ class RustResult:
 class RustRunner:
     """Compile and run Rust code via subprocess."""
 
-    def __init__(self, edition: RustEdition = RustEdition.E2021,
-                 opt_level: int = 0, debug: bool = True):
+    def __init__(
+        self,
+        edition: RustEdition = RustEdition.E2021,
+        opt_level: int = 0,
+        debug: bool = True,
+    ):
         self.edition = edition
         self.opt_level = opt_level
         self.debug = debug
@@ -92,7 +101,9 @@ class RustRunner:
         self.has_cargo = shutil.which("cargo") is not None
 
         if not self.has_rustc:
-            print("  [WARN] rustc not found. Install: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh")
+            print(
+                "  [WARN] rustc not found. Install: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+            )
         return self.has_rustc
 
     def _compile(self, source_path: Path, output_path: Path) -> RustResult:
@@ -107,9 +118,12 @@ class RustRunner:
         cmd = [
             "rustc",
             str(source_path),
-            "-o", str(output_path),
-            "--edition", self.edition.value,
-            "-C", f"opt-level={self.opt_level}",
+            "-o",
+            str(output_path),
+            "--edition",
+            self.edition.value,
+            "-C",
+            f"opt-level={self.opt_level}",
         ]
         if self.debug:
             cmd.append("-g")
@@ -117,7 +131,7 @@ class RustRunner:
         try:
             start = time.time()
             # D7: bytes capture; display via replace, evidence via stderr_bytes.
-            result = subprocess.run(cmd, capture_output=True, timeout=60)
+            result = subprocess.run(cmd, capture_output=True, timeout=60, check=False)
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
@@ -137,9 +151,11 @@ class RustRunner:
             return RustResult(
                 success=False,
                 stderr="Compilation timed out (>60s)",
-                errors=[{"type": "timeout", "message": "Compilation exceeded 60 seconds"}],
+                errors=[
+                    {"type": "timeout", "message": "Compilation exceeded 60 seconds"}
+                ],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L112", e)
             return RustResult(
                 success=False,
@@ -152,27 +168,31 @@ class RustRunner:
         errors: list[dict] = []
         for line in stderr.split("\n"):
             line = line.strip()
-            if not line or line.startswith("  =") or line.startswith("  |"):
+            if not line or line.startswith(("  =", "  |")):
                 continue
-            if line.startswith("error") or line.startswith("warning"):
+            if line.startswith(("error", "warning")):
                 parts = line.split(":", 3)
                 if len(parts) >= 4:
-                    errors.append({
-                        "level": parts[0].strip(),
-                        "file": parts[1].strip() if len(parts) > 1 else "",
-                        "line": parts[2].strip() if len(parts) > 2 else "",
-                        "message": parts[3].strip() if len(parts) > 3 else line,
-                    })
+                    errors.append(
+                        {
+                            "level": parts[0].strip(),
+                            "file": parts[1].strip() if len(parts) > 1 else "",
+                            "line": parts[2].strip() if len(parts) > 2 else "",
+                            "message": parts[3].strip() if len(parts) > 3 else line,
+                        }
+                    )
                 else:
                     errors.append({"level": "error", "message": line})
         return errors
 
-    def _run_binary(self, binary_path: Path, args: Optional[list[str]] = None) -> RustResult:
+    def _run_binary(
+        self, binary_path: Path, args: list[str] | None = None
+    ) -> RustResult:
         """Execute a compiled Rust binary."""
         cmd = [str(binary_path)] + (args or [])
         try:
             start = time.time()
-            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, timeout=30, check=False)
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
@@ -194,7 +214,7 @@ class RustRunner:
                 errors=[{"type": "timeout", "message": "Runtime exceeded 30 seconds"}],
             )
 
-    def run_code(self, code: str, args: Optional[list[str]] = None) -> RustResult:
+    def run_code(self, code: str, args: list[str] | None = None) -> RustResult:
         """Compile and run Rust source code from a string."""
         # Hash the code to create a unique filename
         code_hash = hashlib.md5(code.encode()).hexdigest()[:12]
@@ -214,7 +234,7 @@ class RustRunner:
         run_result.duration_ms += compile_result.duration_ms
         return run_result
 
-    def run_file(self, file_path: str, args: Optional[list[str]] = None) -> RustResult:
+    def run_file(self, file_path: str, args: list[str] | None = None) -> RustResult:
         """Compile and run a .rs file."""
         source = Path(file_path)
         if not source.exists():
@@ -242,7 +262,7 @@ class RustRunner:
 
         cmd = ["rustc", "--edition", self.edition.value, "--check", str(source)]
         try:
-            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, timeout=30, check=False)
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
             return RustResult(
@@ -253,7 +273,7 @@ class RustRunner:
                 errors=self._parse_errors(stderr) if result.returncode != 0 else [],
                 stderr_bytes=result.stderr[:4000].decode("latin-1"),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L216", e)
             return RustResult(success=False, stderr=str(e))
 
@@ -271,19 +291,28 @@ class RustRunner:
 
         try:
             result = subprocess.run(
-                cmd, cwd=project_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
+                cmd,
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,
                 stdout=result.stdout,
                 stderr=result.stderr,
                 returncode=result.returncode,
-                errors=self._parse_errors(result.stderr) if result.returncode != 0 else [],
+                errors=(
+                    self._parse_errors(result.stderr) if result.returncode != 0 else []
+                ),
             )
         except subprocess.TimeoutExpired as exc:
             note_failure("rust_runner:L242", exc)
             return RustResult(success=False, stderr="Cargo build timed out (>120s)")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L244", e)
             return RustResult(success=False, stderr=str(e))
 
@@ -295,7 +324,14 @@ class RustRunner:
         cmd = ["cargo", "test"]
         try:
             result = subprocess.run(
-                cmd, cwd=project_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
+                cmd,
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,
@@ -303,11 +339,11 @@ class RustRunner:
                 stderr=result.stderr,
                 returncode=result.returncode,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L263", e)
             return RustResult(success=False, stderr=str(e))
 
-    def new_project(self, name: str, directory: Optional[str] = None) -> RustResult:
+    def new_project(self, name: str, directory: str | None = None) -> RustResult:
         """Create a new Cargo project."""
         if not self.has_cargo:
             return RustResult(success=False, stderr="cargo not found.")
@@ -316,7 +352,14 @@ class RustRunner:
         cmd = ["cargo", "new", name]
         try:
             result = subprocess.run(
-                cmd, cwd=str(target), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
+                cmd,
+                cwd=str(target),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,
@@ -324,7 +367,7 @@ class RustRunner:
                 stderr=result.stderr,
                 binary_path=str(target / name),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L283", e)
             return RustResult(success=False, stderr=str(e))
 
@@ -335,18 +378,25 @@ class RustRunner:
 
         try:
             result = subprocess.run(
-                ["rustfmt", str(file_path)], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
+                ["rustfmt", str(file_path)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                check=False,
             )
             return RustResult(
                 success=result.returncode == 0,
                 stdout="Formatted" if result.returncode == 0 else result.stderr,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("rust_runner:L299", e)
             return RustResult(success=False, stderr=str(e))
 
 
 # --- CLI ---------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(description="Azazael Rust Interpreter Runner")

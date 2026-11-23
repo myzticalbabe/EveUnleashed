@@ -9,7 +9,7 @@ to be replayed by hand everywhere. This module is the single source;
 the per-store functions remain thin wrappers that set timestamps and
 defaults.
 
-Stdlib-only like failure_ledger, so any layer (CORE or SHARDS) can
+Stdlib-only like failure_ledger, so any layer (core or shards) can
 import it without cycles.
 """
 
@@ -32,8 +32,9 @@ except ImportError:
     msvcrt = None  # type: ignore[assignment]
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -47,9 +48,9 @@ def atomic_write_bytes(path: Path | str, payload: bytes, where: str) -> None:
     `where` names the caller for ledger notes (e.g. "morphed_trainers").
     """
     target = Path(path)
-    fd, tmp = tempfile.mkstemp(dir=str(target.parent),
-                                prefix="." + target.stem + ".",
-                                suffix=".tmp")
+    fd, tmp = tempfile.mkstemp(
+        dir=str(target.parent), prefix="." + target.stem + ".", suffix=".tmp"
+    )
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(payload)
@@ -69,8 +70,9 @@ def atomic_write_bytes(path: Path | str, payload: bytes, where: str) -> None:
 
 def atomic_write_json(path: Path | str, store: dict, where: str) -> None:
     """JSON-serializing thin wrapper over atomic_write_bytes."""
-    atomic_write_bytes(path, (json.dumps(store, indent=1) + "\n").encode("utf-8"),
-                       where)
+    atomic_write_bytes(
+        path, (json.dumps(store, indent=1) + "\n").encode("utf-8"), where
+    )
 
 
 #: In-process mutexes keyed by resolved lock path. msvcrt.locking
@@ -105,26 +107,25 @@ def file_lock(lock_path: Path | str, where: str):
     thread_lock = _thread_lock_for(str(lock.resolve()))
     thread_lock.acquire()
     try:
-        fh = open(str(lock), "ab")  # noqa: PTH123 -- lock handle, binary needs no encoding
-        lock_kind = "none"
-        try:
-            if fcntl is not None:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
-                lock_kind = "flock"
-            elif msvcrt is not None:
-                try:
-                    fh.seek(0)
-                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
-                    lock_kind = "msvcrt"
-                except OSError as e:
-                    note_failure(where + ":msvcrt-lock", e)
-                    lock_kind = "none"
-            else:
-                note_failure(where + ":no-lock-primitive", None)
-                lock_kind = "none"
-            yield lock
-        finally:
+        with open(str(lock), "ab") as fh:
+            lock_kind = "none"
             try:
+                if fcntl is not None:
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+                    lock_kind = "flock"
+                elif msvcrt is not None:
+                    try:
+                        fh.seek(0)
+                        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                        lock_kind = "msvcrt"
+                    except OSError as e:
+                        note_failure(where + ":msvcrt-lock", e)
+                        lock_kind = "none"
+                else:
+                    note_failure(where + ":no-lock-primitive", None)
+                    lock_kind = "none"
+                yield lock
+            finally:
                 kind = lock_kind
                 if kind == "flock" and fcntl is not None:
                     fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
@@ -134,7 +135,5 @@ def file_lock(lock_path: Path | str, where: str):
                         msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
                     except OSError as e:
                         note_failure(where + ":unlock", e)
-            finally:
-                fh.close()
     finally:
         thread_lock.release()

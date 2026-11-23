@@ -12,3 +12,15 @@ graphify-out/.graphify_semantic.json
 graphify-out/.graphify_analysis.json
 graphify-out/.graphify_detect.json
 graphify-out/.graphify_chunk_*.json
+
+# Build/packaging outputs and per-run state (never commit)
+dist-wheels/
+*.whl
+*.pyd
+src/eve_unleashed/_*.c
+state/
+nuitka-crash-report*.xml
+graphify-out/manifest.json
+graphify-out/*.sig
+graphify-out/.graphify_root
+graphify-out/20*/

@@ -24,12 +24,11 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.util
+import random
 import struct
 import time
 
 from .mcml import _xavier
-
-import random
 
 # --------------------------------------------------------------------------
 # OpenCL loader (flat C API -- no COM, no vtables, hence no IDL off-by-one)
@@ -44,7 +43,8 @@ class _CL:
             raise RuntimeError(
                 "no OpenCL ICD found (find_library('OpenCL') failed). "
                 "Install the GPU driver / ocl-icd-libopencl1; CPU path "
-                "in mcml.py is unaffected.")
+                "in mcml.py is unaffected."
+            )
         self.lib = ctypes.CDLL(name)
         lib = self.lib
         vp = ctypes.c_void_p
@@ -62,48 +62,76 @@ class _CL:
             return f
 
         i32 = ctypes.c_int32
-        self.get_platform_ids = bind("clGetPlatformIDs", i32, u32, vp, ctypes.POINTER(u32))
-        self.get_platform_info = bind("clGetPlatformInfo", i32, vp, u32, sz, vp,
-                                      ctypes.POINTER(sz))
-        self.get_device_ids = bind("clGetDeviceIDs", i32, vp, u64, u32, vp,
-                                   ctypes.POINTER(u32))
-        self.get_device_info = bind("clGetDeviceInfo", i32, vp, u32, sz, vp,
-                                    ctypes.POINTER(sz))
-        self.create_context = bind("clCreateContext", vp, vp, u32, vp, vp, vp,
-                                   ctypes.POINTER(i32))
-        self.queue_props = bind("clCreateCommandQueueWithProperties", vp, vp, vp,
-                                vp, ctypes.POINTER(i32))
-        self.queue_legacy = bind("clCreateCommandQueue", vp, vp, vp, u32,
-                                 ctypes.POINTER(i32))
-        self.create_buffer = bind("clCreateBuffer", vp, vp, u64, sz, vp,
-                                  ctypes.POINTER(i32))
-        self.create_program = bind("clCreateProgramWithSource", vp, vp, u32, vp, vp,
-                                   ctypes.POINTER(i32))
+        self.get_platform_ids = bind(
+            "clGetPlatformIDs", i32, u32, vp, ctypes.POINTER(u32)
+        )
+        self.get_platform_info = bind(
+            "clGetPlatformInfo", i32, vp, u32, sz, vp, ctypes.POINTER(sz)
+        )
+        self.get_device_ids = bind(
+            "clGetDeviceIDs", i32, vp, u64, u32, vp, ctypes.POINTER(u32)
+        )
+        self.get_device_info = bind(
+            "clGetDeviceInfo", i32, vp, u32, sz, vp, ctypes.POINTER(sz)
+        )
+        self.create_context = bind(
+            "clCreateContext", vp, vp, u32, vp, vp, vp, ctypes.POINTER(i32)
+        )
+        self.queue_props = bind(
+            "clCreateCommandQueueWithProperties", vp, vp, vp, vp, ctypes.POINTER(i32)
+        )
+        self.queue_legacy = bind(
+            "clCreateCommandQueue", vp, vp, vp, u32, ctypes.POINTER(i32)
+        )
+        self.create_buffer = bind(
+            "clCreateBuffer", vp, vp, u64, sz, vp, ctypes.POINTER(i32)
+        )
+        self.create_program = bind(
+            "clCreateProgramWithSource", vp, vp, u32, vp, vp, ctypes.POINTER(i32)
+        )
         self.build_program = bind("clBuildProgram", i32, vp, u32, vp, vp, vp, vp)
-        self.build_info = bind("clGetProgramBuildInfo", i32, vp, vp, u32, sz, vp,
-                               ctypes.POINTER(sz))
-        self.create_kernel = bind("clCreateKernel", vp, vp, ctypes.c_char_p,
-                                  ctypes.POINTER(i32))
+        self.build_info = bind(
+            "clGetProgramBuildInfo", i32, vp, vp, u32, sz, vp, ctypes.POINTER(sz)
+        )
+        self.create_kernel = bind(
+            "clCreateKernel", vp, vp, ctypes.c_char_p, ctypes.POINTER(i32)
+        )
         self.set_arg = bind("clSetKernelArg", i32, vp, u32, sz, vp)
-        self.enqueue_write = bind("clEnqueueWriteBuffer", i32, vp, vp, u32, u64,
-                                  u64, vp, u32, vp, vp)
-        self.enqueue_read = bind("clEnqueueReadBuffer", i32, vp, vp, u32, u64,
-                                 u64, vp, u32, vp, vp)
-        self.enqueue_nd = bind("clEnqueueNDRangeKernel", i32, vp, vp, u32, vp, vp,
-                               vp, u32, vp, vp)
+        self.enqueue_write = bind(
+            "clEnqueueWriteBuffer", i32, vp, vp, u32, u64, u64, vp, u32, vp, vp
+        )
+        self.enqueue_read = bind(
+            "clEnqueueReadBuffer", i32, vp, vp, u32, u64, u64, vp, u32, vp, vp
+        )
+        self.enqueue_nd = bind(
+            "clEnqueueNDRangeKernel", i32, vp, vp, u32, vp, vp, vp, u32, vp, vp
+        )
         self.finish = bind("clFinish", i32, vp)
-        missing = [n for n, f in self.__dict__.items()
-                   if f is None and n not in ("queue_props", "queue_legacy")]
+        missing = [
+            n
+            for n, f in self.__dict__.items()
+            if f is None and n not in ("queue_props", "queue_legacy")
+        ]
         if missing or (self.queue_props is None and self.queue_legacy is None):
-            raise RuntimeError("ICD missing entry points: %s" % (missing,))
+            raise RuntimeError(f"ICD missing entry points: {missing}")
 
-        must = ["get_platform_ids", "get_device_ids", "create_context",
-                "create_buffer", "create_program", "build_program",
-                "create_kernel", "set_arg", "enqueue_write", "enqueue_read",
-                "enqueue_nd", "finish"]
+        must = [
+            "get_platform_ids",
+            "get_device_ids",
+            "create_context",
+            "create_buffer",
+            "create_program",
+            "build_program",
+            "create_kernel",
+            "set_arg",
+            "enqueue_write",
+            "enqueue_read",
+            "enqueue_nd",
+            "finish",
+        ]
         absent = [n for n in must if getattr(self, n) is None]
         if absent:
-            raise RuntimeError("ICD missing entry points: %s" % (absent,))
+            raise RuntimeError(f"ICD missing entry points: {absent}")
 
 
 CL_DEVICE_TYPE_GPU = 1 << 2
@@ -122,10 +150,8 @@ def available() -> bool:
     try:
         cl = _CL()
         n = ctypes.c_uint32()
-        if cl.get_platform_ids(0, None, ctypes.byref(n)) != 0 or n.value == 0:
-            return False
-        return True
-    except Exception:
+        return not (cl.get_platform_ids(0, None, ctypes.byref(n)) != 0 or n.value == 0)
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return False
 
 
@@ -222,14 +248,18 @@ class GpuDense:
     loss scalar is the only per-step readback the training loop needs.
     """
 
-    def __init__(self, in_dim: int, out_dim: int, seed: int = 7,
-                 activation: str = "tanh", devtype: int = CL_DEVICE_TYPE_GPU) -> None:
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: int,
+        seed: int = 7,
+        activation: str = "tanh",
+        devtype: int = CL_DEVICE_TYPE_GPU,
+    ) -> None:
         if in_dim < 1 or out_dim < 1:
-            raise ValueError("dense dims must be >= 1, got %d -> %d"
-                             % (in_dim, out_dim))
+            raise ValueError(f"dense dims must be >= 1, got {in_dim:d} -> {out_dim:d}")
         if activation not in _ACTS:
-            raise ValueError("activations: %s (got %r)"
-                             % (sorted(_ACTS), activation))
+            raise ValueError(f"activations: {sorted(_ACTS)} (got {activation!r})")
         self.in_dim, self.out_dim, self.seed = in_dim, out_dim, seed
         self.act = _ACTS[activation]
 
@@ -243,8 +273,10 @@ class GpuDense:
         for p in plats:
             for want in (devtype, CL_DEVICE_TYPE_DEFAULT):
                 m = ctypes.c_uint32()
-                if cl.get_device_ids(p, want, 0, None, ctypes.byref(m)) != 0 \
-                        or m.value == 0:
+                if (
+                    cl.get_device_ids(p, want, 0, None, ctypes.byref(m)) != 0
+                    or m.value == 0
+                ):
                     continue
                 devs = (ctypes.c_void_p * m.value)()
                 self._ok(cl.get_device_ids(p, want, m.value, devs, None))
@@ -267,40 +299,55 @@ class GpuDense:
         # NOTE: with restype=c_void_p, ctypes returns the handle as a plain
         # int -- wrap it, or _arg() mistakes a buffer for an int32 kernel arg
         # and clSetKernelArg fails with -51 (CL_INVALID_ARG_SIZE).
-        self.ctx = ctypes.c_void_p(cl.create_context(
-            None, 1, ctypes.byref(ctypes.c_void_p(self.device)),
-            None, None, ctypes.byref(err)))
+        self.ctx = ctypes.c_void_p(
+            cl.create_context(
+                None,
+                1,
+                ctypes.byref(ctypes.c_void_p(self.device)),
+                None,
+                None,
+                ctypes.byref(err),
+            )
+        )
         self._ok(err.value)
         if cl.queue_props is not None:
-            self.queue = ctypes.c_void_p(cl.queue_props(
-                self.ctx, self.device, None, ctypes.byref(err)))
+            self.queue = ctypes.c_void_p(
+                cl.queue_props(self.ctx, self.device, None, ctypes.byref(err))
+            )
         else:
-            self.queue = ctypes.c_void_p(cl.queue_legacy(
-                self.ctx, self.device, 0, ctypes.byref(err)))
+            self.queue = ctypes.c_void_p(
+                cl.queue_legacy(self.ctx, self.device, 0, ctypes.byref(err))
+            )
         self._ok(err.value)
 
         src = (_FWD + _BWD_DX + _BWD_G + _SGD + _ZERO).encode()
-        prog = ctypes.c_void_p(cl.create_program(
-            self.ctx, 1, ctypes.byref(ctypes.c_char_p(src)),
-            ctypes.byref(ctypes.c_size_t(len(src))), ctypes.byref(err)))
+        prog = ctypes.c_void_p(
+            cl.create_program(
+                self.ctx,
+                1,
+                ctypes.byref(ctypes.c_char_p(src)),
+                ctypes.byref(ctypes.c_size_t(len(src))),
+                ctypes.byref(err),
+            )
+        )
         self._ok(err.value)
-        rc = cl.build_program(prog, 1,
-                              ctypes.byref(ctypes.c_void_p(self.device)),
-                              None, None, None)
+        rc = cl.build_program(
+            prog, 1, ctypes.byref(ctypes.c_void_p(self.device)), None, None, None
+        )
         if rc != 0:
             ln2 = ctypes.c_size_t()
             cl.build_info(prog, self.device, 0x1183, 0, None, ctypes.byref(ln2))
             log = ctypes.create_string_buffer(max(ln2.value, 1))
             cl.build_info(prog, self.device, 0x1183, ln2.value, log, None)
-            raise RuntimeError("kernel build failed:\n%s"
-                               % log.value.decode("utf-8", "replace"))
+            raise RuntimeError(
+                "kernel build failed:\n{}".format(log.value.decode("utf-8", "replace"))
+            )
         self.k = {}
         for n_ in ("fwd", "bwd_dx", "bwd_g", "sgd", "zero"):
-            h = ctypes.c_void_p(cl.create_kernel(prog, n_.encode(),
-                                                  ctypes.byref(err)))
+            h = ctypes.c_void_p(cl.create_kernel(prog, n_.encode(), ctypes.byref(err)))
             self._ok(err.value)
             if not h:
-                raise RuntimeError("clCreateKernel(%s) returned NULL" % n_)
+                raise RuntimeError(f"clCreateKernel({n_}) returned NULL")
             self.k[n_] = h
 
         rng = random.Random(seed)
@@ -316,23 +363,32 @@ class GpuDense:
     @staticmethod
     def _ok(rc: int) -> None:
         if rc != 0:
-            raise RuntimeError("OpenCL call failed: %d" % rc)
+            raise RuntimeError(f"OpenCL call failed: {rc:d}")
 
     def _buf(self, vals) -> ctypes.c_void_p:
-        raw = struct.pack("<%df" % len(vals), *vals)
+        raw = struct.pack(f"<{len(vals):d}f", *vals)
         err = ctypes.c_int32()
-        h = ctypes.c_void_p(self.cl.create_buffer(
-            self.ctx, CL_MEM_READ_WRITE, len(raw), None, ctypes.byref(err)))
+        h = ctypes.c_void_p(
+            self.cl.create_buffer(
+                self.ctx, CL_MEM_READ_WRITE, len(raw), None, ctypes.byref(err)
+            )
+        )
         self._ok(err.value)
         data = (ctypes.c_ubyte * len(raw)).from_buffer_copy(raw)
-        self._ok(self.cl.enqueue_write(self.queue, h, CL_BLOCKING, 0, len(raw),
-                                       data, 0, None, None))
+        self._ok(
+            self.cl.enqueue_write(
+                self.queue, h, CL_BLOCKING, 0, len(raw), data, 0, None, None
+            )
+        )
         return h
 
     def _new(self, nfloats: int) -> ctypes.c_void_p:
         err = ctypes.c_int32()
-        h = ctypes.c_void_p(self.cl.create_buffer(
-            self.ctx, CL_MEM_READ_WRITE, nfloats * 4, None, ctypes.byref(err)))
+        h = ctypes.c_void_p(
+            self.cl.create_buffer(
+                self.ctx, CL_MEM_READ_WRITE, nfloats * 4, None, ctypes.byref(err)
+            )
+        )
         self._ok(err.value)
         return h
 
@@ -340,8 +396,7 @@ class GpuDense:
         cl = self.cl
         if isinstance(val, ctypes.c_void_p):
             h = val
-            self._ok(cl.set_arg(k, i, ctypes.sizeof(ctypes.c_void_p),
-                                ctypes.byref(h)))
+            self._ok(cl.set_arg(k, i, ctypes.sizeof(ctypes.c_void_p), ctypes.byref(h)))
         elif isinstance(val, int):
             v = ctypes.c_int32(val)
             self._ok(cl.set_arg(k, i, ctypes.sizeof(v), ctypes.byref(v)))
@@ -351,20 +406,29 @@ class GpuDense:
 
     def _run(self, k, n: int) -> None:
         g = ctypes.c_size_t(n)
-        self._ok(self.cl.enqueue_nd(self.queue, k, 1, None,
-                                    ctypes.byref(g), None, 0, None, None))
+        self._ok(
+            self.cl.enqueue_nd(
+                self.queue, k, 1, None, ctypes.byref(g), None, 0, None, None
+            )
+        )
 
     def _read(self, h, nfloats: int):
         out = (ctypes.c_ubyte * (nfloats * 4))()
-        self._ok(self.cl.enqueue_read(self.queue, h, CL_BLOCKING, 0,
-                                      nfloats * 4, out, 0, None, None))
-        return list(struct.unpack("<%df" % nfloats, bytes(out)))
+        self._ok(
+            self.cl.enqueue_read(
+                self.queue, h, CL_BLOCKING, 0, nfloats * 4, out, 0, None, None
+            )
+        )
+        return list(struct.unpack(f"<{nfloats:d}f"))
 
     def _write(self, h, vals) -> None:
-        raw = struct.pack("<%df" % len(vals), *vals)
+        raw = struct.pack(f"<{len(vals):d}f", *vals)
         data = (ctypes.c_ubyte * len(raw)).from_buffer_copy(raw)
-        self._ok(self.cl.enqueue_write(self.queue, h, CL_BLOCKING, 0,
-                                       len(raw), data, 0, None, None))
+        self._ok(
+            self.cl.enqueue_write(
+                self.queue, h, CL_BLOCKING, 0, len(raw), data, 0, None, None
+            )
+        )
 
     # -- block API (mirrors mcml.Dense, batched) --------------------------
     def forward_batch(self, X):
@@ -385,8 +449,7 @@ class GpuDense:
         self._ok(self.cl.finish(self.queue))
         kt = (time.perf_counter() - t0) * 1e3
         y = self._read(yb, B * self.out_dim)
-        return ([y[i * self.out_dim:(i + 1) * self.out_dim]
-                 for i in range(B)], kt)
+        return ([y[i * self.out_dim : (i + 1) * self.out_dim] for i in range(B)], kt)
 
     def _dact(self, Y):
         if self.act == 0:
@@ -428,8 +491,7 @@ class GpuDense:
         self._ok(self.cl.finish(self.queue))
         kt = (time.perf_counter() - t0) * 1e3
         dx = self._read(dxb, B * self.in_dim)
-        return ([dx[i * self.in_dim:(i + 1) * self.in_dim]
-                 for i in range(B)], kt)
+        return ([dx[i * self.in_dim : (i + 1) * self.in_dim] for i in range(B)], kt)
 
     def zero_grad(self) -> None:
         k = self.k["zero"]
@@ -455,12 +517,15 @@ class GpuDense:
     def weights(self):
         w = self._read(self.W, self._nw)
         b = self._read(self.b, self._nb)
-        return ([w[i * self.in_dim:(i + 1) * self.in_dim]
-                 for i in range(self.out_dim)], b)
+        return (
+            [w[i * self.in_dim : (i + 1) * self.in_dim] for i in range(self.out_dim)],
+            b,
+        )
 
 
 def _cpu_dense(in_dim, out_dim, seed, act_name):
     from . import mcml as _m
+
     d = _m.Dense(in_dim, out_dim, seed=seed)
     a = _m.Activate(act_name)
     return d, a
@@ -478,14 +543,14 @@ class HybridDense:
     the SAME total to both backends before step().
     """
 
-    def __init__(self, in_dim: int, out_dim: int, seed: int = 7,
-                 activation: str = "tanh") -> None:
+    def __init__(
+        self, in_dim: int, out_dim: int, seed: int = 7, activation: str = "tanh"
+    ) -> None:
         self.in_dim, self.out_dim = in_dim, out_dim
         self.cpu_d, self.cpu_a = _cpu_dense(in_dim, out_dim, seed, activation)
         try:
-            self.gpu = GpuDense(in_dim, out_dim, seed=seed,
-                                activation=activation)
-        except Exception as e:
+            self.gpu = GpuDense(in_dim, out_dim, seed=seed, activation=activation)
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             self.gpu = None
             self._gpu_err = str(e)
         self.split = 1.0 if self.gpu is not None else 0.0
@@ -544,17 +609,17 @@ class HybridDense:
         d = self.cpu_d
         flat = [v for row in d.gW for v in row] + list(d.gb)
         total = [a_ + b_ for a_, b_ in zip(gw + gb, flat)]
-        g._write(g.gW, total[:g._nw])
-        g._write(g.gb, total[g._nw:])
-        d.gW = [total[i * d.in_dim:(i + 1) * d.in_dim]
-                for i in range(d.out_dim)]
-        d.gb = total[g._nw:]
+        g._write(g.gW, total[: g._nw])
+        g._write(g.gb, total[g._nw :])
+        d.gW = [total[i * d.in_dim : (i + 1) * d.in_dim] for i in range(d.out_dim)]
+        d.gb = total[g._nw :]
 
     def step(self, lr: float) -> None:
         self.sync_grads()
         d = self.cpu_d
-        d.W = [[w - lr * gw for w, gw in zip(row, grow)]
-               for row, grow in zip(d.W, d.gW)]
+        d.W = [
+            [w - lr * gw for w, gw in zip(row, grow)] for row, grow in zip(d.W, d.gW)
+        ]
         d.b = [x - lr * gb for x, gb in zip(d.b, d.gb)]
         if self.gpu is not None:
             self.gpu.step(lr)
@@ -562,6 +627,7 @@ class HybridDense:
     def tune(self, X, splits=(0.0, 0.25, 0.5, 0.75, 1.0), reps=3):
         """Measure each split, pin the fastest. Returns (best, table)."""
         import time as _t
+
         table = []
         for s in splits:
             if s > 0.0 and self.gpu is None:
@@ -578,7 +644,9 @@ class HybridDense:
 
 
 def main() -> int:
-    print("mcml_gpu backend check (stdlib ctypes OpenCL, additive -- mcml.py untouched)")
+    print(
+        "mcml_gpu backend check (stdlib ctypes OpenCL, additive -- mcml.py untouched)"
+    )
     if not available():
         print("FAIL: no OpenCL ICD on this box; CPU path in mcml.py is unaffected")
         return 1
@@ -588,24 +656,25 @@ def main() -> int:
     T = [[rng.uniform(-1, 1) for _ in range(OUT)] for _ in range(B)]
 
     g = GpuDense(IN, OUT, seed=7, activation="tanh")
-    print("device: %s%s" % (g.devname, "  [GPU]" if g.is_gpu else "  [non-GPU device]"))
+    print(
+        "device: {}{}".format(
+            g.devname, "  [GPU]" if g.is_gpu else "  [non-GPU device]"
+        )
+    )
 
     # -- exactness vs the CPU blocks -------------------------------------
     d, a = _cpu_dense(IN, OUT, 7, "tanh")
     Y, fwd_kt = g.forward_batch(X)
     cpu_Y = [a.forward(d.forward(x)) for x in X]
-    fwd_err = max(abs(yv - cv) for yr, cr in zip(Y, cpu_Y)
-                  for yv, cv in zip(yr, cr))
+    fwd_err = max(abs(yv - cv) for yr, cr in zip(Y, cpu_Y) for yv, cv in zip(yr, cr))
     d.gW = [[0.0] * IN for _ in range(OUT)]
     d.gb = [0.0] * OUT
     gY = [row[:] for row in Y]
-    mse_g = [[2.0 * (yv - tv) / OUT for yv, tv in zip(yr, tr)]
-             for yr, tr in zip(gY, T)]
-    dX, bwd_kt = g.backward_batch(X, mse_g)
+    mse_g = [[2.0 * (yv - tv) / OUT for yv, tv in zip(yr, tr)] for yr, tr in zip(gY, T)]
+    _dX, bwd_kt = g.backward_batch(X, mse_g)
     for x, my in zip(X, mse_g):
         y = a.forward(d.forward(x))
-        dy = [m * _d for m, _d in
-              zip(my, [1.0 - v * v for v in y])]
+        dy = [m * _d for m, _d in zip(my, [1.0 - v * v for v in y])]
         d.backward(x, dy)
     cpu_dW = [v for row in d.gW for v in row]
     gpu_dW = g._read(g.gW, g._nw)
@@ -613,13 +682,13 @@ def main() -> int:
 
     # one SGD step on both, compare weights
     g.step(0.01)
-    d.W = [[w - 0.01 * gw for w, gw in zip(row, grow)]
-           for row, grow in zip(d.W, d.gW)]
+    d.W = [[w - 0.01 * gw for w, gw in zip(row, grow)] for row, grow in zip(d.W, d.gW)]
     d.b = [x - 0.01 * gb for x, gb in zip(d.b, d.gb)]
     gWm, gbm = g.weights()
-    w_err = max([abs(gv - cv) for gr, cr in zip(gWm, d.W)
-                 for gv, cv in zip(gr, cr)] + [abs(gv - cv) for gv, cv in
-                                                zip(gbm, d.b)])
+    w_err = max(
+        [abs(gv - cv) for gr, cr in zip(gWm, d.W) for gv, cv in zip(gr, cr)]
+        + [abs(gv - cv) for gv, cv in zip(gbm, d.b)]
+    )
 
     # -- speed: same batch, CPU wall vs GPU wall --------------------------
     t0 = time.perf_counter()
@@ -627,46 +696,58 @@ def main() -> int:
         a.forward(d.forward(x))
     cpu_ms = (time.perf_counter() - t0) * 1e3
     t0 = time.perf_counter()
-    Y2, _ = g.forward_batch(X)
+    _Y2, _ = g.forward_batch(X)
     gpu_ms = (time.perf_counter() - t0) * 1e3
 
-    print("shape: batch=%d in=%d out=%d  params=%d" % (B, IN, OUT, g._nw + g._nb))
-    print("forward kernel: %.2f ms | backward kernels: %.2f ms" % (fwd_kt, bwd_kt))
-    print("CPU batch forward: %.2f ms | GPU batch wall (up+run+down): %.2f ms | %.1fx"
-          % (cpu_ms, gpu_ms, cpu_ms / max(gpu_ms, 1e-9)))
-    print("exactness: forward max|d|=%.2e  grads max|d|=%.2e  post-step weights max|d|=%.2e"
-          % (fwd_err, bwd_err, w_err))
+    print(f"shape: batch={B:d} in={IN:d} out={OUT:d}  params={g._nw + g._nb:d}")
+    print(f"forward kernel: {fwd_kt:.2f} ms | backward kernels: {bwd_kt:.2f} ms")
+    print(
+        f"CPU batch forward: {cpu_ms:.2f} ms | GPU batch wall (up+run+down): {gpu_ms:.2f} ms | {cpu_ms / max(gpu_ms, 1e-9):.1f}x"
+    )
+    print(
+        f"exactness: forward max|d|={fwd_err:.2e}  grads max|d|={bwd_err:.2e}  post-step weights max|d|={w_err:.2e}"
+    )
     ok = fwd_err < 2e-5 and bwd_err < 2e-5 and w_err < 2e-5
-    print("OK: GpuDense matches mcml.Dense to f32 tolerance; weights live on-device, "
-          "bus sees only X/Y per batch" if ok else "FAIL: tolerance exceeded")
+    print(
+        "OK: GpuDense matches mcml.Dense to f32 tolerance; weights live on-device, "
+        "bus sees only X/Y per batch"
+        if ok
+        else "FAIL: tolerance exceeded"
+    )
     if not ok:
         return 1
 
     # -- hybrid: tunable percentages of ALL backends ----------------------
     h = HybridDense(IN, OUT, seed=7, activation="tanh")
-    print("backends: %s" % h.backends)
+    print(f"backends: {h.backends}")
     best, table = h.tune(X)
-    print("tune (fraction of %d rows on GPU -> ms): %s" %
-          (B, "  ".join("%.2f:%.2f" % (s, ms) for s, ms in table)))
-    print("pinned split: %.2f of batch on GPU" % best)
+    print(
+        "tune (fraction of {:d} rows on GPU -> ms): {}".format(
+            B, "  ".join(f"{s:.2f}:{ms:.2f}" for s, ms in table)
+        )
+    )
+    print(f"pinned split: {best:.2f} of batch on GPU")
     hY = h.forward_batch(X)
-    herr = max(abs(yv - cv) for yr, cr in zip(hY, cpu_Y)
-               for yv, cv in zip(yr, cr))
+    herr = max(abs(yv - cv) for yr, cr in zip(hY, cpu_Y) for yv, cv in zip(yr, cr))
     h.zero_grad()
     h.backward_batch(X, mse_g)
     h.step(0.01)
     if h.gpu is not None:
         hw, hb = h.gpu.weights()
-        rep_err = max([abs(gv - cv) for gr, cr in zip(hw, h.cpu_d.W)
-                       for gv, cv in zip(gr, cr)] +
-                      [abs(gv - cv) for gv, cv in zip(hb, h.cpu_d.b)])
+        rep_err = max(
+            [abs(gv - cv) for gr, cr in zip(hw, h.cpu_d.W) for gv, cv in zip(gr, cr)]
+            + [abs(gv - cv) for gv, cv in zip(hb, h.cpu_d.b)]
+        )
     else:
         rep_err = 0.0
-    print("hybrid: routing max|d|=%.2e  replica-agreement max|d|=%.2e"
-          % (herr, rep_err))
+    print(f"hybrid: routing max|d|={herr:.2e}  replica-agreement max|d|={rep_err:.2e}")
     hok = herr < 2e-5 and rep_err < 1e-6
-    print("OK: hybrid split %.2f routes rows across backends with identical "
-          "replicas" % best if hok else "FAIL: hybrid mismatch")
+    print(
+        f"OK: hybrid split {best:.2f} routes rows across backends with identical "
+        "replicas"
+        if hok
+        else "FAIL: hybrid mismatch"
+    )
     return 0 if hok else 1
 
 

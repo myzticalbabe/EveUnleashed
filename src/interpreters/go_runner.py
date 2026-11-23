@@ -11,23 +11,24 @@ Subprocess-based Go code runner with:
     - Cross-compilation support
 """
 
+import argparse
+import hashlib
 import os
 import shutil
-import hashlib
 import subprocess
 import time
-from pathlib import Path
+
 # from typing import Dict, List, Optional, Tuple  # removed — all names have native equivalents
 from dataclasses import dataclass, field
-import argparse
-from typing import List, Optional
+from pathlib import Path
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -35,8 +36,8 @@ except ImportError:                               # never break the host
 # --- Configuration -----------------------------------------------------------
 
 try:
-    from CORE.paths import get_project_root_safe as _get_project_root_safe
-except ImportError as exc:                               # never break the host
+    from core.paths import get_project_root_safe as _get_project_root_safe
+except ImportError as exc:  # never break the host
     note_failure("go_runner:core-paths-import", exc)
     _get_project_root_safe = None
 
@@ -44,9 +45,12 @@ except ImportError as exc:                               # never break the host
 #: `Path.home() / "azazael"` -- a DIFFERENT, stale checkout from this repo -- so with
 #: AZAZAEL_ROOT unset this runner resolved the WRONG tree and forwarded it to the child
 #: process it spawns. `parents[2]` (this file's own tree) answers only the case where
-#: CORE.paths is unimportable.
-_DEFAULT_ROOT = (str(_get_project_root_safe()) if _get_project_root_safe is not None
-                 else str(Path(__file__).resolve().parents[2]))
+#: core.paths is unimportable.
+_DEFAULT_ROOT = (
+    str(_get_project_root_safe())
+    if _get_project_root_safe is not None
+    else str(Path(__file__).resolve().parents[2])
+)
 
 AZAZAEL_ROOT = os.environ.get(
     "AZAZAEL_ROOT", os.environ.get("Azazael_ROOT", _DEFAULT_ROOT)
@@ -59,12 +63,13 @@ GO_BUILD_DIR.mkdir(parents=True, exist_ok=True)
 @dataclass
 class GoResult:
     """Result of a Go code execution."""
+
     success: bool
     stdout: str = ""
     stderr: str = ""
     returncode: int = 0
     duration_ms: float = 0.0
-    binary_path: (str | None) = None
+    binary_path: str | None = None
     errors: list[dict] = field(default_factory=list)
     stderr_bytes: str = ""  # D7: raw stderr (latin-1) for forensics
 
@@ -93,7 +98,7 @@ class GoRunner:
             env["GOARCH"] = self.goarch
         return env
 
-    def _find_module_root(self, file_path: Path) -> (Path | None):
+    def _find_module_root(self, file_path: Path) -> Path | None:
         """Walk up directories to find go.mod."""
         current = file_path.parent
         for _ in range(10):
@@ -104,7 +109,7 @@ class GoRunner:
             current = current.parent
         return None
 
-    def run_file(self, file_path: str, args: Optional[list[str]] = None) -> GoResult:
+    def run_file(self, file_path: str, args: list[str] | None = None) -> GoResult:
         """Run a .go file using 'go run'."""
         if not self.has_go:
             return GoResult(
@@ -133,6 +138,7 @@ class GoRunner:
                 env=self._go_env(),
                 capture_output=True,
                 timeout=60,
+                check=False,
             )
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
@@ -154,14 +160,15 @@ class GoRunner:
                 stderr="Execution timed out (>60s)",
                 errors=[{"type": "timeout", "message": "Runtime exceeded 60 seconds"}],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L128", e)
             return GoResult(
-                success=False, stderr=str(e),
+                success=False,
+                stderr=str(e),
                 errors=[{"type": "exception", "message": str(e)}],
             )
 
-    def run_code(self, code: str, args: Optional[list[str]] = None) -> GoResult:
+    def run_code(self, code: str, args: list[str] | None = None) -> GoResult:
         """Run Go source code from a string (honest timing, P1-item-1).
 
         `go run` compiles then executes in one process: the reported
@@ -178,8 +185,9 @@ class GoRunner:
         result.duration_ms += write_ms
         return result
 
-    def build_binary(self, file_path: str, output_name: str = "",
-                     release: bool = False) -> GoResult:
+    def build_binary(
+        self, file_path: str, output_name: str = "", release: bool = False
+    ) -> GoResult:
         """Build a .go file into a standalone binary."""
         source = Path(file_path)
         if not source.exists():
@@ -207,12 +215,15 @@ class GoRunner:
                 env=self._go_env(),
                 capture_output=True,
                 timeout=120,
+                check=False,
             )
             duration = (time.time() - start) * 1000
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
 
-            binary_path = str(output) if result.returncode == 0 and output.exists() else None
+            binary_path = (
+                str(output) if result.returncode == 0 and output.exists() else None
+            )
             return GoResult(
                 success=result.returncode == 0,
                 stdout=stdout,
@@ -223,7 +234,7 @@ class GoRunner:
                 errors=self._parse_errors(stderr) if result.returncode != 0 else [],
                 stderr_bytes=result.stderr[:4000].decode("latin-1"),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L184", e)
             return GoResult(success=False, stderr=str(e))
 
@@ -237,13 +248,15 @@ class GoRunner:
             # Go errors: file:line:col: message
             parts = line.split(":", 3)
             if len(parts) >= 4 and parts[0].endswith(".go"):
-                errors.append({
-                    "level": "error",
-                    "file": parts[0].strip(),
-                    "line": parts[1].strip(),
-                    "col": parts[2].strip(),
-                    "message": parts[3].strip(),
-                })
+                errors.append(
+                    {
+                        "level": "error",
+                        "file": parts[0].strip(),
+                        "line": parts[1].strip(),
+                        "col": parts[2].strip(),
+                        "message": parts[3].strip(),
+                    }
+                )
             else:
                 errors.append({"level": "error", "message": line})
         return errors
@@ -259,8 +272,15 @@ class GoRunner:
 
         try:
             result = subprocess.run(
-                cmd, cwd=project_dir, env=self._go_env(),
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+                cmd,
+                cwd=project_dir,
+                env=self._go_env(),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,
@@ -268,7 +288,7 @@ class GoRunner:
                 stderr=result.stderr,
                 returncode=result.returncode,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L228", e)
             return GoResult(success=False, stderr=str(e))
 
@@ -280,13 +300,18 @@ class GoRunner:
         try:
             result = subprocess.run(
                 ["gofmt", "-w", str(file_path)],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,
                 stdout="Formatted" if result.returncode == 0 else result.stderr,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L245", e)
             return GoResult(success=False, stderr=str(e))
 
@@ -298,18 +323,24 @@ class GoRunner:
         try:
             result = subprocess.run(
                 ["go", "vet", "./..."],
-                cwd=project_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=60,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,
                 stdout=result.stdout,
                 stderr=result.stderr,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L263", e)
             return GoResult(success=False, stderr=str(e))
 
-    def mod_init(self, module_name: str, directory: Optional[str] = None) -> GoResult:
+    def mod_init(self, module_name: str, directory: str | None = None) -> GoResult:
         """Initialize a new Go module with 'go mod init'."""
         if not self.has_go:
             return GoResult(success=False, stderr="go not found.")
@@ -320,7 +351,13 @@ class GoRunner:
         try:
             result = subprocess.run(
                 ["go", "mod", "init", module_name],
-                cwd=str(target), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+                cwd=str(target),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                check=False,
             )
             return GoResult(
                 success=result.returncode == 0,
@@ -328,12 +365,13 @@ class GoRunner:
                 stderr=result.stderr,
                 binary_path=str(target / "go.mod"),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("go_runner:L285", e)
             return GoResult(success=False, stderr=str(e))
 
-    def cross_compile(self, file_path: str, targets: Optional[list[tuple[str, str]]] = None
-                      ) -> dict[str, GoResult]:
+    def cross_compile(
+        self, file_path: str, targets: list[tuple[str, str]] | None = None
+    ) -> dict[str, GoResult]:
         """Build for multiple OS/arch targets."""
         if targets is None:
             targets = [
@@ -358,6 +396,7 @@ class GoRunner:
 
 
 # --- CLI ---------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(description="Azazael Go Interpreter Runner")

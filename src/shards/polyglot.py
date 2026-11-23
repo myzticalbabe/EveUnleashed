@@ -2,7 +2,7 @@
 """Polyglot router + golden self-test (arena-64n shard_node shape).
 
 `run_shard(lang)` executes the golden snippet for one language through the
-INTERPRETERS dispatcher and returns a JSON-serializable result (no weights,
+interpreters dispatcher and returns a JSON-serializable result (no weights,
 no handles across the boundary). `self_test()` cold-recomputes every
 available toolchain and asserts stdout agreement on the golden token.
 A missing toolchain is a clean skip, never a failure.
@@ -17,13 +17,13 @@ import re
 import statistics
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from CORE.atomic_store import atomic_write_json
-from CORE.failure_ledger import note_failure
-from INTERPRETERS import run_code, supported_languages
-from SHARDS.registry import LANG_ORDER, SHARDS, _probe_toolchain_versions, route_lang
+from core.atomic_store import atomic_write_json
+from core.failure_ledger import note_failure
+from interpreters import run_code, supported_languages
+from shards.registry import LANG_ORDER, SHARDS, _probe_toolchain_versions, route_lang
 
 GOLDEN_TOKEN = "AZAZAEL-GOLDEN-OK"
 WORK_TOKEN = "AZAZAEL-WORK-OK"
@@ -34,8 +34,9 @@ WORK_N = 20000  # loop iterations for the `work` tier (D8)
 # on real jobs misleads — route_lang uses the work table by default.
 GOLDEN_SNIPPETS: dict = {
     "python": 'print("AZAZAEL-GOLDEN-OK")',
-    "go": ('package main\nimport "fmt"\n'
-            'func main(){fmt.Println("AZAZAEL-GOLDEN-OK")}'),
+    "go": (
+        'package main\nimport "fmt"\n' 'func main(){fmt.Println("AZAZAEL-GOLDEN-OK")}'
+    ),
     "rust": 'fn main(){println!("AZAZAEL-GOLDEN-OK");}',
     "javascript": 'console.log("AZAZAEL-GOLDEN-OK");',
     "powershell": 'Write-Output "AZAZAEL-GOLDEN-OK"',
@@ -43,20 +44,26 @@ GOLDEN_SNIPPETS: dict = {
 }
 
 WORK_SNIPPETS: dict = {
-    "python": ("t=0\nfor i in range(20000): t+=i\n"
-                 'print("AZAZAEL-WORK-OK",t)'),
-    "go": ('package main\nimport "fmt"\nfunc main(){t:=0;'
-             'for i:=0;i<20000;i++{t+=i};'
-             'fmt.Println("AZAZAEL-WORK-OK",t)}'),
-    "rust": ('fn main(){let mut t:u64=0;'
-               'for i in 0..20000u64{t+=i;} '
-               'println!("AZAZAEL-WORK-OK {}",t);}'),
-    "javascript": ('let t=0;for(let i=0;i<20000;i++){t+=i;}'
-                     'console.log("AZAZAEL-WORK-OK",t);'),
-    "powershell": ('$t=0;for($i=0;$i -lt 20000;$i++){$t+=$i};'
-                     'Write-Output "AZAZAEL-WORK-OK $t"'),
-    "bash": ("t=0;for ((i=0;i<20000;i++));do t=$((t+i));done;"
-             "echo AZAZAEL-WORK-OK $t"),
+    "python": ("t=0\nfor i in range(20000): t+=i\n" 'print("AZAZAEL-WORK-OK",t)'),
+    "go": (
+        'package main\nimport "fmt"\nfunc main(){t:=0;'
+        "for i:=0;i<20000;i++{t+=i};"
+        'fmt.Println("AZAZAEL-WORK-OK",t)}'
+    ),
+    "rust": (
+        "fn main(){let mut t:u64=0;"
+        "for i in 0..20000u64{t+=i;} "
+        'println!("AZAZAEL-WORK-OK {}",t);}'
+    ),
+    "javascript": (
+        "let t=0;for(let i=0;i<20000;i++){t+=i;}" 'console.log("AZAZAEL-WORK-OK",t);'
+    ),
+    "powershell": (
+        "$t=0;for($i=0;$i -lt 20000;$i++){$t+=$i};" 'Write-Output "AZAZAEL-WORK-OK $t"'
+    ),
+    "bash": (
+        "t=0;for ((i=0;i<20000;i++));do t=$((t+i));done;" "echo AZAZAEL-WORK-OK $t"
+    ),
 }
 
 EXPECTED_SUM = 20000 * 19999 // 2  # 199990000 — work goldens must print this
@@ -82,20 +89,34 @@ def run_shard(lang: str, tier: str = "instant") -> dict:
     # and the skip contract must not depend on a capital letter.
     if not result.success and "not found" in (result.stderr or "").lower():
         detail = (result.stderr or "").strip().split("\n")[0][:120]
-        return {"lang": key, "tier": tier, "status": "skipped", "ok": True,
-                "detail": f"toolchain missing: {detail}"}
+        return {
+            "lang": key,
+            "tier": tier,
+            "status": "skipped",
+            "ok": True,
+            "detail": f"toolchain missing: {detail}",
+        }
     token_ok = token in (result.stdout or "")
     sum_ok = True
     if tier == "work" and token_ok:
         sum_ok = str(EXPECTED_SUM) in (result.stdout or "")
     ok = bool(result.success and token_ok and sum_ok)
-    return {"lang": key, "tier": tier, "status": "pass" if ok else "fail", "ok": ok,
-            "success": result.success, "token": token_ok, "sum": sum_ok,
-            "stdout": (result.stdout or "").strip()[:200],
-            "stderr": (result.stderr or "").strip()[:300] if not ok else "",
-            # E8: raw stderr survives display truncation (D7) for forensics.
-            "stderr_bytes": (getattr(result, "stderr_bytes", "") or "")[:500] if not ok else "",
-            "duration_ms": round(result.duration_ms, 1)}
+    return {
+        "lang": key,
+        "tier": tier,
+        "status": "pass" if ok else "fail",
+        "ok": ok,
+        "success": result.success,
+        "token": token_ok,
+        "sum": sum_ok,
+        "stdout": (result.stdout or "").strip()[:200],
+        "stderr": (result.stderr or "").strip()[:300] if not ok else "",
+        # E8: raw stderr survives display truncation (D7) for forensics.
+        "stderr_bytes": (
+            (getattr(result, "stderr_bytes", "") or "")[:500] if not ok else ""
+        ),
+        "duration_ms": round(result.duration_ms, 1),
+    }
 
 
 def check_doc_shards() -> dict:
@@ -109,11 +130,9 @@ def check_doc_shards() -> dict:
     missing: list = []
     try:
         repo = Path(__file__).resolve().parents[2]
-        skill_roots = [repo / ".agents" / "skills",
-                       repo.parent / ".agents" / "skills"]
-        candidates = skill_roots + [repo / "docs",
-                                    Path(__file__).resolve().parents[1]]
-    except Exception:
+        skill_roots = [repo / ".agents" / "skills", repo.parent / ".agents" / "skills"]
+        candidates = skill_roots + [repo / "docs", Path(__file__).resolve().parents[1]]
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return {"ok": False, "checked": 0, "missing": ["repo-unresolvable"]}
     # Every doc shard is a list of SKILL NAMES, and the corpus they name is
     # INSTALLED rather than committed: `.agents/skills` arrives with the skills
@@ -121,11 +140,15 @@ def check_doc_shards() -> dict:
     # nothing to resolve against, so calling the shard "missing" would blame the
     # repository for a checkout that never carried it. Say that instead.
     if not any(root.is_dir() for root in skill_roots):
-        return {"ok": True, "checked": 0, "missing": [],
-                "note": "skill corpus absent (.agents/skills is installed by "
-                        "the skills CLI, not committed): doc shards not verified"}
+        return {
+            "ok": True,
+            "checked": 0,
+            "missing": [],
+            "note": "skill corpus absent (.agents/skills is installed by "
+            "the skills CLI, not committed): doc shards not verified",
+        }
     for name in SHARDS:
-        # `SHARDS` is already imported from SHARDS.registry at module level;
+        # `SHARDS` is already imported from shards.registry at module level;
         # the per-iteration re-import here was the same dict every time, and
         # its except-continue could hide a failure nothing else would show.
         entry = SHARDS.get(name, {})
@@ -156,7 +179,9 @@ def check_doc_shards() -> dict:
                     break
                 for md in base.glob(f"{stem}*/SKILL.md"):
                     try:
-                        if re.search(r"(?m)^name\s*:", md.read_text(encoding="utf-8")[:2000]):
+                        if re.search(
+                            r"(?m)^name\s*:", md.read_text(encoding="utf-8")[:2000]
+                        ):
                             found = True
                             break
                     except OSError as exc:
@@ -181,13 +206,18 @@ def self_test() -> bool:
     agree = len(tokens) <= 1
     try:
         doc = check_doc_shards()
-    except Exception:
+    except Exception:  # noqa: BLE001 -- best-effort self_test
         doc = {"ok": False, "checked": 0, "missing": ["check-crashed"]}
     ok_all = bool(ok and agree and doc.get("ok", False))
-    report = {"self_test": "PASS" if ok_all else "FAIL",
-              "dispatcher_langs": sorted(supported_languages()),
-              "ran": len(ran), "skipped": len(results) - len(ran),
-              "agree": agree, "results": results, "doc_shards": doc}
+    report = {
+        "self_test": "PASS" if ok_all else "FAIL",
+        "dispatcher_langs": sorted(supported_languages()),
+        "ran": len(ran),
+        "skipped": len(results) - len(ran),
+        "agree": agree,
+        "results": results,
+        "doc_shards": doc,
+    }
     print(json.dumps(report, indent=1))
     return ok_all
 
@@ -203,7 +233,7 @@ def prune_build_dirs(max_age_days: int = 14) -> dict:
     kept = 0
     try:
         build_root = Path(__file__).resolve().parents[2] / "build"
-    except Exception:
+    except Exception:  # noqa: BLE001 -- logged below, guard broad
         return {"removed": 0, "kept": 0}
     if not build_root.is_dir():
         return {"removed": 0, "kept": 0}
@@ -228,7 +258,7 @@ def prune_build_dirs(max_age_days: int = 14) -> dict:
 
 
 def _atomic_write_json(path: Path, payload: dict) -> None:
-    """Atomic JSON write (D1) via CORE.atomic_store — single implementation."""
+    """Atomic JSON write (D1) via core.atomic_store — single implementation."""
     atomic_write_json(path, payload, "shards")
 
 
@@ -242,7 +272,7 @@ def sweep(n: int = 10) -> dict:
     t_start = time.time()
     try:
         prune_build_dirs()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("polyglot:prune-call", e)
     work_medians: dict = {}
     instant_medians: dict = {}
@@ -261,10 +291,16 @@ def sweep(n: int = 10) -> dict:
             rows.append({"lang": lang, "status": "skipped"})
             continue
         work_medians[lang] = round(statistics.median(work_durations), 1)
-        rows.append({"lang": lang, "status": "pass" if ok_all else "fail",
-                     "n": len(work_durations), "median_ms": work_medians[lang],
-                     "min_ms": round(min(work_durations), 1),
-                     "max_ms": round(max(work_durations), 1)})
+        rows.append(
+            {
+                "lang": lang,
+                "status": "pass" if ok_all else "fail",
+                "n": len(work_durations),
+                "median_ms": work_medians[lang],
+                "min_ms": round(min(work_durations), 1),
+                "max_ms": round(max(work_durations), 1),
+            }
+        )
     for lang in supported_shard_langs():
         durations: list = []
         for _ in range(max(1, min(n, 3))):
@@ -275,22 +311,27 @@ def sweep(n: int = 10) -> dict:
                 durations.append(res["duration_ms"])
         if durations:
             instant_medians[lang] = round(statistics.median(durations), 1)
-    report = {"generated_at": datetime.now(timezone.utc).isoformat(),
-              "n": n, "elapsed_s": round(time.time() - t_start, 1),
-              "medians_ms": work_medians,  # routing table = WORK (D8)
-              "instant_medians_ms": instant_medians,  # pipe health only
-              "versions": _probe_toolchain_versions(),
-              "rows": rows}
+    report = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "n": n,
+        "elapsed_s": round(time.time() - t_start, 1),
+        "medians_ms": work_medians,  # routing table = WORK (D8)
+        "instant_medians_ms": instant_medians,  # pipe health only
+        "versions": _probe_toolchain_versions(),
+        "rows": rows,
+    }
     _atomic_write_json(Path(__file__).with_name("sweep.json"), report)
     print(f"{'lang':<12}{'n':>4}  work-median  min/max  status")
     for row in sorted(rows, key=lambda r: r.get("median_ms", float("inf"))):
         if row["status"] == "skipped":
             print(f"{row['lang']:<12}   -  skipped (toolchain missing)")
         else:
-            print(f"{row['lang']:<12}{row['n']:>4}  "
-                  f"median={row['median_ms']:.1f}ms "
-                  f"min={row['min_ms']:.1f} max={row['max_ms']:.1f} "
-                  f"{row['status']}")
+            print(
+                f"{row['lang']:<12}{row['n']:>4}  "
+                f"median={row['median_ms']:.1f}ms "
+                f"min={row['min_ms']:.1f} max={row['max_ms']:.1f} "
+                f"{row['status']}"
+            )
     return report
 
 
@@ -302,17 +343,29 @@ def main(argv=None) -> int:
     ap.add_argument("--sweep", action="store_true")
     ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--lang", default=None, choices=sorted(GOLDEN_SNIPPETS))
-    ap.add_argument("--budget", default="balanced",
-                    choices=["fast", "balanced", "peak"])
+    ap.add_argument(
+        "--budget", default="balanced", choices=["fast", "balanced", "peak"]
+    )
     ap.add_argument("--shard", default=None)
     args = ap.parse_args(argv)
 
     if args.list:
-        print(json.dumps(
-            {"langs": supported_shard_langs(),
-             "shards": {k: {"langs": v["langs"], "canonical": v["canonical"],
-                             "notes": v["notes"]} for k, v in SHARDS.items()}},
-            indent=1))
+        print(
+            json.dumps(
+                {
+                    "langs": supported_shard_langs(),
+                    "shards": {
+                        k: {
+                            "langs": v["langs"],
+                            "canonical": v["canonical"],
+                            "notes": v["notes"],
+                        }
+                        for k, v in SHARDS.items()
+                    },
+                },
+                indent=1,
+            )
+        )
         return 0
     if args.self_test:
         return 0 if self_test() else 1

@@ -13,25 +13,30 @@ Supports:
 from __future__ import annotations
 
 import time
-from typing import AsyncGenerator, List
+from collections.abc import AsyncGenerator
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
-
 
 
 class StreamToken:
     """A single token or chunk from a streaming inference call."""
 
-    def __init__(self, text: str = "", token_id: int = -1,
-                 index: int = 0, is_final: bool = False,
-                 latency_ms: float = 0.0):
+    def __init__(
+        self,
+        text: str = "",
+        token_id: int = -1,
+        index: int = 0,
+        is_final: bool = False,
+        latency_ms: float = 0.0,
+    ):
         self.text = text
         self.token_id = token_id
         self.index = index
@@ -67,7 +72,7 @@ async def stream_gguf(
     model,
     prompt: str,
     max_tokens: int = 256,
-) -> AsyncGenerator[StreamToken, None]:
+) -> AsyncGenerator[StreamToken]:
     """Stream tokens from a GGUF (llama.cpp) model."""
     import asyncio
 
@@ -92,8 +97,10 @@ async def stream_gguf(
             text=text,
             token_id=-1,
             index=index,
-            is_final=(output.get("usage", {}).get("completion_tokens", 0) >= max_tokens
-                      or output.get("finish_reason") == "stop"),
+            is_final=(
+                output.get("usage", {}).get("completion_tokens", 0) >= max_tokens
+                or output.get("finish_reason") == "stop"
+            ),
         )
         index += 1
 
@@ -112,7 +119,7 @@ async def stream_transformers(
     tokenizer,
     prompt: str,
     max_tokens: int = 256,
-) -> AsyncGenerator[StreamToken, None]:
+) -> AsyncGenerator[StreamToken]:
     """Stream tokens from a HuggingFace model using TextIteratorStreamer.
 
     Uses model.generate() with TextIteratorStreamer for true token-by-token
@@ -144,7 +151,9 @@ async def stream_transformers(
         model = model.model
 
     inputs = tokenizer(prompt, return_tensors="pt")
-    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+    streamer = TextIteratorStreamer(
+        tokenizer, skip_prompt=True, skip_special_tokens=True
+    )
 
     def _generate():
         try:
@@ -156,7 +165,7 @@ async def stream_transformers(
                 temperature=0.7,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("streaming:L148", exc)
         finally:
             # Ensure the async generator always unblocks, even on error
@@ -194,15 +203,14 @@ async def stream_transformers(
     )
 
 
-
 async def stream_native(
     result,  # already-computed InferenceResult or similar
-) -> AsyncGenerator[StreamToken, None]:
+) -> AsyncGenerator[StreamToken]:
     """Yield a pre-computed result as a single streamed chunk."""
     yield StreamToken(
-        text=str(result.predictions) if hasattr(result, 'predictions') else str(result),
+        text=str(result.predictions) if hasattr(result, "predictions") else str(result),
         token_id=-1,
         index=0,
         is_final=True,
-        latency_ms=result.latency_ms if hasattr(result, 'latency_ms') else 0,
+        latency_ms=result.latency_ms if hasattr(result, "latency_ms") else 0,
     )

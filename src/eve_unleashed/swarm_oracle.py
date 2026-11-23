@@ -17,14 +17,17 @@ record oracles only. The default is conservative: text plus record,
 because a swarm that silently hits the network a hundred times is
 an outage in waiting.
 """
+
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
+
 
 MAX_WORKERS = 8
 PER_CLAIM_TIMEOUT = 120
@@ -32,18 +35,28 @@ PER_CLAIM_TIMEOUT = 120
 
 def _one(claim, grievance_id, live):
     from .oracle import consult
+
     if live:
         return consult(claim, grievance_id)
     from .debunk import debunk_claim
+
     d = debunk_claim(claim)
-    return {"claim": claim, "verdict": d["verdict"],
-            "signals": [{"signal": "text", "verdict": d["verdict"],
-                         "detail": "%d flag(s)" % len(d["fallacy_flags"]),
-                         "refutes": d["verdict"] == "REFUTED"}],
-            "agreeing": 1 if d["verdict"] != "REFUTED" else 0,
-            "disagreeing": 1 if d["verdict"] == "REFUTED" else 0,
-            "confidence": 0.0 if d["verdict"] == "REFUTED" else 1.0,
-            "note": "text oracle only (live=False)"}
+    return {
+        "claim": claim,
+        "verdict": d["verdict"],
+        "signals": [
+            {
+                "signal": "text",
+                "verdict": d["verdict"],
+                "detail": "{:d} flag(s)".format(len(d["fallacy_flags"])),
+                "refutes": d["verdict"] == "REFUTED",
+            }
+        ],
+        "agreeing": 1 if d["verdict"] != "REFUTED" else 0,
+        "disagreeing": 1 if d["verdict"] == "REFUTED" else 0,
+        "confidence": 0.0 if d["verdict"] == "REFUTED" else 1.0,
+        "note": "text oracle only (live=False)",
+    }
 
 
 def swarm(claims, grievance_id=None, live=False, workers=4):
@@ -55,29 +68,37 @@ def swarm(claims, grievance_id=None, live=False, workers=4):
     results, failures = [], []
     pool = ThreadPoolExecutor(max_workers=workers)
     try:
-        futures = {pool.submit(_one, c, grievance_id, live): c
-                   for c in claims}
+        futures = {pool.submit(_one, c, grievance_id, live): c for c in claims}
         for fut, claim in futures.items():
             try:
                 results.append(fut.result(timeout=PER_CLAIM_TIMEOUT))
             except FuturesTimeout as e:
                 note_failure("swarm_oracle:timeout", e)
-                failures.append({"claim": claim,
-                                 "error": "timeout after %ds"
-                                          % PER_CLAIM_TIMEOUT})
-            except Exception as e:
+                failures.append(
+                    {
+                        "claim": claim,
+                        "error": f"timeout after {PER_CLAIM_TIMEOUT:d}s",
+                    }
+                )
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("swarm_oracle:claim", e)
-                failures.append({"claim": claim,
-                                 "error": str(e)[:160]})
+                failures.append({"claim": claim, "error": str(e)[:160]})
     finally:
         pool.shutdown(wait=False)
     tally = {}
     for r in results:
         tally[r["verdict"]] = tally.get(r["verdict"], 0) + 1
-    return {"claims": len(claims), "answered": len(results),
-            "failed": failures, "tally": tally,
-            "workers": workers, "live": live,
-            "results": results,
-            "note": ("Every failed claim is named with its error. A "
-                     "swarm that dropped work silently would report a "
-                     "smaller world than the one it was given.")}
+    return {
+        "claims": len(claims),
+        "answered": len(results),
+        "failed": failures,
+        "tally": tally,
+        "workers": workers,
+        "live": live,
+        "results": results,
+        "note": (
+            "Every failed claim is named with its error. A "
+            "swarm that dropped work silently would report a "
+            "smaller world than the one it was given."
+        ),
+    }

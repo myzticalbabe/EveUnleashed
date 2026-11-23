@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
 """bible_theme.py -- themed editions of the canon, validated against the corpus.
 
 Why this exists
@@ -47,20 +46,21 @@ Exit codes: 0 pass, 1 a theme has a defect, 2 the theme set or the base corpus
 is unusable. 2 is not a pass: a validator that cannot read its input has not
 judged anything.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
 
 #: Shared with `bible_check.py`: a rule exists when canon gives it a heading and a
 #: body. The regex this replaces matched `RULE 0B-D` inside a `Related:` pointer,
 #: so a theme could cite a repealed statute and read clean.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import canon_rules  # noqa: E402  (after the path insertion, by necessity)
+import canon_rules
 
 REPO = Path(__file__).resolve().parents[1]
 BIBLE_DIR = REPO / "docs" / "bible"
@@ -70,8 +70,19 @@ MANDATES = REPO / "MANDATES.md"
 
 SCHEMA = "azazael/bible-theme@1"
 ANNOTATION_KINDS = ("textual", "historical", "translation", "editorial", "cross")
-GENRES = ("etiology", "law", "asceticism", "catholicity", "heresy", "creed",
-          "formation", "governance", "lament", "record", "history")
+GENRES = (
+    "etiology",
+    "law",
+    "asceticism",
+    "catholicity",
+    "heresy",
+    "creed",
+    "formation",
+    "governance",
+    "lament",
+    "record",
+    "history",
+)
 
 DEFAULT_LIMITS = {
     "max_books": 10,
@@ -97,7 +108,8 @@ class ThemeError(Exception):
 # Loading
 # --------------------------------------------------------------------------- #
 
-def load_base(path: Path = BASE) -> Dict[str, Dict[int, Dict[int, Dict]]]:
+
+def load_base(path: Path = BASE) -> dict[str, dict[int, dict[int, dict]]]:
     """The base corpus indexed ``book -> chapter -> verse -> verse``.
 
     Raised on an unreadable corpus rather than returning an empty index: an empty
@@ -105,24 +117,24 @@ def load_base(path: Path = BASE) -> Dict[str, Dict[int, Dict[int, Dict]]]:
     hides the one that matters -- that nothing was read.
     """
     if not path.is_file():
-        raise ThemeError("base corpus not found: %s" % path)
+        raise ThemeError(f"base corpus not found: {path}")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
-        raise ThemeError("base corpus %s is not readable JSON: %s" % (path, exc)) from exc
-    index: Dict[str, Dict[int, Dict[int, Dict]]] = {}
+        raise ThemeError(f"base corpus {path} is not readable JSON: {exc}") from exc
+    index: dict[str, dict[int, dict[int, dict]]] = {}
     for book in data.get("books", []):
-        chapters: Dict[int, Dict[int, Dict]] = {}
+        chapters: dict[int, dict[int, dict]] = {}
         for chapter in book.get("chapters", []):
             verses = {verse["number"]: verse for verse in chapter.get("verses", [])}
             chapters[int(chapter["number"])] = verses
         index[book["id"]] = chapters
     if not index:
-        raise ThemeError("base corpus %s declares no books" % path)
+        raise ThemeError(f"base corpus {path} declares no books")
     return index
 
 
-def theme_names(directory: Optional[Path] = None) -> List[str]:
+def theme_names(directory: Path | None = None) -> list[str]:
     """Theme names on disk, sorted. A missing directory is an empty set.
 
     ``directory`` defaults to the module constant at CALL time, not at definition
@@ -136,23 +148,27 @@ def theme_names(directory: Optional[Path] = None) -> List[str]:
     return sorted(path.stem for path in directory.glob("*.json"))
 
 
-def load_theme(name: str, directory: Optional[Path] = None) -> Tuple[Path, Dict]:
+def load_theme(name: str, directory: Path | None = None) -> tuple[Path, dict]:
     directory = THEMES if directory is None else directory
-    path = directory / ("%s.json" % name)
+    path = directory / (f"{name}.json")
     if not path.is_file():
-        raise ThemeError("no theme named %r in %s (found: %s)"
-                         % (name, directory, ", ".join(theme_names(directory)) or "none"))
+        raise ThemeError(
+            "no theme named {!r} in {} (found: {})".format(
+                name, directory, ", ".join(theme_names(directory)) or "none"
+            )
+        )
     try:
         return path, json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
-        raise ThemeError("%s is not readable JSON: %s" % (path, exc)) from exc
+        raise ThemeError(f"{path} is not readable JSON: {exc}") from exc
 
 
 # --------------------------------------------------------------------------- #
 # Validation
 # --------------------------------------------------------------------------- #
 
-def _canon_rules(repo: Path = REPO) -> Tuple[Optional[Dict[str, Dict]], Optional[str]]:
+
+def _canon_rules(repo: Path = REPO) -> tuple[dict[str, dict] | None, str | None]:
     """(rules `MANDATES.md` defines, its text), or (None, None) when unreadable."""
     path = Path(repo) / MANDATES.relative_to(REPO)
     if not path.is_file():
@@ -161,32 +177,41 @@ def _canon_rules(repo: Path = REPO) -> Tuple[Optional[Dict[str, Dict]], Optional
     return canon_rules.rule_blocks(text), text
 
 
-def _text_problems(value, where: str) -> List[str]:
-    problems: List[str] = []
+def _text_problems(value, where: str) -> list[str]:
+    problems: list[str] = []
     if not isinstance(value, str) or not value.strip():
-        return ["%s must be a non-empty string" % where]
+        return [f"{where} must be a non-empty string"]
     if EMAIL_RE.search(value):
-        problems.append("%s contains an email address" % where)
+        problems.append(f"{where} contains an email address")
     if PHONE_RE.search(value):
-        problems.append("%s contains a phone number" % where)
+        problems.append(f"{where} contains a phone number")
     return problems
 
 
-def validate(data: Dict, base: Dict[str, Dict[int, Dict[int, Dict]]],
-             repo: Path = REPO) -> Dict:
+def validate(
+    data: dict, base: dict[str, dict[int, dict[int, dict]]], repo: Path = REPO
+) -> dict:
     """Return ``{counts..., problems: [...]}``. An empty list means it may print."""
-    problems: List[str] = []
-    summary = {"theme": data.get("theme"), "books": 0, "chapters": 0, "verses": 0,
-               "citations": 0, "problems": problems}
+    problems: list[str] = []
+    summary = {
+        "theme": data.get("theme"),
+        "books": 0,
+        "chapters": 0,
+        "verses": 0,
+        "citations": 0,
+        "problems": problems,
+    }
 
     if not isinstance(data, dict):
         problems.append("the corpus must be a JSON object")
         return summary
     if data.get("schema") != SCHEMA:
-        problems.append("schema must be %r, found %r" % (SCHEMA, data.get("schema")))
+        problems.append(
+            "schema must be {!r}, found {!r}".format(SCHEMA, data.get("schema"))
+        )
     for field in ("title", "theme", "register", "source_corpus", "status", "updated"):
         if not isinstance(data.get(field), str) or not data.get(field, "").strip():
-            problems.append("%s must be a non-empty string" % field)
+            problems.append(f"{field} must be a non-empty string")
 
     # The register is the theme's own claim about its voice. An unstated voice is
     # how a themed edition starts reading as a second source.
@@ -196,7 +221,7 @@ def validate(data: Dict, base: Dict[str, Dict[int, Dict[int, Dict]]],
 
     source = data.get("source_corpus")
     if isinstance(source, str) and not (Path(repo) / source).is_file():
-        problems.append("source_corpus %r does not exist in this repository" % source)
+        problems.append(f"source_corpus {source!r} does not exist in this repository")
 
     limits = dict(DEFAULT_LIMITS)
     declared = data.get("limits")
@@ -206,207 +231,254 @@ def validate(data: Dict, base: Dict[str, Dict[int, Dict[int, Dict]]],
             if isinstance(value, int) and value > 0:
                 limits[key] = value
             else:
-                problems.append("limits.%s must be a positive integer" % key)
+                problems.append(f"limits.{key} must be a positive integer")
 
     rules, canon_text = _canon_rules(repo)
     if rules is None:
-        problems.append("MANDATES.md is unreadable, so a statute's RULE cannot be verified")
+        problems.append(
+            "MANDATES.md is unreadable, so a statute's RULE cannot be verified"
+        )
 
     books = data.get("books")
     if not isinstance(books, list) or not books:
         problems.append("books must be a non-empty list")
         return summary
     if len(books) > limits["max_books"]:
-        problems.append("%d books exceeds the declared cap of %d"
-                        % (len(books), limits["max_books"]))
+        problems.append(
+            "{:d} books exceeds the declared cap of {:d}".format(
+                len(books), limits["max_books"]
+            )
+        )
 
     seen_books = set()
     theme_refs = set()
     for book_position, book in enumerate(books, start=1):
-        where = "book %d" % book_position
+        where = f"book {book_position:d}"
         if not isinstance(book, dict):
-            problems.append("%s is not an object" % where)
+            problems.append(f"{where} is not an object")
             continue
         book_id = book.get("id")
         if not isinstance(book_id, str) or not ID_RE.match(book_id):
-            problems.append("%s id must be a lowercase slug, found %r" % (where, book_id))
-            book_id = "book%d" % book_position
+            problems.append(f"{where} id must be a lowercase slug, found {book_id!r}")
+            book_id = f"book{book_position:d}"
         elif book_id in seen_books:
-            problems.append("book id %r is used twice" % book_id)
+            problems.append(f"book id {book_id!r} is used twice")
         seen_books.add(book_id)
-        where = "book %r" % book_id
+        where = f"book {book_id!r}"
         for field in ("name", "subtitle", "genre"):
             if not isinstance(book.get(field), str) or not book.get(field, "").strip():
-                problems.append("%s needs a non-empty %s" % (where, field))
+                problems.append(f"{where} needs a non-empty {field}")
         if book.get("genre") not in GENRES:
-            problems.append("%s genre %r is not one of %s"
-                            % (where, book.get("genre"), ", ".join(GENRES)))
+            problems.append(
+                "{} genre {!r} is not one of {}".format(
+                    where, book.get("genre"), ", ".join(GENRES)
+                )
+            )
         introduction = book.get("introduction")
         if not isinstance(introduction, dict):
-            problems.append("%s needs an introduction object" % where)
+            problems.append(f"{where} needs an introduction object")
         else:
             paragraphs = introduction.get("paragraphs")
             if not isinstance(paragraphs, list) or not paragraphs:
-                problems.append("%s introduction needs paragraphs" % where)
+                problems.append(f"{where} introduction needs paragraphs")
             else:
                 for position, paragraph in enumerate(paragraphs, start=1):
-                    problems.extend(_text_problems(
-                        paragraph, "%s introduction paragraph %d" % (where, position)))
+                    problems.extend(
+                        _text_problems(
+                            paragraph,
+                            f"{where} introduction paragraph {position:d}",
+                        )
+                    )
             sources = introduction.get("sources")
             if not isinstance(sources, list) or not sources:
-                problems.append("%s introduction must name its sources" % where)
+                problems.append(f"{where} introduction must name its sources")
             else:
                 for entry in sources:
                     if isinstance(entry, str) and not (Path(repo) / entry).exists():
-                        problems.append("%s introduction source %r does not exist"
-                                        % (where, entry))
+                        problems.append(
+                            f"{where} introduction source {entry!r} does not exist"
+                        )
 
         chapters = book.get("chapters")
         if not isinstance(chapters, list) or not chapters:
-            problems.append("%s needs at least one chapter" % where)
+            problems.append(f"{where} needs at least one chapter")
             continue
         if len(chapters) > limits["max_chapters_per_book"]:
-            problems.append("%s has %d chapters, over the declared cap of %d"
-                            % (where, len(chapters), limits["max_chapters_per_book"]))
+            problems.append(
+                "{} has {:d} chapters, over the declared cap of {:d}".format(
+                    where, len(chapters), limits["max_chapters_per_book"]
+                )
+            )
         summary["books"] += 1
         for chapter_position, chapter in enumerate(chapters, start=1):
-            chapter_where = "%s chapter %d" % (where, chapter_position)
+            chapter_where = f"{where} chapter {chapter_position:d}"
             if not isinstance(chapter, dict):
-                problems.append("%s is not an object" % chapter_where)
+                problems.append(f"{chapter_where} is not an object")
                 continue
             number = chapter.get("number")
             if number != chapter_position:
-                problems.append("%s is numbered %r; chapters must run 1..n in order"
-                                % (chapter_where, number))
+                problems.append(
+                    f"{chapter_where} is numbered {number!r}; chapters must run 1..n in order"
+                )
             verses = chapter.get("verses")
             if not isinstance(verses, list) or not verses:
-                problems.append("%s has no verses" % chapter_where)
+                problems.append(f"{chapter_where} has no verses")
                 continue
             summary["chapters"] += 1
             if len(verses) > limits["max_verses_per_chapter"]:
-                problems.append("%s has %d verses, over the declared cap of %d"
-                                % (chapter_where, len(verses),
-                                   limits["max_verses_per_chapter"]))
+                problems.append(
+                    "{} has {:d} verses, over the declared cap of {:d}".format(
+                        chapter_where, len(verses), limits["max_verses_per_chapter"]
+                    )
+                )
             numbers = set()
             for verse_position, verse in enumerate(verses, start=1):
-                verse_where = "%s verse %d" % (chapter_where, verse_position)
+                verse_where = f"{chapter_where} verse {verse_position:d}"
                 if not isinstance(verse, dict):
-                    problems.append("%s is not an object" % verse_where)
+                    problems.append(f"{verse_where} is not an object")
                     continue
                 if verse.get("number") != verse_position:
-                    problems.append("%s is numbered %r; verses must run 1..n in order"
-                                    % (verse_where, verse.get("number")))
+                    problems.append(
+                        "{} is numbered {!r}; verses must run 1..n in order".format(
+                            verse_where, verse.get("number")
+                        )
+                    )
                 numbers.add(verse.get("number"))
                 summary["verses"] += 1
-                theme_refs.add("%s %d:%d" % (book_id, chapter_position, verse_position))
-                problems.extend(_verse_problems(verse, verse_where, base, rules,
-                                                canon_text, Path(repo), summary))
+                theme_refs.add(f"{book_id} {chapter_position:d}:{verse_position:d}")
+                problems.extend(
+                    _verse_problems(
+                        verse, verse_where, base, rules, canon_text, Path(repo), summary
+                    )
+                )
 
-            problems.extend(_section_problems(chapter.get("sections"), numbers,
-                                              chapter_where))
+            problems.extend(
+                _section_problems(chapter.get("sections"), numbers, chapter_where)
+            )
 
     problems.extend(_glossary_problems(data.get("glossary"), theme_refs))
     return summary
 
 
-def _verse_problems(verse: Dict, where: str,
-                    base: Dict[str, Dict[int, Dict[int, Dict]]],
-                    rules: Optional[Dict[str, Dict]], canon_text: Optional[str],
-                    repo: Path, summary: Dict) -> List[str]:
-    problems = _text_problems(verse.get("text"), "%s text" % where)
+def _verse_problems(
+    verse: dict,
+    where: str,
+    base: dict[str, dict[int, dict[int, dict]]],
+    rules: dict[str, dict] | None,
+    canon_text: str | None,
+    repo: Path,
+    summary: dict,
+) -> list[str]:
+    problems = _text_problems(verse.get("text"), f"{where} text")
 
     cites = verse.get("cites")
     if not isinstance(cites, list) or not cites:
         # THE rule. A themed verse with nothing to cite is a new doctrine wearing
         # an old voice, and there is no other place this can be caught.
-        problems.append("%s cites nothing: a themed verse must restate a verse of "
-                        "the base corpus, not add one" % where)
+        problems.append(
+            f"{where} cites nothing: a themed verse must restate a verse of "
+            "the base corpus, not add one"
+        )
     else:
         for citation in cites:
             if not isinstance(citation, str) or not REF_RE.match(citation):
-                problems.append("%s citation %r must read \"<book> <chapter>:<verse>\""
-                                % (where, citation))
+                problems.append(
+                    f'{where} citation {citation!r} must read "<book> <chapter>:<verse>"'
+                )
                 continue
             book_id, chapter_text, verse_text = REF_RE.match(citation).groups()
             chapters = base.get(book_id)
             verses = chapters.get(int(chapter_text)) if chapters else None
             if not verses or int(verse_text) not in verses:
-                problems.append("%s cites %s, which is not a verse of the base corpus"
-                                % (where, citation))
+                problems.append(
+                    f"{where} cites {citation}, which is not a verse of the base corpus"
+                )
             else:
                 summary["citations"] += 1
 
     statute = verse.get("statute")
     if statute is not None:
         if not isinstance(statute, dict):
-            problems.append("%s statute must be an object" % where)
+            problems.append(f"{where} statute must be an object")
         else:
             rule = statute.get("rule")
             if not isinstance(rule, str) or not rule.strip():
-                problems.append("%s statute must name a RULE" % where)
+                problems.append(f"{where} statute must name a RULE")
             elif rules is not None:
                 defect = canon_rules.rule_problem(rule, rules, canon_text)
                 if defect:
-                    problems.append("%s statute %s" % (where, defect))
+                    problems.append(f"{where} statute {defect}")
             check = statute.get("check")
             if not isinstance(check, str) or not check.strip():
-                problems.append("%s statute names no check command" % where)
+                problems.append(f"{where} statute names no check command")
             elif not _command_target_exists(check, repo):
-                problems.append("%s statute's check %r names no path in this repository"
-                                % (where, check))
+                problems.append(
+                    f"{where} statute's check {check!r} names no path in this repository"
+                )
 
     annotations = verse.get("annotations")
     if annotations is not None:
         if not isinstance(annotations, list):
-            problems.append("%s annotations must be a list" % where)
+            problems.append(f"{where} annotations must be a list")
         else:
             for position, annotation in enumerate(annotations, start=1):
-                note_where = "%s annotation %d" % (where, position)
+                note_where = f"{where} annotation {position:d}"
                 if not isinstance(annotation, dict):
-                    problems.append("%s is not an object" % note_where)
+                    problems.append(f"{note_where} is not an object")
                     continue
                 if annotation.get("kind") not in ANNOTATION_KINDS:
-                    problems.append("%s kind %r is not one of %s"
-                                    % (note_where, annotation.get("kind"),
-                                       ", ".join(ANNOTATION_KINDS)))
-                problems.extend(_text_problems(annotation.get("note"),
-                                               "%s note" % note_where))
+                    problems.append(
+                        "{} kind {!r} is not one of {}".format(
+                            note_where,
+                            annotation.get("kind"),
+                            ", ".join(ANNOTATION_KINDS),
+                        )
+                    )
+                problems.extend(
+                    _text_problems(annotation.get("note"), f"{note_where} note")
+                )
                 source = annotation.get("source")
-                if source is not None:
-                    if not isinstance(source, str) or not (repo / source).is_file():
-                        problems.append("%s source %r does not exist in this repository"
-                                        % (note_where, source))
+                if source is not None and (
+                    not isinstance(source, str) or not (repo / source).is_file()
+                ):
+                    problems.append(
+                        f"{note_where} source {source!r} does not exist in this repository"
+                    )
     return problems
 
 
-def _section_problems(sections, numbers: set, where: str) -> List[str]:
-    problems: List[str] = []
+def _section_problems(sections, numbers: set, where: str) -> list[str]:
+    problems: list[str] = []
     if sections is None:
         return problems
     if not isinstance(sections, list):
-        return ["%s sections must be a list" % where]
+        return [f"{where} sections must be a list"]
     previous = 0
     for position, section in enumerate(sections, start=1):
-        section_where = "%s section %d" % (where, position)
+        section_where = f"{where} section {position:d}"
         if not isinstance(section, dict):
-            problems.append("%s is not an object" % section_where)
+            problems.append(f"{section_where} is not an object")
             continue
         before = section.get("before_verse")
         if not isinstance(before, int) or before not in numbers:
-            problems.append("%s names verse %r, which does not exist"
-                            % (section_where, before))
+            problems.append(
+                f"{section_where} names verse {before!r}, which does not exist"
+            )
         elif before <= previous:
-            problems.append("%s is out of order: %d after %d"
-                            % (section_where, before, previous))
+            problems.append(
+                f"{section_where} is out of order: {before:d} after {previous:d}"
+            )
         else:
             previous = before
         heading = section.get("heading")
-        problems.extend(_text_problems(heading, "%s heading" % section_where))
+        problems.extend(_text_problems(heading, f"{section_where} heading"))
         if isinstance(heading, str) and DIGIT_RE.search(heading):
             # A heading is a label. A figure in it is a claim with no command,
             # which is the exact defect the corpus refuses.
-            problems.append("%s heading %r carries a figure; a heading is a label, "
-                            "not a claim" % (section_where, heading))
+            problems.append(
+                f"{section_where} heading {heading!r} carries a figure; a heading is a label, "
+                "not a claim"
+            )
     return problems
 
 
@@ -419,29 +491,29 @@ def _command_target_exists(command: str, repo: Path) -> bool:
     return False
 
 
-def _glossary_problems(glossary, theme_refs: set) -> List[str]:
-    problems: List[str] = []
+def _glossary_problems(glossary, theme_refs: set) -> list[str]:
+    problems: list[str] = []
     if glossary is None:
         return problems
     if not isinstance(glossary, list):
         return ["glossary must be a list"]
     seen = set()
     for position, entry in enumerate(glossary, start=1):
-        where = "glossary entry %d" % position
+        where = f"glossary entry {position:d}"
         if not isinstance(entry, dict):
-            problems.append("%s is not an object" % where)
+            problems.append(f"{where} is not an object")
             continue
         term = entry.get("term")
         if not isinstance(term, str) or not term.strip():
-            problems.append("%s needs a term" % where)
+            problems.append(f"{where} needs a term")
         elif term.lower() in seen:
-            problems.append("glossary term %r is defined twice" % term)
+            problems.append(f"glossary term {term!r} is defined twice")
         else:
             seen.add(term.lower())
-        problems.extend(_text_problems(entry.get("gloss"), "%s gloss" % where))
+        problems.extend(_text_problems(entry.get("gloss"), f"{where} gloss"))
         see = entry.get("see")
         if see is not None and see not in theme_refs:
-            problems.append("%s see %r is not a verse of this theme" % (where, see))
+            problems.append(f"{where} see {see!r} is not a verse of this theme")
     return problems
 
 
@@ -449,45 +521,65 @@ def _glossary_problems(glossary, theme_refs: set) -> List[str]:
 # Rendering
 # --------------------------------------------------------------------------- #
 
-def _reference_index(books: Sequence[Dict]) -> Dict[str, List[str]]:
+
+def _reference_index(books: Sequence[dict]) -> dict[str, list[str]]:
     """Who cites whom, inside the theme only. Used for the marginal note."""
-    cited_by: Dict[str, List[str]] = {}
+    cited_by: dict[str, list[str]] = {}
     for book in books:
         for chapter in book.get("chapters", []) or []:
             for verse in chapter.get("verses", []) or []:
-                reference = "%s %d:%d" % (book.get("id"), chapter.get("number"),
-                                          verse.get("number"))
+                reference = "{} {:d}:{:d}".format(
+                    book.get("id"),
+                    chapter.get("number"),
+                    verse.get("number"),
+                )
                 for citation in verse.get("cites", []) or []:
                     cited_by.setdefault(citation, []).append(reference)
     return cited_by
 
 
-def render_theme(data: Dict, corpus_name: str = "unknown") -> str:
+def render_theme(data: dict, corpus_name: str = "unknown") -> str:
     """Deterministic markdown: headings in place, notes beside their verse.
 
     Nothing here is timestamped or path-dependent, so a second run is
     byte-identical and the drift check cannot fail on a clock.
     """
-    lines = ["# %s" % data.get("title", "Untitled")]
+    lines = ["# {}".format(data.get("title", "Untitled"))]
     register = data.get("register")
     if register:
-        lines.extend(["", "*%s*" % register])
+        lines.extend(["", f"*{register}*"])
     source = data.get("source_corpus")
     if source:
-        lines.extend(["", "A themed edition of `%s`: every verse below cites a verse "
-                          "of the corpus, and adds none." % source])
-    lines.extend(["", "Status: **%s** · updated %s." % (data.get("status"),
-                                                       data.get("updated")), "",
-                  "_Generated from `docs/bible/themes/%s.json` by "
-                  "`python tools/bible_theme.py --all --render --write`. Do not edit "
-                  "this file: edit the corpus._" % corpus_name])
+        lines.extend(
+            [
+                "",
+                (
+                    f"A themed edition of `{source}`: every verse below cites a verse "
+                    "of the corpus, and adds none."
+                ),
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "Status: **{}** · updated {}.".format(
+                data.get("status"), data.get("updated")
+            ),
+            "",
+            (
+                f"_Generated from `docs/bible/themes/{corpus_name}.json` by "
+                "`python tools/bible_theme.py --all --render --write`. Do not edit "
+                "this file: edit the corpus._"
+            ),
+        ]
+    )
 
     for book in data.get("books", []) or []:
-        lines.extend(["", "## %s" % book.get("name", book.get("id")), ""])
+        lines.extend(["", "## {}".format(book.get("name", book.get("id"))), ""])
         if book.get("subtitle"):
-            lines.extend(["### %s" % book["subtitle"], ""])
+            lines.extend(["### {}".format(book["subtitle"]), ""])
         if book.get("genre"):
-            lines.extend(["*%s*" % book["genre"], ""])
+            lines.extend(["*{}*".format(book["genre"]), ""])
         introduction = book.get("introduction")
         if isinstance(introduction, dict):
             lines.append("")
@@ -495,59 +587,70 @@ def render_theme(data: Dict, corpus_name: str = "unknown") -> str:
                 lines.extend([paragraph, ""])
             sources = introduction.get("sources") or []
             if sources:
-                lines.extend(["*Sources: %s*" % "; ".join(sources), ""])
+                lines.extend(["*Sources: {}*".format("; ".join(sources)), ""])
         for chapter in book.get("chapters", []) or []:
             number = chapter.get("number")
-            lines.extend(["", "#### %s %s" % (book.get("name", ""), number), ""])
-            headings = {section.get("before_verse"): section.get("heading")
-                        for section in chapter.get("sections", []) or []}
+            lines.extend(["", "#### {} {}".format(book.get("name", ""), number), ""])
+            headings = {
+                section.get("before_verse"): section.get("heading")
+                for section in chapter.get("sections", []) or []
+            }
             for verse in chapter.get("verses", []) or []:
                 verse_number = verse.get("number")
                 if verse_number in headings:
-                    lines.extend(["##### %s" % headings[verse_number], ""])
+                    lines.extend([f"##### {headings[verse_number]}", ""])
                 trailing = []
                 if verse.get("cites"):
                     trailing.append("corpus " + ", ".join(verse["cites"]))
                 if isinstance(verse.get("statute"), dict):
                     statute = verse["statute"]
-                    trailing.append("statute %s → `%s`" % (statute.get("rule"),
-                                                           statute.get("check")))
-                suffix = (" *(%s)*" % "; ".join(trailing)) if trailing else ""
-                lines.append("**%s** %s%s" % (verse_number, verse.get("text", ""),
-                                              suffix))
+                    trailing.append(
+                        "statute {} → `{}`".format(
+                            statute.get("rule"), statute.get("check")
+                        )
+                    )
+                suffix = (" *({})*".format("; ".join(trailing))) if trailing else ""
+                lines.append(
+                    "**{}** {}{}".format(verse_number, verse.get("text", ""), suffix)
+                )
                 annotations = verse.get("annotations") or []
                 if annotations:
                     lines.append("")
                 for annotation in annotations:
                     source_note = annotation.get("source")
-                    lines.append("> **%s** — %s%s"
-                                 % (annotation.get("kind"), annotation.get("note"),
-                                    (" (`%s`)" % source_note) if source_note else ""))
+                    lines.append(
+                        "> **{}** — {}{}".format(
+                            annotation.get("kind"),
+                            annotation.get("note"),
+                            (f" (`{source_note}`)") if source_note else "",
+                        )
+                    )
                 lines.append("")
 
     glossary = data.get("glossary") or []
     if glossary:
         lines.extend(["", "## Glossary", ""])
         for entry in glossary:
-            see = (" (see %s)" % entry["see"]) if entry.get("see") else ""
-            lines.append("- **%s** — %s%s" % (entry.get("term"), entry.get("gloss"), see))
+            see = (" (see {})".format(entry["see"])) if entry.get("see") else ""
+            lines.append(
+                "- **{}** — {}{}".format(entry.get("term"), entry.get("gloss"), see)
+            )
     lines.append("")
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines))
 
 
-def rendered_path(name: str, directory: Optional[Path] = None) -> Path:
-    return (THEMES if directory is None else directory) / ("%s.md" % name)
+def rendered_path(name: str, directory: Path | None = None) -> Path:
+    return (THEMES if directory is None else directory) / (f"{name}.md")
 
 
-def drift_message(name: str, data: Dict,
-                  directory: Optional[Path] = None) -> Optional[str]:
+def drift_message(name: str, data: dict, directory: Path | None = None) -> str | None:
     """A one-line drift report, or None when the rendered file matches the corpus."""
     path = rendered_path(name, directory)
     expected = render_theme(data, name)
     if not path.is_file():
-        return ("%s.md has never been rendered; run --all --render --write" % name)
+        return f"{name}.md has never been rendered; run --all --render --write"
     if path.read_text(encoding="utf-8", errors="replace") != expected:
-        return ("%s.md does not match its corpus; run --all --render --write" % name)
+        return f"{name}.md does not match its corpus; run --all --render --write"
     return None
 
 
@@ -555,19 +658,32 @@ def drift_message(name: str, data: Dict,
 # CLI
 # --------------------------------------------------------------------------- #
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate and render themed editions of the bible corpus.")
+        description="Validate and render themed editions of the bible corpus."
+    )
     parser.add_argument("--list", action="store_true", help="list themes on disk")
-    parser.add_argument("--theme", action="append", default=[],
-                        help="a theme name (repeatable); default is every theme")
+    parser.add_argument(
+        "--theme",
+        action="append",
+        default=[],
+        help="a theme name (repeatable); default is every theme",
+    )
     parser.add_argument("--all", action="store_true", help="every theme on disk")
-    parser.add_argument("--check", action="store_true", help="validate; exit 1 on a defect")
-    parser.add_argument("--render", action="store_true", help="print the rendered edition")
-    parser.add_argument("--write", action="store_true", help="write the rendered edition")
+    parser.add_argument(
+        "--check", action="store_true", help="validate; exit 1 on a defect"
+    )
+    parser.add_argument(
+        "--render", action="store_true", help="print the rendered edition"
+    )
+    parser.add_argument(
+        "--write", action="store_true", help="write the rendered edition"
+    )
     parser.add_argument("--json", action="store_true", help="machine-readable summary")
-    parser.add_argument("--no-drift", action="store_true",
-                        help="skip the rendered-file drift check")
+    parser.add_argument(
+        "--no-drift", action="store_true", help="skip the rendered-file drift check"
+    )
     args = parser.parse_args(argv)
 
     if args.list:
@@ -578,21 +694,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         base = load_base()
     except ThemeError as exc:
-        print("UNUSABLE: %s" % exc, file=sys.stderr)
+        print(f"UNUSABLE: {exc}", file=sys.stderr)
         return 2
 
     names = list(args.theme) or theme_names()
     if not names:
-        print("UNUSABLE: no themes in %s" % THEMES, file=sys.stderr)
+        print(f"UNUSABLE: no themes in {THEMES}", file=sys.stderr)
         return 2
 
-    summaries: List[Dict] = []
+    summaries: list[dict] = []
     failures = 0
     for name in names:
         try:
             _path, data = load_theme(name)
         except ThemeError as exc:
-            print("UNUSABLE: %s" % exc, file=sys.stderr)
+            print(f"UNUSABLE: {exc}", file=sys.stderr)
             return 2
         summary = validate(data, base)
         problems = summary["problems"]
@@ -609,19 +725,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             continue
         # The theme's own field is its declared identity; the header shows the
         # title, because a reader opening the output wants the name of the book.
-        print("== %s: %s" % (name, data.get("title") or "?"))
+        print("== {}: {}".format(name, data.get("title") or "?"))
         if problems:
             for problem in problems:
-                print("   FAIL %s" % problem)
+                print(f"   FAIL {problem}")
         else:
-            print("   OK   %d book(s), %d chapter(s), %d verse(s), %d citation(s)"
-                  % (summary["books"], summary["chapters"], summary["verses"],
-                     summary["citations"]))
+            print(
+                "   OK   {:d} book(s), {:d} chapter(s), {:d} verse(s), {:d} citation(s)".format(
+                    summary["books"],
+                    summary["chapters"],
+                    summary["verses"],
+                    summary["citations"],
+                )
+            )
         if args.render or args.write:
             text = render_theme(data, name)
             if args.write:
                 rendered_path(name).write_text(text, encoding="utf-8", newline="\n")
-                print("   wrote %s" % rendered_path(name).relative_to(REPO))
+                print(f"   wrote {rendered_path(name).relative_to(REPO)}")
             else:
                 print(text)
 
@@ -631,7 +752,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # A defect exits 1 whether or not --check was asked for. Printing FAIL and
         # returning 0 is the false-green this estate has spent sessions removing:
         # a caller reading the exit code would record a broken theme as valid.
-        print("\n%d of %d theme(s) refused." % (failures, len(summaries)))
+        print(f"\n{failures:d} of {len(summaries):d} theme(s) refused.")
         return 1
     return 0
 

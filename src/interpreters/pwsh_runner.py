@@ -12,6 +12,7 @@ argv lists throughout -- never shell=True. Toolchain/module absence is a
 structured error, never a crash.
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -20,24 +21,27 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-import argparse
-from typing import List, Optional
+from typing import ClassVar
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
 
 try:
-    from CORE.paths import get_project_root_safe as _get_project_root_safe
-except ImportError as exc:                               # never break the host
+    from core.paths import get_project_root_safe as _get_project_root_safe
+except ImportError as exc:  # never break the host
     note_failure("pwsh_runner:core-paths-import", exc)
     _get_project_root_safe = None
 
-_DEFAULT_ROOT = (str(_get_project_root_safe()) if _get_project_root_safe is not None
-                 else str(Path(__file__).resolve().parents[2]))
+_DEFAULT_ROOT = (
+    str(_get_project_root_safe())
+    if _get_project_root_safe is not None
+    else str(Path(__file__).resolve().parents[2])
+)
 
 AZAZAEL_ROOT = os.environ.get(
     "AZAZAEL_ROOT", os.environ.get("Azazael_ROOT", _DEFAULT_ROOT)
@@ -60,12 +64,13 @@ _PARSER_CHECK = (
 @dataclass
 class PwshResult:
     """Result of a PowerShell execution."""
+
     success: bool
     stdout: str = ""
     stderr: str = ""
     returncode: int = 0
     duration_ms: float = 0.0
-    errors: List[dict] = field(default_factory=list)
+    errors: list[dict] = field(default_factory=list)
     stderr_bytes: str = ""  # D7: raw stderr (latin-1) for forensics
 
 
@@ -85,13 +90,22 @@ class PwshRunner:
             return False
         try:
             out = subprocess.run(
-                [self.pwsh_bin, "-NoProfile", "-NonInteractive", "-Command",
-                 "$PSVersionTable.PSVersion.ToString()"],
-                capture_output=True, text=True, encoding="utf-8",
-                errors="replace", timeout=20,
+                [
+                    self.pwsh_bin,
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    "$PSVersionTable.PSVersion.ToString()",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=20,
+                check=False,
             )
             self.version = out.stdout.strip()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pwsh_runner:version", e)
         return True
 
@@ -104,8 +118,8 @@ class PwshRunner:
             errors=[{"type": "toolchain", "message": "pwsh missing"}],
         )
 
-    def _parse_errors(self, stderr: str) -> List[dict]:
-        errors: List[dict] = []
+    def _parse_errors(self, stderr: str) -> list[dict]:
+        errors: list[dict] = []
         for line in stderr.split("\n"):
             s = line.strip()
             if not s:
@@ -114,13 +128,17 @@ class PwshRunner:
             errors.append({"level": "error", "message": s})
         return errors
 
-    def _run(self, cmd: List[str], cwd: str, timeout: int) -> PwshResult:
+    def _run(self, cmd: list[str], cwd: str, timeout: int) -> PwshResult:
         # D7: capture bytes, decode manually — display via replace,
         # evidence via stderr_bytes (latin-1 round-trips every byte).
         try:
             start = time.time()
             result = subprocess.run(
-                cmd, cwd=cwd, capture_output=True, timeout=timeout,
+                cmd,
+                cwd=cwd,
+                capture_output=True,
+                timeout=timeout,
+                check=False,
             )
             stdout = result.stdout.decode("utf-8", errors="replace")
             stderr = result.stderr.decode("utf-8", errors="replace")
@@ -138,19 +156,25 @@ class PwshRunner:
             return PwshResult(
                 success=False,
                 stderr=f"Execution timed out (>{timeout}s)",
-                errors=[{"type": "timeout", "message": f"Runtime exceeded {timeout} seconds"}],
+                errors=[
+                    {
+                        "type": "timeout",
+                        "message": f"Runtime exceeded {timeout} seconds",
+                    }
+                ],
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pwsh_runner:exec", e)
             return PwshResult(
-                success=False, stderr=str(e),
+                success=False,
+                stderr=str(e),
                 errors=[{"type": "exception", "message": str(e)}],
             )
 
-    def _base(self, extra: List[str]) -> List[str]:
+    def _base(self, extra: list[str]) -> list[str]:
         return [self.pwsh_bin, "-NoProfile", "-NonInteractive"] + extra
 
-    def run_file(self, file_path: str, args: Optional[List[str]] = None) -> PwshResult:
+    def run_file(self, file_path: str, args: list[str] | None = None) -> PwshResult:
         """Run a .ps1 file.
 
         D6 contract: args are literal strings passed to `pwsh -File` with NO
@@ -166,18 +190,24 @@ class PwshRunner:
                 stderr=f"File not found: {file_path}",
                 errors=[{"type": "file", "message": f"Missing: {file_path}"}],
             )
-        return self._run(self._base(["-File", str(source)] + (args or [])),
-                         cwd=str(source.parent), timeout=60)
+        return self._run(
+            self._base(["-File", str(source)] + (args or [])),
+            cwd=str(source.parent),
+            timeout=60,
+        )
 
-    def run_code(self, code: str, args: Optional[List[str]] = None) -> PwshResult:
+    def run_code(self, code: str, args: list[str] | None = None) -> PwshResult:
         """Run inline PowerShell (written to a hashed temp file)."""
         if not self.has_pwsh:
             return self._no_toolchain()
         code_hash = hashlib.md5(code.encode()).hexdigest()[:12]
         source_path = PWSH_BUILD_DIR / f"azazael_{code_hash}.ps1"
         source_path.write_text(code, encoding="utf-8")
-        return self._run(self._base(["-File", str(source_path)] + (args or [])),
-                         cwd=str(PWSH_BUILD_DIR), timeout=60)
+        return self._run(
+            self._base(["-File", str(source_path)] + (args or [])),
+            cwd=str(PWSH_BUILD_DIR),
+            timeout=60,
+        )
 
     def check_syntax(self, file_path: str) -> PwshResult:
         """Parser-only check (never executes the script)."""
@@ -186,10 +216,13 @@ class PwshRunner:
         source = Path(file_path)
         if not source.exists():
             return PwshResult(success=False, stderr=f"File not found: {file_path}")
-        return self._run(self._base(["-Command", _PARSER_CHECK, str(source)]),
-                         cwd=str(source.parent), timeout=30)
+        return self._run(
+            self._base(["-Command", _PARSER_CHECK, str(source)]),
+            cwd=str(source.parent),
+            timeout=30,
+        )
 
-    _module_cache: dict = {}  # P2: process-level probe cache (pwsh spawn ~200ms)
+    _module_cache: ClassVar[dict] = {}  # P2: process-level probe cache
 
     def _module_present(self, name: str) -> bool:
         """True when a PowerShell module is importable (fast probe).
@@ -202,13 +235,17 @@ class PwshRunner:
             return PwshRunner._module_cache[name]
         try:
             probe = subprocess.run(
-                self._base(["-Command", f"if(Get-Module -ListAvailable -Name {name}){{'YES'}}"]),
-                capture_output=True, timeout=30,
+                self._base(
+                    ["-Command", f"if(Get-Module -ListAvailable -Name {name}){{'YES'}}"]
+                ),
+                capture_output=True,
+                timeout=30,
+                check=False,
             )
             present = b"YES" in (probe.stdout or b"")
             PwshRunner._module_cache[name] = present
             return present
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("pwsh_runner:module-probe", e)
             return False
 
@@ -220,30 +257,46 @@ class PwshRunner:
             return PwshResult(
                 success=False,
                 stderr="PSScriptAnalyzer not installed; skipping lint.",
-                errors=[{"type": "toolchain", "message": "PSScriptAnalyzer missing (optional)"}],
+                errors=[
+                    {
+                        "type": "toolchain",
+                        "message": "PSScriptAnalyzer missing (optional)",
+                    }
+                ],
             )
         cmd = (
             "$__r=Invoke-ScriptAnalyzer -Path $args[0];"
             "$__r|ConvertTo-Json -Depth 3 -Compress;"
             "if($null -eq $__r){'[]'}"
         )
-        res = self._run(self._base(["-Command", cmd, str(file_path)]),
-                        cwd=str(Path(file_path).parent), timeout=60)
+        res = self._run(
+            self._base(["-Command", cmd, str(file_path)]),
+            cwd=str(Path(file_path).parent),
+            timeout=60,
+        )
         if not res.success:
             return res
         try:
             findings = json.loads(res.stdout.strip() or "[]")
             if isinstance(findings, dict):
                 findings = [findings]
-            errors = [{"level": str(f.get("Severity", "error")).lower(),
-                       "message": f"{f.get('ScriptName', '')}:{f.get('Line', '')} "
-                                  f"{f.get('RuleName', '')} {f.get('Message', '')}".strip()}
-                      for f in findings]
+            errors = [
+                {
+                    "level": str(f.get("Severity", "error")).lower(),
+                    "message": f"{f.get('ScriptName', '')}:{f.get('Line', '')} "
+                    f"{f.get('RuleName', '')} {f.get('Message', '')}".strip(),
+                }
+                for f in findings
+            ]
             bad = [e for e in errors if e["level"] == "error"]
-            return PwshResult(success=not bad, stdout=res.stdout,
-                              stderr="" if not bad else f"{len(bad)} error(s)",
-                              returncode=0 if not bad else 1,
-                              duration_ms=res.duration_ms, errors=errors)
+            return PwshResult(
+                success=not bad,
+                stdout=res.stdout,
+                stderr="" if not bad else f"{len(bad)} error(s)",
+                returncode=0 if not bad else 1,
+                duration_ms=res.duration_ms,
+                errors=errors,
+            )
         except ValueError as e:
             note_failure("pwsh_runner:lint-parse", e)
             return PwshResult(success=False, stderr=f"lint output unparseable: {e}")
@@ -258,14 +311,16 @@ class PwshRunner:
                 stderr="Pester not installed; skipping tests.",
                 errors=[{"type": "toolchain", "message": "Pester missing (optional)"}],
             )
-        cmd = ("$__c=Invoke-Pester -Path $args[0] -PassThru;"
-               "'FAILED='+$__c.FailedCount+',PASSED='+$__c.PassedCount")
+        cmd = (
+            "$__c=Invoke-Pester -Path $args[0] -PassThru;"
+            "'FAILED='+$__c.FailedCount+',PASSED='+$__c.PassedCount"
+        )
         base = target if Path(target).is_dir() else str(Path(target).parent)
-        return self._run(self._base(["-Command", cmd, target]),
-                         cwd=base, timeout=180)
+        return self._run(self._base(["-Command", cmd, target]), cwd=base, timeout=180)
 
 
 # --- CLI ---------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Azazael PowerShell Runner")

@@ -9,16 +9,18 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
+
+
 # from typing import Optional  # removed — all names have native equivalents
 
 
@@ -53,7 +55,7 @@ class EveConfig:
     warmup_iterations: int = 3
 
     @classmethod
-    def from_file(cls, path: str) -> "EveConfig":
+    def from_file(cls, path: str) -> EveConfig:
         """Load configuration from a JSON file."""
         config_path = Path(path)
         if not config_path.exists():
@@ -74,7 +76,7 @@ class EveConfig:
             json.dump(data, f, indent=2)
 
     @classmethod
-    def gpu_optimized(cls) -> "EveConfig":
+    def gpu_optimized(cls) -> EveConfig:
         """Create a GPU-optimized configuration."""
         return cls(
             device="cuda",
@@ -85,7 +87,7 @@ class EveConfig:
         )
 
     @classmethod
-    def cpu_optimized(cls) -> "EveConfig":
+    def cpu_optimized(cls) -> EveConfig:
         """Create a CPU-optimized configuration."""
         return cls(
             device="cpu",

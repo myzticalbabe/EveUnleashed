@@ -49,7 +49,7 @@
 <div id="graph"></div>
 <div id="sidebar">
   <div id="search-wrap">
-    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
+    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off" aria-label="Search nodes">
     <div id="search-results"></div>
   </div>
   <div id="info-panel">
@@ -59,7 +59,7 @@
   <div id="legend-wrap">
     <h3>Communities</h3>
     <div id="legend-controls">
-      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
+      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)" aria-label="Select all communities">Select All</label>
     </div>
     <div id="legend"></div>
   </div>

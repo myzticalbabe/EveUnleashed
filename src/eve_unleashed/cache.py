@@ -15,7 +15,7 @@ import json
 import sys
 import threading
 import time
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 
@@ -23,8 +23,9 @@ import numpy as np
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -64,7 +65,7 @@ class InferenceCache:
     def __init__(
         self,
         max_size_bytes: int = 512 * 1024 * 1024,  # default 512 MB
-        ttl_seconds: int = 300,                     # default 5 minutes
+        ttl_seconds: int = 300,  # default 5 minutes
     ):
         self._max_size = max_size_bytes
         self._ttl = ttl_seconds
@@ -87,7 +88,7 @@ class InferenceCache:
             "hit_rate": round(self._hits / total, 3) if total > 0 else 0.0,
         }
 
-    def get(self, handle: str, inputs: Any, framework: str) -> (Any | None):
+    def get(self, handle: str, inputs: Any, framework: str) -> Any | None:
         """Look up a cached result. Returns None on miss or expiry."""
         key = self._make_key(handle, inputs, framework)
         with self._lock:
@@ -127,7 +128,7 @@ class InferenceCache:
             self._store[key] = (time.time(), result)
             self._current_size += entry_size
 
-    def invalidate(self, handle: (str | None) = None):
+    def invalidate(self, handle: str | None = None):
         """Clear entries for a specific handle, or the entire cache."""
         with self._lock:
             if handle is None:

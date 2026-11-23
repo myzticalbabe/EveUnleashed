@@ -10,14 +10,13 @@ exposed so Lillith can tune them instead of a human re-deriving them.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 import numpy as np
 
 from .dodeca_recall import SHAPES, ShapeStore, bfs_distances
 
 try:
     from . import _forensic_cy as _cy
+
     ENGINE = "native"
 except ImportError:
     _cy = None
@@ -34,15 +33,19 @@ def moore_efficiency(solid: str) -> float:
     return n / bound
 
 
-def fault_stats(solid: str) -> Dict:
+def fault_stats(solid: str) -> dict:
     """Kill every vertex in turn: worst surviving diameter + disconnects."""
     n, nbr = SHAPES[solid]
     adj = {v: list(nbr(v)) for v in range(n)}
     base = max(bfs_distances(0, n, nbr).values())
     if _cy is not None:
         worst, disc = _cy.fault_worst(n, [adj[v] for v in range(n)])
-        return {"fault_diameter": worst, "disconnects": disc,
-                "fault_stretch": worst / base, "engine": ENGINE}
+        return {
+            "fault_diameter": worst,
+            "disconnects": disc,
+            "fault_stretch": worst / base,
+            "engine": ENGINE,
+        }
     worst, disc = base, 0
     for kill in range(n):
         keep = [v for v in range(n) if v != kill]
@@ -61,8 +64,12 @@ def fault_stats(solid: str) -> Dict:
             disc += 1
         else:
             worst = max(worst, mx)
-    return {"fault_diameter": worst, "disconnects": disc,
-            "fault_stretch": worst / base, "engine": ENGINE}
+    return {
+        "fault_diameter": worst,
+        "disconnects": disc,
+        "fault_stretch": worst / base,
+        "engine": ENGINE,
+    }
 
 
 def spectral_gap(solid: str) -> float:
@@ -77,22 +84,26 @@ def spectral_gap(solid: str) -> float:
     return float(sorted(np.linalg.eigvalsh(lap))[1])
 
 
-def regime_report(solid: str) -> Dict:
+def regime_report(solid: str) -> dict:
     n, nbr = SHAPES[solid]
-    dists = [bfs_distances(u, n, nbr)[v]
-             for u in range(n) for v in range(n) if u != v]
+    dists = [bfs_distances(u, n, nbr)[v] for u in range(n) for v in range(n) if u != v]
     fs = fault_stats(solid)
-    return {"solid": solid, "n": n, "degree": len(nbr(0)),
-            "edges": sum(len(nbr(v)) for v in range(n)) // 2,
-            "diameter": max(dists), "mean_distance": sum(dists) / len(dists),
-            "moore_efficiency": moore_efficiency(solid),
-            "spectral_gap": spectral_gap(solid),
-            "survival": fs,
-            "engine": ENGINE,
-            "price": fs["fault_stretch"] / moore_efficiency(solid)}
+    return {
+        "solid": solid,
+        "n": n,
+        "degree": len(nbr(0)),
+        "edges": sum(len(nbr(v)) for v in range(n)) // 2,
+        "diameter": max(dists),
+        "mean_distance": sum(dists) / len(dists),
+        "moore_efficiency": moore_efficiency(solid),
+        "spectral_gap": spectral_gap(solid),
+        "survival": fs,
+        "engine": ENGINE,
+        "price": fs["fault_stretch"] / moore_efficiency(solid),
+    }
 
 
-def melee(solids: List[str], keys: List[str], query: str) -> Dict:
+def melee(solids: list[str], keys: list[str], query: str) -> dict:
     """Same keys, same query, real recall path on each solid. Fewest hops wins."""
     table = {}
     for name in solids:
@@ -101,18 +112,19 @@ def melee(solids: List[str], keys: List[str], query: str) -> Dict:
             store.put(k, k)
         r = store.recall(query)
         table[name] = {"hops": r["hops"], "visited": r["visited"]}
-    winner = min(table, key=lambda s: (table[s]["hops"],
-                                       table[s]["visited"]))
+    winner = min(table, key=lambda s: (table[s]["hops"], table[s]["visited"]))
     return {"winner": winner, "table": table, "query": query}
 
 
 # Lillith tunes these, not humans: workload features -> solid.
-RETUNE_RULE = ("broadcast->complete-20; fits petersen (<=10)->petersen; "
-               "fits dodeca (<=20)->dodecahedron; fits cube (<=32)->"
-               "hypercube-32; else g40")
+RETUNE_RULE = (
+    "broadcast->complete-20; fits petersen (<=10)->petersen; "
+    "fits dodeca (<=20)->dodecahedron; fits cube (<=32)->"
+    "hypercube-32; else g40"
+)
 
 
-def retune(n_total: int, n_hot: int = 0, broadcast: bool = False) -> Dict:
+def retune(n_total: int, n_hot: int = 0, broadcast: bool = False) -> dict:
     """Workload in, solid out. Few hot keys -> small diameter (petersen);
     many keys where order matters -> dodecahedron; broadcast with no
     nearest-first -> complete. Thresholds are data so Lillith can move them."""
@@ -126,6 +138,8 @@ def retune(n_total: int, n_hot: int = 0, broadcast: bool = False) -> Dict:
         solid = "hypercube-32"
     else:
         solid = "g40"
-    return {"solid": solid, "rule": RETUNE_RULE,
-            "workload": {"n_total": n_total, "n_hot": n_hot,
-                         "broadcast": broadcast}}
+    return {
+        "solid": solid,
+        "rule": RETUNE_RULE,
+        "workload": {"n_total": n_total, "n_hot": n_hot, "broadcast": broadcast},
+    }

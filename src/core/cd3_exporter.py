@@ -1,6 +1,6 @@
-# Vendored from azazael/src/CORE/cd3_exporter.py -- span writer for the
+# Vendored from azazael/src/core/cd3_exporter.py -- span writer for the
 # tree ledger (otel_spans). Byte-identical except this header. EveUnleashed
-# src/CORE is a standalone-safe mirror; the azazael tree remains canonical.
+# src/core is a standalone-safe mirror; the azazael tree remains canonical.
 # coding: utf-8
 """
 
@@ -20,7 +20,7 @@ Provides:
     BatchSpanProcessor + SQLiteSpanExporter.
 
 Usage:
-    from CORE.cd3_exporter import SQLiteSpanExporter, configure_otel_tracing
+    from core.cd3_exporter import SQLiteSpanExporter, configure_otel_tracing
 
     # Option 1: Manual setup
     exporter = SQLiteSpanExporter()
@@ -48,38 +48,41 @@ import json
 import os
 import sqlite3
 import sys
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Sequence
 import time as _time
+from collections.abc import Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 #: This list used to sit INSIDE the module docstring above, i.e. inside a string
-#: literal, so it was never assigned: `from CORE.cd3_exporter import *` exported
+#: literal, so it was never assigned: `from core.cd3_exporter import *` exported
 #: every public name and __all__ itself did not exist.
 __all__ = [
     "DB_PATH",
-    "TELEMETRY_DB_PATH",
     "OTEL_SPANS_SCHEMA",
+    "TELEMETRY_DB_PATH",
     "SQLiteSpanExporter",
     "configure_otel_tracing",
     "get_exporter",
-    "record_span",
     "purge_old_spans",
     "query_trace_by_id",
     "query_unified_trace",
+    "record_span",
 ]
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
+
 # -- OTel SDK, GUARDED (optional in fact, mandatory in the old code) ----
 # The SDK is optional in FACT but was mandatory in the CODE: the two module-level
-# imports that used to sit at the top made `import CORE.cd3_exporter` itself raise
+# imports that used to sit at the top made `import core.cd3_exporter` itself raise
 # wherever the SDK is absent. Measured 2026-10-10 on the production interpreter
 # (C:/Azazael/.venvs/py315t): only the bare `opentelemetry` namespace package is
 # installed, and `from opentelemetry.sdk.trace import ReadableSpan` raises
@@ -94,9 +97,9 @@ except ImportError:                               # never break the host
 # Nothing here needs the SDK to WRITE a span -- `SQLiteSpanExporter` persists to
 # SQLite itself and merely NAMES the SDK's types -- so the module now imports
 # cleanly either way, and `OTEL_SDK_AVAILABLE` reports which case it is in.
-if TYPE_CHECKING:               # annotation-only: never evaluated at run time
+if TYPE_CHECKING:  # annotation-only: never evaluated at run time
     from opentelemetry.sdk.trace import ReadableSpan
-    from opentelemetry.sdk.trace.export import SpanExportResult as _SpanExportResultType
+
     # `SpanExporter` is a plain class, not a typing.Protocol (`_is_protocol` is
     # False, its mro is `(SpanExporter, object)`), so the processors that take
     # one use NOMINAL assignability: an exporter that merely HAS the three
@@ -104,10 +107,11 @@ if TYPE_CHECKING:               # annotation-only: never evaluated at run time
     # base is resolved again at runtime below, so this module still imports
     # cleanly when the optional SDK is absent.
     from opentelemetry.sdk.trace.export import SpanExporter as _SpanExporterBase
+    from opentelemetry.sdk.trace.export import SpanExportResult as _SpanExportResultType
 else:
     try:
         from opentelemetry.sdk.trace.export import SpanExporter as _SpanExporterBase
-    except ImportError:                     # optional dependency absent
+    except ImportError:  # optional dependency absent
         _SpanExporterBase = object
 
 
@@ -134,12 +138,12 @@ if TYPE_CHECKING:
     # not the declared return type -- and SQLiteSpanExporter then stops
     # satisfying the `SpanExporter` protocol it is handed to as a processor.
     from opentelemetry.sdk.trace.export import SpanExportResult
-else:                           # runtime only; a type checker skips this branch
+else:  # runtime only; a type checker skips this branch
     try:
         from opentelemetry.sdk.trace.export import SpanExportResult
 
         OTEL_SDK_AVAILABLE = True
-    except ImportError as _otel_missing:            # optional dependency absent
+    except ImportError as _otel_missing:  # optional dependency absent
         note_failure("cd3_exporter:otel-sdk-import", _otel_missing)
         SpanExportResult = _SpanExportResultFallback
 
@@ -221,6 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_otel_correlation ON otel_spans(correlation_id);
 # Writes spans to memory_store.db in WAL mode for concurrent access
 # from multiple 3.14t threads.
 
+
 class SQLiteSpanExporter(_SpanExporterBase):
     """Exports OTel spans to memory_store.db for unified trace analysis.
 
@@ -235,7 +240,7 @@ class SQLiteSpanExporter(_SpanExporterBase):
         schema_initialized: Whether the otel_spans table exists.
     """
 
-    def __init__(self, db_path: (str | None) = None, batch_size: int = 64):
+    def __init__(self, db_path: str | None = None, batch_size: int = 64):
         """Initialize the exporter.
 
         Args:
@@ -293,7 +298,7 @@ class SQLiteSpanExporter(_SpanExporterBase):
         finally:
             self._release(conn)
 
-    def export(self, spans: Sequence[ReadableSpan]) -> "_SpanExportResultType":
+    def export(self, spans: Sequence[ReadableSpan]) -> _SpanExportResultType:
         """Export a batch of spans to the SQLite database.
 
         Implements the OTel SpanExporter interface.
@@ -347,7 +352,7 @@ class SQLiteSpanExporter(_SpanExporterBase):
 
             conn.commit()
             return SpanExportResult.SUCCESS
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             print(f"[cd3_exporter] Export error: {e}")
             return SpanExportResult.FAILURE
         finally:
@@ -401,7 +406,7 @@ class SQLiteSpanExporter(_SpanExporterBase):
 # Convenience functions
 # ====================================================================
 
-_default_exporter: (SQLiteSpanExporter | None) = None
+_default_exporter: SQLiteSpanExporter | None = None
 
 #: Databases whose schema this process has already created. Keyed by resolved
 #: path so a test that redirects the path still gets its own schema, and so the
@@ -416,13 +421,13 @@ def record_span(
     name: str,
     start_time: int,
     end_time: int,
-    parent_span_id: (str | None) = None,
+    parent_span_id: str | None = None,
     kind: str = "INTERNAL",
     status_code: int = 0,
-    attributes: (Dict[str, Any] | None) = None,
-    correlation_id: (str | None) = None,
-    session_id: (str | None) = None,
-    db_path: (str | None) = None,
+    attributes: dict[str, Any] | None = None,
+    correlation_id: str | None = None,
+    session_id: str | None = None,
+    db_path: str | None = None,
 ) -> bool:
     """Write ONE span without the OpenTelemetry SDK.
 
@@ -454,8 +459,10 @@ def record_span(
     tid = str(trace_id or "").strip()
     sid = str(span_id or "").strip()
     if not tid or not sid or not name:
-        note_failure("cd3_exporter:record_span:ids",
-                     ValueError("trace_id, span_id and name are required"))
+        note_failure(
+            "cd3_exporter:record_span:ids",
+            ValueError("trace_id, span_id and name are required"),
+        )
         return False
 
     path = db_path or str(TELEMETRY_DB_PATH)
@@ -490,12 +497,12 @@ def record_span(
         finally:
             conn.close()
         return True
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         note_failure("cd3_exporter:record_span", exc)
         return False
 
 
-def get_exporter(db_path: (str | None) = None) -> SQLiteSpanExporter:
+def get_exporter(db_path: str | None = None) -> SQLiteSpanExporter:
     """Get or create the default SQLiteSpanExporter singleton.
 
     Args:
@@ -513,7 +520,7 @@ def get_exporter(db_path: (str | None) = None) -> SQLiteSpanExporter:
 def configure_otel_tracing(
     service_name: str = "azazael-core",
     service_version: str = "1.0.0",
-    exporter: (SQLiteSpanExporter | None) = None,
+    exporter: SQLiteSpanExporter | None = None,
     batch_size: int = 64,
 ) -> Any:
     """One-shot OTel tracing setup with SQLite exporter.
@@ -542,18 +549,20 @@ def configure_otel_tracing(
             "SQLiteSpanExporter needs no SDK and writes spans to SQLite directly."
         )
 
+    from opentelemetry import trace
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry import trace
 
     if exporter is None:
         exporter = get_exporter()
 
-    resource = Resource.create({
-        "service.name": service_name,
-        "service.version": service_version,
-    })
+    resource = Resource.create(
+        {
+            "service.name": service_name,
+            "service.version": service_version,
+        }
+    )
 
     provider = TracerProvider(resource=resource)
     # BatchSpanProcessor validates max_export_batch_size <= max_queue_size,
@@ -564,11 +573,12 @@ def configure_otel_tracing(
     # this function could never succeed. Set both from the same value.
     batch = max(1, int(batch_size))
     processor = BatchSpanProcessor(
-        exporter, max_queue_size=batch, max_export_batch_size=batch)
+        exporter, max_queue_size=batch, max_export_batch_size=batch
+    )
     provider.add_span_processor(processor)
     try:
         trace.set_tracer_provider(provider)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         # The provider is process-global and settable once; if one is already
         # installed we use whatever is active instead of failing the caller.
         note_failure("cd3_exporter:L332", exc)
@@ -576,7 +586,9 @@ def configure_otel_tracing(
     return trace.get_tracer(__name__)
 
 
-def query_trace_by_id(trace_id: str, db_path: (str | None) = None) -> list[dict[str, Any]]:
+def query_trace_by_id(
+    trace_id: str, db_path: str | None = None
+) -> list[dict[str, Any]]:
     """Reconstruct a trace from otel_spans by trace_id.
 
     .. note::
@@ -612,7 +624,7 @@ def query_trace_by_id(trace_id: str, db_path: (str | None) = None) -> list[dict[
 
 
 def query_unified_trace(
-    trace_id: str, db_path: (str | None) = None
+    trace_id: str, db_path: str | None = None
 ) -> list[dict[str, Any]]:
     """LEFT JOIN otel_spans with memories table via correlation_id.
 
@@ -655,7 +667,7 @@ def query_unified_trace(
         conn.close()
 
 
-def purge_old_spans(older_than_days: int = 30, db_path: (str | None) = None) -> int:
+def purge_old_spans(older_than_days: int = 30, db_path: str | None = None) -> int:
     """Delete spans older than the specified number of days.
 
     Args:
@@ -668,12 +680,8 @@ def purge_old_spans(older_than_days: int = 30, db_path: (str | None) = None) -> 
     path = db_path or str(TELEMETRY_DB_PATH)
     conn = sqlite3.connect(path, timeout=5)
     try:
-        cutoff_ns = int(
-            _time.time() - older_than_days * 86400
-        ) * 1_000_000_000
-        cursor = conn.execute(
-            "DELETE FROM otel_spans WHERE end_time < ?", (cutoff_ns,)
-        )
+        cutoff_ns = int(_time.time() - older_than_days * 86400) * 1_000_000_000
+        cursor = conn.execute("DELETE FROM otel_spans WHERE end_time < ?", (cutoff_ns,))
         conn.commit()
         return cursor.rowcount
     finally:
@@ -685,16 +693,15 @@ def purge_old_spans(older_than_days: int = 30, db_path: (str | None) = None) -> 
 # ====================================================================
 
 if __name__ == "__main__":
-    pass
-    # Ensure src/ is on sys.path so CORE.* imports resolve
+    # Ensure src/ is on sys.path so core.* imports resolve
     _src_path = os.path.join(os.path.dirname(__file__), "..")
     if _src_path not in sys.path:
         sys.path.insert(0, _src_path)
 
-    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry import trace as _trace
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry import trace as _trace
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
     print("CD3 SQLiteSpanExporter v1.0 -- Self-test")
     print(f"  DB path: {DB_PATH}")
@@ -739,7 +746,9 @@ if __name__ == "__main__":
             child.set_attribute("step", "verify")
 
     processor.force_flush()
-    assert exporter2.export_count >= 2, f"Expected >=2 spans, got {exporter2.export_count}"
+    assert (
+        exporter2.export_count >= 2
+    ), f"Expected >=2 spans, got {exporter2.export_count}"
     print(f"  [PASS] Span export: {exporter2.export_count} spans exported")
 
     # Test 4: Trace reconstruction -- read back what the exporter wrote, through

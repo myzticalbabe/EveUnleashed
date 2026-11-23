@@ -17,17 +17,19 @@ chain-of-custody log: who, when, what hash, what action.
 Eve keeps; only you file. Tampering the locker is outside Eve's
 threat model and stated here: the log detects, it does not prevent.
 """
+
 import hashlib
 import json
-import shutil
 import time
 from pathlib import Path
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
+
 
 LOCKER_DIR = Path.home() / ".azazael" / "evidence"
 _CUSTODY_LOG = "custody.jsonl"
@@ -39,9 +41,13 @@ def _ldir():
 
 
 def _log(action, locker_id, digest, detail=""):
-    entry = {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-             "action": action, "id": locker_id, "sha256": digest,
-             "detail": detail}
+    entry = {
+        "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "action": action,
+        "id": locker_id,
+        "sha256": digest,
+        "detail": detail,
+    }
     with open(_ldir() / _CUSTODY_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
     return entry
@@ -49,19 +55,21 @@ def _log(action, locker_id, digest, detail=""):
 
 def _store_bytes(data, label):
     digest = hashlib.sha256(data).hexdigest()
-    lid = "ev:%s" % digest[:16]
+    lid = f"ev:{digest[:16]}"
     dest = _ldir() / (digest + ".bin")
     if not dest.is_file():
         dest.write_bytes(data)
         _log("ingest", lid, digest, label)
     else:
         _log("ingest_duplicate", lid, digest, label)
-    meta = {"id": lid, "sha256": digest, "bytes": len(data),
-            "label": label,
-            "stored_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
-                                        time.gmtime())}
-    with open(_ldir() / (digest + ".json"), "w",
-              encoding="utf-8") as f:
+    meta = {
+        "id": lid,
+        "sha256": digest,
+        "bytes": len(data),
+        "label": label,
+        "stored_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    with open(_ldir() / (digest + ".json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
     return meta
 
@@ -70,8 +78,8 @@ def ingest_file(path):
     """Ingest a file. Returns the locker meta (with id)."""
     p = Path(path)
     if not p.is_file():
-        raise ValueError("no such file: %s" % path)
-    return _store_bytes(p.read_bytes(), "file:%s" % p.name)
+        raise ValueError(f"no such file: {path}")
+    return _store_bytes(p.read_bytes(), f"file:{p.name}")
 
 
 def ingest_text(note, label="intake-note"):
@@ -87,7 +95,8 @@ def ingest_receipt(receipt):
         raise ValueError("not a receipt: need a dict with sha256")
     return _store_bytes(
         json.dumps(receipt, sort_keys=True).encode("utf-8"),
-        "receipt:%s" % receipt.get("url", "?")[:80])
+        "receipt:{}".format(receipt.get("url", "?")[:80]),
+    )
 
 
 def verify(locker_id):
@@ -101,7 +110,7 @@ def verify(locker_id):
         return {"id": locker_id, "state": "MISSING"}
     digest = hashlib.sha256(blob.read_bytes()).hexdigest()
     state = "INTACT" if digest == meta["sha256"] else "TAMPERED"
-    _log("verify_%s" % state.lower(), locker_id, digest)
+    _log(f"verify_{state.lower()}", locker_id, digest)
     return {"id": locker_id, "state": state, "sha256": digest}
 
 
@@ -114,7 +123,7 @@ def custody(locker_id):
     for line in log.read_text(encoding="utf-8").splitlines():
         try:
             e = json.loads(line)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evidence:custody-parse", exc)
             continue
         if e.get("id") == locker_id:
@@ -132,7 +141,7 @@ def list_items():
             continue
         try:
             metas.append(json.loads(p.read_text(encoding="utf-8")))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evidence:list", exc)
     return metas
 
@@ -158,7 +167,7 @@ def _meta_for(locker_id):
             continue
         try:
             meta = json.loads(p.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("evidence:meta", exc)
             continue
         if meta.get("id") == locker_id:

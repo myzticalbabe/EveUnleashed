@@ -9,7 +9,7 @@ runner class with compile, run, test, and lint capabilities.
 Supported: Python, Rust, Go, Bash, JavaScript (Node), PowerShell (pwsh).
 
 Usage:
-    from INTERPRETERS import run_code
+    from interpreters import run_code
     result = run_code("rust", 'fn main() { println!("Hello"); }')
 
 OpenMono Integration:
@@ -20,24 +20,23 @@ OpenMono Integration:
 """
 
 import argparse
-import os
-import sys
-# from typing import List  # removed — all names have native equivalents
-from dataclasses import dataclass
-from typing import Callable, List
 import io
 import subprocess
+import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 
-from INTERPRETERS.node_runner import NodeRunner
-from INTERPRETERS.pwsh_runner import PwshRunner
-from INTERPRETERS.sh_runner import ShRunner
+from interpreters.node_runner import NodeRunner
+from interpreters.pwsh_runner import PwshRunner
+from interpreters.sh_runner import ShRunner
 
 #: Swallows recorded when the failure ledger is unavailable (it is a stdlib-only
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
@@ -45,6 +44,7 @@ except ImportError:                               # never break the host
 @dataclass
 class RunResult:
     """Unified result from any language runner."""
+
     language: str
     success: bool
     stdout: str = ""
@@ -59,9 +59,14 @@ def run_python(code: str, args: list[str] | None = None) -> RunResult:
     """Run Python code via exec.
 
     D6 contract: args are literal strings exposed as sys.argv[1:] with NO
-    shell evaluation; args containing spaces/quotes arrive intact."""
+    shell evaluation; args containing spaces/quotes arrive intact.
+
+    Trust boundary: `code` runs with the caller's own privileges (same as
+    `python -c`), so only the invoking user can authorize it; argv is
+    sandboxed to ["<inline>", *args] and stdio is captured, never inherited.
+    """
     import time
-    from contextlib import redirect_stdout, redirect_stderr
+    from contextlib import redirect_stderr, redirect_stdout
 
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
@@ -72,12 +77,14 @@ def run_python(code: str, args: list[str] | None = None) -> RunResult:
             _old_argv = sys.argv
             sys.argv = ["<inline>"] + list(args or [])
             try:
-                exec(code, {"__name__": "__main__"})
+                exec(  # noqa: S102 -- audited: caller-privileged runner, see docstring
+                    code, {"__name__": "__main__"}
+                )
             finally:
                 sys.argv = _old_argv
         success = True
         returncode = 0
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("__init__:L55", e)
         stderr_capture.write(f"{type(e).__name__}: {e}\n")
         success = False
@@ -98,7 +105,7 @@ def run_rust(code: str, args: list[str] | None = None) -> RunResult:
 
     D6 contract: args are literal strings forwarded as process argv with
     NO shell evaluation; args containing spaces/quotes arrive intact."""
-    from INTERPRETERS.rust_runner import RustRunner
+    from interpreters.rust_runner import RustRunner
 
     runner = RustRunner()
     result = runner.run_code(code, args or [])
@@ -119,7 +126,7 @@ def run_go(code: str, args: list[str] | None = None) -> RunResult:
 
     D6 contract: args are literal strings forwarded as process argv with
     NO shell evaluation; args containing spaces/quotes arrive intact."""
-    from INTERPRETERS.go_runner import GoRunner
+    from interpreters.go_runner import GoRunner
 
     runner = GoRunner()
     result = runner.run_code(code, args or [])
@@ -151,8 +158,11 @@ def run_shell_untrusted(command: str) -> RunResult:
     try:
         # D7: bytes capture; display via replace, evidence via stderr_bytes.
         result = subprocess.run(
-            command, shell=True,  # scanner:ignore -- run_shell_untrusted IS the designated shell path; input is user shell by contract
-            capture_output=True, timeout=30
+            command,
+            shell=True,  # scanner:ignore -- run_shell_untrusted IS the designated shell path; input is user shell by contract
+            capture_output=True,
+            timeout=30,
+            check=False,
         )
         stdout = result.stdout.decode("utf-8", errors="replace")
         stderr = result.stderr.decode("utf-8", errors="replace")
@@ -165,7 +175,7 @@ def run_shell_untrusted(command: str) -> RunResult:
             duration_ms=(time.time() - start) * 1000,
             stderr_bytes=result.stderr[:4000].decode("latin-1"),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("__init__:L128", e)
         return RunResult(
             language="bash",
@@ -262,7 +272,7 @@ def run_code(language: str, code: str, args: list[str] | None = None) -> RunResu
             language=language,
             success=False,
             stderr=f"Unsupported language: {language}. "
-                    f"Supported: {sorted(set(LANGUAGE_RUNNERS.keys()))}",
+            f"Supported: {sorted(set(LANGUAGE_RUNNERS.keys()))}",
             returncode=1,
         )
     return runner(code, args)
@@ -270,13 +280,11 @@ def run_code(language: str, code: str, args: list[str] | None = None) -> RunResu
 
 def supported_languages() -> list[str]:
     """Return list of supported languages."""
-    return sorted(set(
-        k for k in LANGUAGE_RUNNERS
-        if len(k) > 2  # Skip short aliases
-    ))
+    return sorted({k for k in LANGUAGE_RUNNERS if len(k) > 2})  # Skip short aliases
 
 
 # --- CLI ---------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(description="Azazael Multi-Language Interpreter")

@@ -24,7 +24,7 @@ def main() -> int:
     try:
         out = inject(prompt)
         sys.stdout.write(out["injected"])
-    except Exception:
+    except Exception:  # noqa: BLE001 -- main: best-effort sys.stdout.write(prompt)
         # Injection must never eat a prompt: pass it through raw.
         sys.stdout.write(prompt)
     return 0

@@ -25,10 +25,10 @@ import json
 import math
 import random
 import struct
-from typing import Callable, Dict, List, Sequence
+from collections.abc import Callable, Sequence
 
-Vec = List[float]
-Mat = List[Vec]
+Vec = list[float]
+Mat = list[Vec]
 
 
 def _xavier(rng: random.Random, fan_in: int, fan_out: int) -> float:
@@ -41,24 +41,27 @@ class Dense:
 
     def __init__(self, in_dim: int, out_dim: int, seed: int = 7) -> None:
         if in_dim < 1 or out_dim < 1:
-            raise ValueError("dense dims must be >= 1, got %d -> %d"
-                             % (in_dim, out_dim))
+            raise ValueError(f"dense dims must be >= 1, got {in_dim:d} -> {out_dim:d}")
         rng = random.Random(seed)
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.seed = seed
-        self.W: Mat = [[_xavier(rng, in_dim, out_dim) for _ in range(in_dim)]
-                       for _ in range(out_dim)]
+        self.W: Mat = [
+            [_xavier(rng, in_dim, out_dim) for _ in range(in_dim)]
+            for _ in range(out_dim)
+        ]
         self.b: Vec = [_xavier(rng, in_dim, out_dim) for _ in range(out_dim)]
         self.gW: Mat = [[0.0] * in_dim for _ in range(out_dim)]
         self.gb: Vec = [0.0] * out_dim
 
     def forward(self, x: Vec) -> Vec:
         if len(x) != self.in_dim:
-            raise ValueError("dense %d->%d got input len %d"
-                             % (self.in_dim, self.out_dim, len(x)))
-        return [sum(w * v for w, v in zip(row, x)) + b
-                for row, b in zip(self.W, self.b)]
+            raise ValueError(
+                f"dense {self.in_dim:d}->{self.out_dim:d} got input len {len(x):d}"
+            )
+        return [
+            sum(w * v for w, v in zip(row, x)) + b for row, b in zip(self.W, self.b)
+        ]
 
     def backward(self, x: Vec, grad_y: Vec) -> Vec:
         # Accumulate into gW/gb (zero_grad starts the batch): the loop in
@@ -67,8 +70,10 @@ class Dense:
             for i, xv in enumerate(x):
                 self.gW[o][i] += gy * xv
             self.gb[o] += gy
-        return [sum(self.W[o][i] * grad_y[o] for o in range(self.out_dim))
-                for i in range(self.in_dim)]
+        return [
+            sum(self.W[o][i] * grad_y[o] for o in range(self.out_dim))
+            for i in range(self.in_dim)
+        ]
 
     def params(self) -> Vec:
         return [v for row in self.W for v in row] + list(self.b)
@@ -79,7 +84,7 @@ class Dense:
 
 # -- activations: (name, f, df) triples; df takes the ACTIVATED value --
 def _relu(x: float) -> float:
-    return x if x > 0.0 else 0.0
+    return max(0.0, x)
 
 
 def _d_relu(y: float) -> float:
@@ -95,15 +100,14 @@ def _d_tanh(y: float) -> float:
 
 
 def _sigmoid(x: float) -> float:
-    return 1.0 / (1.0 + math.exp(-x)) if x >= 0 else (
-        math.exp(x) / (1.0 + math.exp(x)))
+    return 1.0 / (1.0 + math.exp(-x)) if x >= 0 else (math.exp(x) / (1.0 + math.exp(x)))
 
 
 def _d_sigmoid(y: float) -> float:
     return y * (1.0 - y)
 
 
-ACTIVATIONS: Dict[str, tuple] = {
+ACTIVATIONS: dict[str, tuple] = {
     "relu": (_relu, _d_relu),
     "tanh": (_tanh, _d_tanh),
     "sigmoid": (_sigmoid, _d_sigmoid),
@@ -115,8 +119,7 @@ class Activate:
 
     def __init__(self, kind: str = "tanh") -> None:
         if kind not in ACTIVATIONS:
-            raise ValueError("activations: %s (got %r)"
-                             % (sorted(ACTIVATIONS), kind))
+            raise ValueError(f"activations: {sorted(ACTIVATIONS)} (got {kind!r})")
         self.kind = kind
         self.f, self.df = ACTIVATIONS[kind]
 
@@ -157,16 +160,15 @@ class Sequential:
         blocks = list(blocks)
         if not blocks:
             raise ValueError("sequential needs >= 1 block")
-        for a, b in zip(
-                [d for b in blocks if isinstance(b, Dense)
-                 for d in [b.out_dim]][:-1],
-                [b.in_dim for b in blocks if isinstance(b, Dense)][1:]):
-            if a != b:
-                raise ValueError("dim mismatch at assembly: %d != %d" % (a, b))
+        for a, b_in in zip(
+            [d for b in blocks if isinstance(b, Dense) for d in [b.out_dim]][:-1],
+            [b.in_dim for b in blocks if isinstance(b, Dense)][1:],
+        ):
+            if a != b_in:
+                raise ValueError(f"dim mismatch at assembly: {a:d} != {b_in:d}")
         self.blocks = blocks
         self.in_dim = next(b.in_dim for b in blocks if isinstance(b, Dense))
-        self.out_dim = next(b.out_dim for b in reversed(blocks)
-                            if isinstance(b, Dense))
+        self.out_dim = next(b.out_dim for b in reversed(blocks) if isinstance(b, Dense))
 
     def forward(self, x: Vec) -> Vec:
         cache = [list(x)]
@@ -180,9 +182,9 @@ class Sequential:
 
     def backward(self, grad: Vec) -> None:
         g = list(grad)
-        for b, inp, out in zip(reversed(self.blocks),
-                               reversed(self._cache[:-1]),
-                               reversed(self._cache[1:])):
+        for b, inp, out in zip(
+            reversed(self.blocks), reversed(self._cache[:-1]), reversed(self._cache[1:])
+        ):
             if isinstance(b, Dense):
                 g = b.backward(inp, g)
             else:
@@ -200,25 +202,27 @@ class Sequential:
     def step(self, lr: float) -> None:
         for b in self.blocks:
             if isinstance(b, Dense):
-                b.W = [[w - lr * gw for w, gw in zip(row, grow)]
-                       for row, grow in zip(b.W, b.gW)]
+                b.W = [
+                    [w - lr * gw for w, gw in zip(row, grow)]
+                    for row, grow in zip(b.W, b.gW)
+                ]
                 b.b = [x - lr * gb for x, gb in zip(b.b, b.gb)]
 
 
 def digest(model: Sequential) -> str:
     """sha256 over packed f32 params -- the model's golden identity."""
     vals = model.params()
-    return hashlib.sha256(struct.pack("<%df" % len(vals), *vals)).hexdigest()
+    return hashlib.sha256(struct.pack(f"<{len(vals):d}f", *vals)).hexdigest()
 
 
-def replicate(model_fn: Callable[[], Sequential]) -> Dict:
+def replicate(model_fn: Callable[[], Sequential]) -> dict:
     """Rebuild from (seed, architecture) and prove bit-identity."""
     a, b = model_fn(), model_fn()
     da, db = digest(a), digest(b)
     return {"match": da == db, "digest": da, "n_params": len(a.params())}
 
 
-def describe(model: Sequential) -> Dict:
+def describe(model: Sequential) -> dict:
     """Architecture record: everything needed to rebuild, nothing learned."""
     spec = []
     for b in model.blocks:
@@ -226,25 +230,27 @@ def describe(model: Sequential) -> Dict:
             spec.append({"dense": [b.in_dim, b.out_dim], "seed": b.seed})
         else:
             spec.append({"activate": b.kind})
-    return {"in_dim": model.in_dim, "out_dim": model.out_dim,
-            "blocks": spec}
+    return {"in_dim": model.in_dim, "out_dim": model.out_dim, "blocks": spec}
 
 
-def rebuild(spec: Dict) -> Sequential:
+def rebuild(spec: dict) -> Sequential:
     blocks = []
     for s in spec["blocks"]:
         if "dense" in s:
-            blocks.append(Dense(s["dense"][0], s["dense"][1],
-                                seed=s["seed"]))
+            blocks.append(Dense(s["dense"][0], s["dense"][1], seed=s["seed"]))
         else:
             blocks.append(Activate(s["activate"]))
     return Sequential(blocks)
 
 
-def ship(model: Sequential, loss: float, path: str) -> Dict:
+def ship(model: Sequential, loss: float, path: str) -> dict:
     """Write the shippable artifact: architecture + learned params + digest."""
-    artifact = {"spec": describe(model), "params": model.params(),
-                "loss": loss, "digest": digest(model)}
+    artifact = {
+        "spec": describe(model),
+        "params": model.params(),
+        "loss": loss,
+        "digest": digest(model),
+    }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(artifact, f)
     return artifact
@@ -259,19 +265,23 @@ def load_ship(path: str) -> Sequential:
     for b in model.blocks:
         if isinstance(b, Dense):
             n = b.in_dim * b.out_dim
-            b.W = [flat[i * b.in_dim:(i + 1) * b.in_dim]
-                   for i in range(b.out_dim)]
+            b.W = [flat[i * b.in_dim : (i + 1) * b.in_dim] for i in range(b.out_dim)]
             flat = flat[n:]
-            b.b = flat[:b.out_dim]
-            flat = flat[b.out_dim:]
+            b.b = flat[: b.out_dim]
+            flat = flat[b.out_dim :]
     if digest(model) != artifact["digest"]:
-        raise ValueError("shipment refused: digest mismatch (have %s)"
-                         % digest(model)[:12])
+        raise ValueError(
+            f"shipment refused: digest mismatch (have {digest(model)[:12]})"
+        )
     return model
 
 
-def mcml_proof(model: Sequential, loss: float, bound: float) -> Dict:
+def mcml_proof(model: Sequential, loss: float, bound: float) -> dict:
     """Shape a training result for well.aether_verify (the real auditors)."""
-    return {"within_bound": loss <= bound, "n": len(model.params()),
-            "loss": round(loss, 6), "bound": bound,
-            "digest": digest(model)[:12]}
+    return {
+        "within_bound": loss <= bound,
+        "n": len(model.params()),
+        "loss": round(loss, 6),
+        "bound": bound,
+        "digest": digest(model)[:12],
+    }

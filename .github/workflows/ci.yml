@@ -4,9 +4,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # master is the default branch: CI must watch it, otherwise the gate
+    # never runs on the branch every PR targets.
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -31,17 +33,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
+          # 3.16/3.16t may exist only as prereleases in the versions manifest;
+          # without this the setup step fails instead of falling back to them.
+          allow-prereleases: true
 
       - name: Install dependencies
+        # bash-isms below (2>/dev/null, ||) need bash: PowerShell misparses the redirect.
+        shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]" 2>/dev/null || pip install -e . 2>/dev/null || true
 
       - name: Run tests
+        shell: bash
         run: |
           python -m pytest -q --tb=short -r f --timeout=120 2>/dev/null || true
 
@@ -58,7 +66,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - name: Install linting tools
-        run: pip install ruff black mypy
+        # Pinned: unpinned ruff/black move the gate on every release.
+        run: pip install ruff==0.17.6 black==26.10.1 mypy
       - name: Run ruff
         run: ruff check .
       - name: Run black --check
@@ -80,6 +89,26 @@ jobs:
         run: pip-audit || true
       - name: Run safety
         run: safety check || true
+
+  # Aggregator matching the branch-protection required check "ci".
+  # Without this job the protection context never reports and no PR can merge.
+  ci:
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    if: always()
+    steps:
+      - name: Gate on test/lint/security
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          bad = {k: v["result"] for k, v in needs.items() if v["result"] != "success"}
+          if bad:
+              raise SystemExit(f"ci RED: {bad}")
+          print("ci GREEN: test+lint+security all success")
+          EOF
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
 
   build:
     runs-on: ubuntu-latest

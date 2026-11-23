@@ -28,9 +28,7 @@ from __future__ import annotations
 import hashlib
 import random
 import struct
-import sys
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from eve_unleashed.soul_foundry import (
     dequantize_q40,
@@ -41,28 +39,29 @@ from eve_unleashed.soul_foundry import (
 
 try:  # Aether auditors live in tools/, on the path in tests and CI
     import reading_audit  # type: ignore
-except Exception:
+except Exception:  # noqa: BLE001 -- best-effort guard
     reading_audit = None  # type: ignore
 try:
     import leg_ledger  # type: ignore
-except Exception:
+except Exception:  # noqa: BLE001 -- best-effort guard
     leg_ledger = None  # type: ignore
 
 
 # ------------------------------------------------------------ 1. golden tensor
-def golden_tensor(seed: int = 7, rows: int = 8, cols: int = 8) -> List[float]:
+def golden_tensor(seed: int = 7, rows: int = 8, cols: int = 8) -> list[float]:
     """Deterministic reference weight vector, foundry stream compatible."""
     rng = random.Random(seed)
     return [rng.uniform(-1.0, 1.0) for _ in range(rows * cols)]
 
 
-def golden_digest(vals: List[float]) -> str:
+def golden_digest(vals: list[float]) -> str:
     """sha256 over packed f32 bytes -- the replica's identity proof."""
-    return hashlib.sha256(struct.pack("<%df" % len(vals), *vals)).hexdigest()
+    return hashlib.sha256(struct.pack(f"<{len(vals):d}f", *vals)).hexdigest()
 
 
-def replicate_golden(seed: int = 7, rows: int = 8, cols: int = 8,
-                     expected: str | None = None) -> Dict[str, Any]:
+def replicate_golden(
+    seed: int = 7, rows: int = 8, cols: int = 8, expected: str | None = None
+) -> dict[str, Any]:
     """Rebuild the golden tensor and prove bit-identity.
 
     When expected is None the digest is anchored on first build (returned
@@ -71,19 +70,34 @@ def replicate_golden(seed: int = 7, rows: int = 8, cols: int = 8,
     vals = golden_tensor(seed, rows, cols)
     digest = golden_digest(vals)
     if expected is None:
-        return {"match": True, "digest": digest, "anchored": True,
-                "seed": seed, "rows": rows, "cols": cols, "n": len(vals)}
-    return {"match": digest == expected, "digest": digest,
-            "expected": expected, "anchored": False,
-            "seed": seed, "rows": rows, "cols": cols, "n": len(vals)}
+        return {
+            "match": True,
+            "digest": digest,
+            "anchored": True,
+            "seed": seed,
+            "rows": rows,
+            "cols": cols,
+            "n": len(vals),
+        }
+    return {
+        "match": digest == expected,
+        "digest": digest,
+        "expected": expected,
+        "anchored": False,
+        "seed": seed,
+        "rows": rows,
+        "cols": cols,
+        "n": len(vals),
+    }
 
 
 # ------------------------------------------------------------------ 2. fix
 _BOUNDS = {"Q8_0": 0.01, "Q4_0": 0.15, "F32": 0.0}
 
 
-def fix_neural_space(vals: List[float], dtype: str = "Q8_0",
-                     bound: float | None = None) -> Dict[str, Any]:
+def fix_neural_space(
+    vals: list[float], dtype: str = "Q8_0", bound: float | None = None
+) -> dict[str, Any]:
     """Re-encode weights into spec-exact blocks; error must fit the bound.
 
     The fix IS the re-encode: damaged precision (foreign quant, truncated
@@ -91,22 +105,27 @@ def fix_neural_space(vals: List[float], dtype: str = "Q8_0",
     a measured max reconstruction error. within_bound is the verdict.
     """
     if dtype not in _BOUNDS:
-        raise ValueError("well dtypes: Q8_0, Q4_0, F32 (got %r)" % dtype)
+        raise ValueError(f"well dtypes: Q8_0, Q4_0, F32 (got {dtype!r})")
     if dtype == "Q8_0":
-        back = dequantize_q80(quantize_q80(vals))[:len(vals)]
+        back = dequantize_q80(quantize_q80(vals))[: len(vals)]
     elif dtype == "Q4_0":
-        back = dequantize_q40(quantize_q40(vals))[:len(vals)]
+        back = dequantize_q40(quantize_q40(vals))[: len(vals)]
     else:
         back = list(vals)
     max_err = max(abs(a - c) for a, c in zip(vals, back)) if vals else 0.0
     lim = _BOUNDS[dtype] if bound is None else bound
-    return {"dtype": dtype, "n": len(vals),
-            "max_err": round(max_err, 6), "bound": lim,
-            "within_bound": max_err <= lim, "fixed": back}
+    return {
+        "dtype": dtype,
+        "n": len(vals),
+        "max_err": round(max_err, 6),
+        "bound": lim,
+        "within_bound": max_err <= lim,
+        "fixed": back,
+    }
 
 
 # ------------------------------------------------------------- 3. aether gate
-def aether_verify(proof: Dict[str, Any]) -> Dict[str, Any]:
+def aether_verify(proof: dict[str, Any]) -> dict[str, Any]:
     """Run a fix proof through the Aether auditors. Clean iff no findings.
 
     proof needs denominators the auditors can count: files (tensors
@@ -114,29 +133,51 @@ def aether_verify(proof: Dict[str, Any]) -> Dict[str, Any]:
     real auditors when importable, else by the local mirror below, which
     implements the same two verdict classes A-4 was built on.
     """
-    verdict = {"verdict": "PASS" if proof.get("within_bound") else "FAIL",
-               "files": proof.get("n", 0),
-               "legs": [{"leg": "well-fix", "status": "ok"
-                         if proof.get("within_bound") else "error",
-                         "seconds": 0.1, "detail": "replica+fix proof"}]}
-    findings: List[Any] = []
+    verdict = {
+        "verdict": "PASS" if proof.get("within_bound") else "FAIL",
+        "files": proof.get("n", 0),
+        "legs": [
+            {
+                "leg": "well-fix",
+                "status": "ok" if proof.get("within_bound") else "error",
+                "seconds": 0.1,
+                "detail": "replica+fix proof",
+            }
+        ],
+    }
+    findings: list[Any] = []
     if reading_audit is not None:
         reading_audit.audit_verdicts(
-            {"verdict": verdict["verdict"], "files": verdict["files"]},
-            "well", findings)
+            {"verdict": verdict["verdict"], "files": verdict["files"]}, "well", findings
+        )
     elif not verdict["files"]:
-        findings.append({"class": "denominator_free",
-                         "detail": "no tensor count on the verdict"})
+        findings.append(
+            {"class": "denominator_free", "detail": "no tensor count on the verdict"}
+        )
     if leg_ledger is not None:
         findings.extend(leg_ledger.audit(verdict))
     else:
         for leg in verdict["legs"]:
             if verdict["verdict"] == "PASS" and leg["status"] != "ok":
-                findings.append({"class": "verdict_mismatch",
-                                 "detail": "PASS over failed leg " + leg["leg"]})
+                findings.append(
+                    {
+                        "class": "verdict_mismatch",
+                        "detail": "PASS over failed leg " + leg["leg"],
+                    }
+                )
     clean = not findings
-    return {"clean": clean, "verdict": verdict["verdict"],
-            "findings": [{"class": f["class"] if isinstance(f, dict) else f[0],
-                          "detail": (f.get("detail", "") if isinstance(f, dict)
-                                     else (f[1] if len(f) > 1 else ""))}
-                         for f in findings]}
+    return {
+        "clean": clean,
+        "verdict": verdict["verdict"],
+        "findings": [
+            {
+                "class": f["class"] if isinstance(f, dict) else f[0],
+                "detail": (
+                    f.get("detail", "")
+                    if isinstance(f, dict)
+                    else (f[1] if len(f) > 1 else "")
+                ),
+            }
+            for f in findings
+        ],
+    }

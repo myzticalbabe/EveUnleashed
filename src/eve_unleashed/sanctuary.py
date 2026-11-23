@@ -21,43 +21,57 @@ claims, ordains nothing, and interprets no text. What it does:
 Justice-grade means the same doctrine as everywhere else: every
 unchecked sentence is labeled OPINION.
 """
+
 import time
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
 
-CRISIS_US = ("988 Suicide and Crisis Lifeline (call or text 988, "
-             "US, 24/7) -- for any moment of despair, call first, "
-             "Eve second.")
+
+CRISIS_US = (
+    "988 Suicide and Crisis Lifeline (call or text 988, "
+    "US, 24/7) -- for any moment of despair, call first, "
+    "Eve second."
+)
 
 REFERRALS = [
-    ("Hospital / hospice chaplaincy (ask any hospital operator)",
-     "trained interfaith chaplains, bedside, no fee"),
+    (
+        "Hospital / hospice chaplaincy (ask any hospital operator)",
+        "trained interfaith chaplains, bedside, no fee",
+    ),
     ("ACLU religious liberty intake", "https://www.aclu.org/"),
     ("Becket Fund for Religious Liberty", "https://becketlaw.org/"),
     ("Sikh Coalition (workplace / school bias)", "https://www.sikhcoalition.org/"),
-    ("CAIR legal intake (anti-Muslim discrimination)",
-     "https://www.cair.com/"),
-    ("Jewish Federations community chaplains (local directory)",
-     "https://www.jewishfederations.org/"),
+    ("CAIR legal intake (anti-Muslim discrimination)", "https://www.cair.com/"),
+    (
+        "Jewish Federations community chaplains (local directory)",
+        "https://www.jewishfederations.org/",
+    ),
 ]
 
 MOVEMENTS = [
-    {"name": "Abolition (faith-rooted)",
-     "checkable": "Quaker and Black church networks ran stations of the "
-                  "Underground Railroad; check denominational archives.",
-     "opinion": "OPINION: faith made endurance possible where law made it illegal."},
-    {"name": "US civil rights (church-rooted)",
-     "checkable": "Mass meetings organized from Black churches; check the "
-                  "King Center archives and movement newspapers.",
-     "opinion": "OPINION: the pulpit was the broadcast network before broadcast."},
-    {"name": "Sanctuary movement (faith-rooted)",
-     "checkable": "Congregations sheltered refugees in the 1980s and face "
-                  "prosecution in the record; check court dockets.",
-     "opinion": "OPINION: sanctuary literalized what liturgy rehearsed."},
+    {
+        "name": "Abolition (faith-rooted)",
+        "checkable": "Quaker and Black church networks ran stations of the "
+        "Underground Railroad; check denominational archives.",
+        "opinion": "OPINION: faith made endurance possible where law made it illegal.",
+    },
+    {
+        "name": "US civil rights (church-rooted)",
+        "checkable": "Mass meetings organized from Black churches; check the "
+        "King Center archives and movement newspapers.",
+        "opinion": "OPINION: the pulpit was the broadcast network before broadcast.",
+    },
+    {
+        "name": "Sanctuary movement (faith-rooted)",
+        "checkable": "Congregations sheltered refugees in the 1980s and face "
+        "prosecution in the record; check court dockets.",
+        "opinion": "OPINION: sanctuary literalized what liturgy rehearsed.",
+    },
 ]
 
 
@@ -66,17 +80,21 @@ def counsel(burden):
     if not burden or not burden.strip():
         raise ValueError("nothing to hold: empty burden")
     lines = [
-        "SANCTUARY -- %s" % time.strftime("%Y-%m-%d", time.gmtime()),
-        "You carried this here: %s" % burden.strip()[:300],
-        ("Eve is not a chaplain, a priest, an imam, a rabbi, or a "
-         "counselor. What follows is comfort and doors, not doctrine."),
-        ("If despair is present right now: %s" % CRISIS_US),
+        "SANCTUARY -- {}".format(time.strftime("%Y-%m-%d", time.gmtime())),
+        f"You carried this here: {burden.strip()[:300]}",
+        (
+            "Eve is not a chaplain, a priest, an imam, a rabbi, or a "
+            "counselor. What follows is comfort and doors, not doctrine."
+        ),
+        (f"If despair is present right now: {CRISIS_US}"),
         "Doors with people behind them:",
     ]
     for name, detail in REFERRALS:
-        lines.append("  %s -- %s" % (name, detail))
-    lines.append("OPINION (not counsel): endurance is a practice, not a "
-                 "feeling; the record shows movements outlasted moods.")
+        lines.append(f"  {name} -- {detail}")
+    lines.append(
+        "OPINION (not counsel): endurance is a practice, not a "
+        "feeling; the record shows movements outlasted moods."
+    )
     return "\n".join(lines)
 
 
@@ -86,23 +104,31 @@ def draft_accommodation(name, context, need):
         raise ValueError("context must be workplace, school, or prison")
     if not name or not need or not need.strip():
         raise ValueError("need a name and a stated need")
-    basis = {"workplace": "Title VII of the Civil Rights Act (42 U.S.C. "
-                          "2000e), reasonable accommodation short of "
-                          "undue hardship",
-             "school": "First Amendment plus Title IV / state equal-access "
-                       "rules; check district policy",
-             "prison": "RLUIPA (42 U.S.C. 2000cc), compelling-interest "
-                       "standard; check facility grievance first"}[context]
+    basis = {
+        "workplace": "Title VII of the Civil Rights Act (42 U.S.C. "
+        "2000e), reasonable accommodation short of "
+        "undue hardship",
+        "school": "First Amendment plus Title IV / state equal-access "
+        "rules; check district policy",
+        "prison": "RLUIPA (42 U.S.C. 2000cc), compelling-interest "
+        "standard; check facility grievance first",
+    }[context]
     return (
         "RELIGIOUS ACCOMMODATION REQUEST (DRAFT -- not filed)\n"
-        "From: %s\nDate: %s\nRe: %s accommodation -- %s\n\n"
-        "I hold a sincere religious belief requiring: %s\n"
-        "Legal basis I ask to be considered: %s\n\n"
+        "From: {}\nDate: {}\nRe: {} accommodation -- {}\n\n"
+        "I hold a sincere religious belief requiring: {}\n"
+        "Legal basis I ask to be considered: {}\n\n"
         "Proposed accommodation that lets the work go on: [state yours]\n"
         "Have counsel or a faith-based legal defender review before "
-        "sending. Eve drafts; only you file.\n"
-        % (name, time.strftime("%Y-%m-%d", time.gmtime()), context,
-           need.strip()[:120], need.strip()[:500], basis))
+        "sending. Eve drafts; only you file.\n".format(
+            name,
+            time.strftime("%Y-%m-%d", time.gmtime()),
+            context,
+            need.strip()[:120],
+            need.strip()[:500],
+            basis,
+        )
+    )
 
 
 def study(topic):
@@ -111,20 +137,25 @@ def study(topic):
         raise ValueError("nothing to study: empty topic")
     try:
         from .factcheck import wikipedia_lookup
+
         hit = wikipedia_lookup(topic.strip())
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("sanctuary:study", e)
         return {"topic": topic, "found": False, "error": str(e)[:200]}
-    entry = {"topic": topic, "found": hit.get("found", False),
-             "title": hit.get("title", ""),
-             "description": hit.get("description", ""),
-             "extract": (hit.get("extract") or "")[:500],
-             "receipt": hit.get("receipt"),
-             "studied_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
-                                          time.gmtime()),
-             "note": ("OPINION-free zone ends here: the extract above is "
-                      "the encyclopedia's words with a receipt, not Eve's "
-                      "theology. Eve has none.")}
+    entry = {
+        "topic": topic,
+        "found": hit.get("found", False),
+        "title": hit.get("title", ""),
+        "description": hit.get("description", ""),
+        "extract": (hit.get("extract") or "")[:500],
+        "receipt": hit.get("receipt"),
+        "studied_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "note": (
+            "OPINION-free zone ends here: the extract above is "
+            "the encyclopedia's words with a receipt, not Eve's "
+            "theology. Eve has none."
+        ),
+    }
     return entry
 
 
