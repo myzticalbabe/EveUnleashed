@@ -65,20 +65,7 @@ jobs:
       - name: Validate SBOM
         run: |
           # Basic validation - check required fields
-          python -c "
-import json, sys
-with open('sbom.json') as f:
-    sbom = json.load(f)
-assert 'bomFormat' in sbom and sbom['bomFormat'] == 'CycloneDX'
-assert 'specVersion' in sbom
-assert 'serialNumber' in sbom
-assert 'version' in sbom
-assert 'metadata' in sbom
-assert 'components' in sbom
-print('SBOM validation: PASSED')
-print(f\"Components: {len(sbom.get('components', []))}\")
-print(f\"Version: {sbom['metadata'].get('component', {}).get('version', 'unknown')}\")
-"
+          python -c "import json, sys; sbom = json.load(open('sbom.json')); assert sbom.get('bomFormat') == 'CycloneDX'; assert 'specVersion' in sbom; assert 'serialNumber' in sbom; assert 'version' in sbom; assert 'metadata' in sbom; assert 'components' in sbom; print('SBOM validation: PASSED'); print('Components:', len(sbom.get('components', []))); print('Version:', sbom['metadata'].get('component', {}).get('version', 'unknown'))"
 
       - name: Comment on PR with SBOM summary
         if: github.event_name == 'pull_request'
