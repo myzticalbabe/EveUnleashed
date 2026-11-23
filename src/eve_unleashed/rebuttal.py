@@ -10,11 +10,13 @@ claim was checked.
 Eve drafts; only you publish, and only under your name. A rebuttal
 names claims, never people: no ad-hominem in, none out.
 """
+
 import time
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
 
@@ -25,37 +27,54 @@ def draft_rebuttal(factcheck_result):
         raise ValueError("not a factcheck result: need verdict + receipts")
     deb = factcheck_result.get("debunk", {})
     lines = []
-    lines.append("CORRECTION -- %s" % time.strftime(
-        "%Y-%m-%d", time.gmtime()))
-    lines.append("Claim: %s" % factcheck_result.get("claim", "")[:300])
-    lines.append("Finding: %s." % factcheck_result.get("verdict", "?"))
+    lines.append("CORRECTION -- {}".format(time.strftime("%Y-%m-%d", time.gmtime())))
+    lines.append("Claim: {}".format(factcheck_result.get("claim", "")[:300]))
+    lines.append("Finding: {}.".format(factcheck_result.get("verdict", "?")))
     for flag in deb.get("fallacy_flags", []):
-        lines.append("The claim's own words show %s (%s)." % (
-            flag.get("flag", "?").replace("_", " "),
-            ", ".join(flag.get("matched", []))))
+        lines.append(
+            "The claim's own words show {} ({}).".format(
+                flag.get("flag", "?").replace("_", " "),
+                ", ".join(flag.get("matched", [])),
+            )
+        )
     for contra in deb.get("contradictions", [])[:2]:
-        lines.append("It contradicts itself here: %s" % contra[:200])
-    found = [lk for lk in factcheck_result.get("entity_lookups", [])
-             if lk.get("found")]
+        lines.append(f"It contradicts itself here: {contra[:200]}")
+    found = [lk for lk in factcheck_result.get("entity_lookups", []) if lk.get("found")]
     if found:
-        lines.append("The live record confirms: %s." % "; ".join(
-            "%s -- %s" % (lk.get("topic", "?"),
-                          (lk.get("description") or lk.get("title") or ""))
-            for lk in found[:4]))
-    missing = [lk.get("topic", "?") for lk in
-               factcheck_result.get("entity_lookups", [])
-               if not lk.get("found")]
+        lines.append(
+            "The live record confirms: {}.".format(
+                "; ".join(
+                    "{} -- {}".format(
+                        lk.get("topic", "?"),
+                        (lk.get("description") or lk.get("title") or ""),
+                    )
+                    for lk in found[:4]
+                )
+            )
+        )
+    missing = [
+        lk.get("topic", "?")
+        for lk in factcheck_result.get("entity_lookups", [])
+        if not lk.get("found")
+    ]
     if missing:
-        lines.append("The live record does not confirm: %s." % ", ".join(
-            missing[:4]))
+        lines.append(
+            "The live record does not confirm: {}.".format(", ".join(missing[:4]))
+        )
     for r in factcheck_result.get("receipts", [])[:6]:
         if r.get("status") == "ok":
-            lines.append("Seen %s -- %d bytes, sha256 %s." % (
-                r.get("fetched_utc", "?"), r.get("bytes", 0),
-                (r.get("sha256") or "")[:16]))
+            lines.append(
+                "Seen {} -- {:d} bytes, sha256 {}.".format(
+                    r.get("fetched_utc", "?"),
+                    r.get("bytes", 0),
+                    (r.get("sha256") or "")[:16],
+                )
+            )
     opinion = factcheck_result.get("opinion", "")
     if opinion:
-        lines.append("%s" % opinion)
-    lines.append("Compiled by Eve; publish only under your own name, "
-                 "after counsel review for filing contexts.")
+        lines.append(f"{opinion}")
+    lines.append(
+        "Compiled by Eve; publish only under your own name, "
+        "after counsel review for filing contexts."
+    )
     return "\n".join(lines)

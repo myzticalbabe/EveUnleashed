@@ -14,6 +14,7 @@ Two tiers, same contract (step_count / steps_json / render_frame):
   (syscall/js) compiled with GOOS=js GOARCH=wasm, executed under node
   (WebAssembly is built into node, no browser needed).
 """
+
 import json
 import os
 import shutil
@@ -22,7 +23,7 @@ from pathlib import Path
 
 from .model_registry import note_failure
 
-LIB_RS = r'''use wasm_bindgen::prelude::*;
+LIB_RS = r"""use wasm_bindgen::prelude::*;
 
 const STEPS: &str = %s;
 
@@ -78,9 +79,9 @@ pub fn render_frame(i: usize) -> String {
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
-'''
+"""
 
-CARGO_TOML = '''[package]
+CARGO_TOML = """[package]
 name = "%s"
 version = "0.1.0"
 edition = "2021"
@@ -91,9 +92,9 @@ crate-type = ["cdylib"]
 [dependencies]
 wasm-bindgen = "0.2"
 serde_json = "1.0"
-'''
+"""
 
-INDEX_HTML = '''<!DOCTYPE html>
+INDEX_HTML = """<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>%s</title>
 <style>body{background:#0d1117;color:#e6edf3;font-family:sans-serif;
 max-width:700px;margin:2em auto}button{margin:.2em;padding:.5em 1em}
@@ -189,46 +190,69 @@ steps.forEach((s, i) => { const b = document.createElement('button');
   b.textContent = (i+1); b.onclick = () => show(i); nav.appendChild(b); });
 show(0);
 </script></body></html>
-'''
+"""
 
 
 def state_to_steps(state):
     """Inner state dict -> ordered tutorial steps."""
-    steps = [{"title": "Swarm overview: %d providers, %d answered"
-                       % (state.get("total", 0), state.get("answered", 0)),
-              "verdict": "OVERVIEW",
-              "detail": state.get("summary", "")}]
+    steps = [
+        {
+            "title": "Swarm overview: {:d} providers, {:d} answered".format(
+                state.get("total", 0), state.get("answered", 0)
+            ),
+            "verdict": "OVERVIEW",
+            "detail": state.get("summary", ""),
+        }
+    ]
     for r in state.get("rows", []):
-        steps.append({"title": "Provider %s" % r.get("provider"),
-                      "verdict": r.get("verdict", ""),
-                      "detail": r.get("detail", "")})
-    steps.append({"title": "Fallback serves with NSP judgment",
-                  "verdict": "JUDGED",
-                  "detail": state.get("nsp", "nsp verdict attached "
-                                             "to every served answer")})
+        steps.append(
+            {
+                "title": "Provider {}".format(r.get("provider")),
+                "verdict": r.get("verdict", ""),
+                "detail": r.get("detail", ""),
+            }
+        )
+    steps.append(
+        {
+            "title": "Fallback serves with NSP judgment",
+            "verdict": "JUDGED",
+            "detail": state.get(
+                "nsp", "nsp verdict attached " "to every served answer"
+            ),
+        }
+    )
     return steps
 
 
 def parse_ablation_log(path):
     """Parse a real `eve ablate` log into an inner-state dict."""
     rows, summary = [], ""
-    for line in Path(path).read_text(encoding="utf-8",
-                                     errors="replace").splitlines():
+    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if line.startswith("[") and "]" in line:
             verdict, rest = line[1:].split("]", 1)
             provider, _, detail = rest.strip().partition(":")
-            rows.append({"provider": provider.strip(),
-                         "verdict": verdict.strip(),
-                         "detail": detail.strip()[:100]})
+            rows.append(
+                {
+                    "provider": provider.strip(),
+                    "verdict": verdict.strip(),
+                    "detail": detail.strip()[:100],
+                }
+            )
         elif line.startswith("ABLATION:"):
             summary = line
-    answered = sum(1 for r in rows
-                   if r["provider"] != "swarm+NSP fallback"
-                   and r["verdict"] == "ANSWERED")
+    answered = sum(
+        1
+        for r in rows
+        if r["provider"] != "swarm+NSP fallback" and r["verdict"] == "ANSWERED"
+    )
     providers = [r for r in rows if r["provider"] != "swarm+NSP fallback"]
-    return {"rows": rows, "answered": answered,
-            "total": len(providers), "summary": summary}
+    return {
+        "rows": rows,
+        "answered": answered,
+        "total": len(providers),
+        "summary": summary,
+    }
 
 
 def generate(state, out_dir, crate_name="eve_inner_state"):
@@ -237,14 +261,14 @@ def generate(state, out_dir, crate_name="eve_inner_state"):
     (out / "src").mkdir(parents=True, exist_ok=True)
     steps = state_to_steps(state)
     (out / "src" / "lib.rs").write_text(
-        LIB_RS % json.dumps(json.dumps(steps)), encoding="utf-8")
-    (out / "Cargo.toml").write_text(CARGO_TOML % crate_name,
-                                    encoding="utf-8")
+        LIB_RS % json.dumps(json.dumps(steps)), encoding="utf-8"
+    )
+    (out / "Cargo.toml").write_text(CARGO_TOML % crate_name, encoding="utf-8")
     title = "Eve inner states: swarm ablation tutorial"
-    (out / "index.html").write_text(INDEX_HTML % (title, title, crate_name),
-                                    encoding="utf-8")
-    (out / "state.json").write_text(json.dumps(state, indent=2),
-                                    encoding="utf-8")
+    (out / "index.html").write_text(
+        INDEX_HTML % (title, title, crate_name), encoding="utf-8"
+    )
+    (out / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return out, len(steps)
 
 
@@ -260,10 +284,10 @@ def have_toolchain(kind):
         return {"go": shutil.which("go")}
     if kind == "node":
         return {"node": shutil.which("node")}
-    raise ValueError("wasm tiers are rust, go, node: %s" % kind)
+    raise ValueError(f"wasm tiers are rust, go, node: {kind}")
 
 
-GO_WASM_SRC = '''package main
+GO_WASM_SRC = """package main
 
 import (
     "encoding/json"
@@ -370,18 +394,18 @@ func min(a, b int) int {
     }
     return b
 }
-'''
+"""
 
-GO_MOD = '''module eveinnerstate
+GO_MOD = """module eveinnerstate
 
 go 1.23
-'''
+"""
 
 #: Node harness for the Go module. Sets the __eveCollect callback so Go
 #: main() pushes the payload out and returns; the loop then drains
 #: cleanly (no process.exit under a blocked runtime -- that crashes node
 #: on Windows). The payload is computed inside the WASM module.
-NODE_HARNESS = '''const fs = require('fs');
+NODE_HARNESS = """const fs = require('fs');
 const path = require('path');
 const dir = __dirname;
 globalThis.__eveResult = null;
@@ -401,13 +425,13 @@ WebAssembly.instantiate(fs.readFileSync(path.join(dir, 'main.wasm')),
   console.error('WASM-FAIL: ' + (e && e.message));
   process.exit(1);
 });
-'''
+"""
 
 #: Node harness for a --target nodejs pkg. That target emits CommonJS
 #: (exports.*, synchronous wasm load at require time -- no init() call,
 #: unlike the web target). Written into the pkg dir by run_wasm as
 #: run_node.cjs with the real stem filled in (one .js per pkg).
-NODE_RUST_HARNESS = '''const w = require('./%s.js');
+NODE_RUST_HARNESS = """const w = require('./%s.js');
 const frame = w.render_frame(0);
 console.log(JSON.stringify({
   step_count: w.step_count(),
@@ -415,7 +439,7 @@ console.log(JSON.stringify({
   frame_chars: String(frame).length,
   frame_head: String(frame).slice(0, 60),
 }));
-'''
+"""
 
 
 def _go_root():
@@ -423,8 +447,13 @@ def _go_root():
     go = shutil.which("go")
     if not go:
         raise RuntimeError("go not on PATH")
-    proc = subprocess.run([go, "env", "GOROOT"], capture_output=True,
-                          text=True, timeout=60)
+    proc = subprocess.run(
+        [go, "env", "GOROOT"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
     root = (proc.stdout or "").strip()
     if proc.returncode != 0 or not root:
         raise RuntimeError("go env GOROOT failed")
@@ -441,8 +470,7 @@ def generate_go(state, out_dir):
     (out / "main.go").write_text(GO_WASM_SRC % blob, encoding="utf-8")
     (out / "go.mod").write_text(GO_MOD, encoding="utf-8")
     (out / "run_node.js").write_text(NODE_HARNESS, encoding="utf-8")
-    (out / "state.json").write_text(json.dumps(state, indent=2),
-                                    encoding="utf-8")
+    (out / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return out, len(steps)
 
 
@@ -460,31 +488,38 @@ def build_wasm_go(src_dir, timeout=600):
     try:
         proc = subprocess.run(
             [go, "build", "-o", "main.wasm", "."],
-            capture_output=True, text=True, timeout=timeout,
-            cwd=str(src), env=env)
-    except Exception as e:
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(src),
+            env=env,
+            check=False,
+        )
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:build-spawn", e)
-        raise RuntimeError("go build would not start: %s" % e)
+        raise RuntimeError(f"go build would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
         note_failure("wasm-go:build-fail", Exception(err[:200]))
-        raise RuntimeError("go build failed: %s" % err)
+        raise RuntimeError(f"go build failed: {err}")
     try:
         root = _go_root()
         staged = None
-        for cand in (root / "misc" / "wasm" / "wasm_exec.js",
-                     root / "lib" / "wasm" / "wasm_exec.js"):
+        for cand in (
+            root / "misc" / "wasm" / "wasm_exec.js",
+            root / "lib" / "wasm" / "wasm_exec.js",
+        ):
             if cand.is_file():
                 staged = cand
                 break
         if staged is None:
-            raise RuntimeError("wasm_exec.js not found under %s" % root)
+            raise RuntimeError(f"wasm_exec.js not found under {root}")
         (src / "wasm_exec.js").write_bytes(staged.read_bytes())
     except RuntimeError:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:stage", e)
-        raise RuntimeError("could not stage wasm_exec.js: %s" % e)
+        raise RuntimeError(f"could not stage wasm_exec.js: {e}")
     return src
 
 
@@ -500,24 +535,30 @@ def run_wasm_go(src_dir, timeout=120):
         raise RuntimeError("node not on PATH")
     for need in ("main.wasm", "wasm_exec.js", "run_node.js"):
         if not (src / need).is_file():
-            raise RuntimeError("missing %s (build first)" % need)
+            raise RuntimeError(f"missing {need} (build first)")
     try:
         proc = subprocess.run(
-            [node, "run_node.js"], capture_output=True, text=True,
-            timeout=timeout, cwd=str(src))
-    except Exception as e:
+            [node, "run_node.js"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(src),
+            check=False,
+        )
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:run-spawn", e)
-        raise RuntimeError("node would not start: %s" % e)
+        raise RuntimeError(f"node would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
         note_failure("wasm-go:run-fail", Exception(err[:200]))
-        raise RuntimeError("wasm run failed: %s" % err)
+        raise RuntimeError(f"wasm run failed: {err}")
     try:
         rep = json.loads((proc.stdout or "").strip().splitlines()[-1])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm-go:run-parse", e)
-        raise RuntimeError("wasm run printed no JSON: %s"
-                           % (proc.stdout or "")[:300])
+        raise RuntimeError(
+            "wasm run printed no JSON: {}".format((proc.stdout or "")[:300])
+        )
     rep["ok"] = True
     return rep
 
@@ -533,36 +574,42 @@ def run_wasm(pkg_dir, timeout=120):
     node = shutil.which("node")
     if not node:
         raise RuntimeError("node not on PATH")
-    mods = sorted(p for p in pkg.glob("*.js")
-                  if not p.name.endswith(".d.ts")
-                  and p.name not in ("run_node.mjs", "run_node.cjs"))
+    mods = sorted(
+        p
+        for p in pkg.glob("*.js")
+        if not p.name.endswith(".d.ts")
+        and p.name not in ("run_node.mjs", "run_node.cjs")
+    )
     if len(mods) != 1:
-        raise RuntimeError("expected one module in %s, found %d"
-                           % (pkg, len(mods)))
+        raise RuntimeError(f"expected one module in {pkg}, found {len(mods):d}")
     stem = mods[0].stem
     for need in (stem + ".js", stem + "_bg.wasm"):
         if not (pkg / need).is_file():
-            raise RuntimeError("missing %s (build --target nodejs first)"
-                               % need)
-    (pkg / "run_node.cjs").write_text(NODE_RUST_HARNESS % stem,
-                                       encoding="utf-8")
+            raise RuntimeError(f"missing {need} (build --target nodejs first)")
+    (pkg / "run_node.cjs").write_text(NODE_RUST_HARNESS % stem, encoding="utf-8")
     try:
         proc = subprocess.run(
-            [node, "run_node.cjs"], capture_output=True, text=True,
-            timeout=timeout, cwd=str(pkg))
-    except Exception as e:
+            [node, "run_node.cjs"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(pkg),
+            check=False,
+        )
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:run-spawn", e)
-        raise RuntimeError("node would not start: %s" % e)
+        raise RuntimeError(f"node would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
         note_failure("wasm:run-fail", Exception(err[:200]))
-        raise RuntimeError("wasm run failed: %s" % err)
+        raise RuntimeError(f"wasm run failed: {err}")
     try:
         rep = json.loads((proc.stdout or "").strip().splitlines()[-1])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:run-parse", e)
-        raise RuntimeError("wasm run printed no JSON: %s"
-                           % (proc.stdout or "")[:300])
+        raise RuntimeError(
+            "wasm run printed no JSON: {}".format((proc.stdout or "")[:300])
+        )
     rep["ok"] = True
     return rep
 
@@ -575,17 +622,20 @@ def build_wasm(crate_dir, timeout=600, target="web"):
     verification runs.
     """
     if target not in ("web", "nodejs"):
-        raise ValueError("wasm target is web or nodejs: %s" % target)
+        raise ValueError(f"wasm target is web or nodejs: {target}")
     try:
         proc = subprocess.run(
             ["wasm-pack", "build", "--target", target, str(crate_dir)],
-            capture_output=True, text=True, timeout=timeout)
-    except Exception as e:
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("wasm:build-spawn", e)
-        raise RuntimeError("wasm-pack would not start: %s" % e)
+        raise RuntimeError(f"wasm-pack would not start: {e}")
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout)[-2000:]
-        note_failure("wasm:build-fail",
-                     Exception(err[:200]))
-        raise RuntimeError("wasm-pack failed: %s" % err)
+        note_failure("wasm:build-fail", Exception(err[:200]))
+        raise RuntimeError(f"wasm-pack failed: {err}")
     return Path(crate_dir) / "pkg"

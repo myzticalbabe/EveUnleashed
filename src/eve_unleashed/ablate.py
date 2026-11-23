@@ -7,11 +7,19 @@ judgment) delivers for the same prompt. The ablation is the answer to
 fallback answers. Refusal detection is heuristic keyword matching and is
 labeled as such, never as proof of a model's policy.
 """
+
 from .model_registry import note_failure
 
-REFUSAL_MARKS = ("i can't", "i cannot", "i'm unable", "i am unable",
-                 "i refuse", "unable to help", "against my",
-                 "i don't have access")
+REFUSAL_MARKS = (
+    "i can't",
+    "i cannot",
+    "i'm unable",
+    "i am unable",
+    "i refuse",
+    "unable to help",
+    "against my",
+    "i don't have access",
+)
 
 
 def classify(reply_text, error=None):
@@ -23,8 +31,8 @@ def classify(reply_text, error=None):
     lowered = reply_text.lower()
     for mark in REFUSAL_MARKS:
         if mark in lowered:
-            return "REFUSED", "matched %r (heuristic)" % mark
-    return "ANSWERED", "%d chars" % len(reply_text)
+            return "REFUSED", f"matched {mark!r} (heuristic)"
+    return "ANSWERED", f"{len(reply_text):d} chars"
 
 
 def ablate_prompt(prompt, providers, single_fn, timeout=60):
@@ -37,16 +45,23 @@ def ablate_prompt(prompt, providers, single_fn, timeout=60):
     for name in providers:
         try:
             text, err = single_fn(name, prompt, timeout)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("ablate:provider", e)
             text, err = None, e
         verdict, detail = classify(text, err)
-        rows.append({"provider": name, "verdict": verdict,
-                     "detail": detail})
+        rows.append({"provider": name, "verdict": verdict, "detail": detail})
     answered = sum(1 for r in rows if r["verdict"] == "ANSWERED")
-    rows.append({"provider": "swarm+NSP fallback", "verdict": "n/a",
-                 "detail": "%d/%d providers answered; fallback serves "
-                           "first answer with Z3 routing judgment"
-                           % (answered, len(providers))})
-    return {"prompt": prompt[:80], "rows": rows,
-            "answered": answered, "total": len(providers)}
+    rows.append(
+        {
+            "provider": "swarm+NSP fallback",
+            "verdict": "n/a",
+            "detail": f"{answered:d}/{len(providers):d} providers answered; fallback serves "
+            "first answer with Z3 routing judgment",
+        }
+    )
+    return {
+        "prompt": prompt[:80],
+        "rows": rows,
+        "answered": answered,
+        "total": len(providers),
+    }

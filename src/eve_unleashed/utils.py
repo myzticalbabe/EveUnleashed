@@ -6,7 +6,7 @@ Tensor preparation, output postprocessing, and shape validation.
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 
@@ -14,15 +14,14 @@ import numpy as np
 #: leaf, so this fallback should never fire -- if it does, the ledger is missing).
 
 try:
-    from CORE.failure_ledger import note_failure
-except ImportError:                               # never break the host
+    from core.failure_ledger import note_failure
+except ImportError:  # never break the host
+
     def note_failure(where: str, exc: BaseException | None = None) -> None:
         pass  # ledger missing; evidence-vs-silence tradeoff capped here
 
 
-def prepare_input_tensor(
-    inputs: np.ndarray | list | float | int
-) -> "np.ndarray":
+def prepare_input_tensor(inputs: np.ndarray | list | float) -> np.ndarray:
     """Convert various input formats to a numpy array suitable for inference."""
     if isinstance(inputs, np.ndarray):
         arr = inputs
@@ -40,9 +39,7 @@ def prepare_input_tensor(
     return arr.astype(np.float32)  # pyright: ignore[reportAttributeAccessIssue]
 
 
-def postprocess_output(
-    output: Any, framework: str
-) -> list[Any]:
+def postprocess_output(output: Any, framework: str) -> list[Any]:
     """Convert framework-specific output to a standard list format."""
     if framework == "torch":
         return output.cpu().numpy().tolist()
@@ -62,11 +59,9 @@ def validate_input_shape(
     allow_batch: bool = True,
 ) -> bool:
     """Validate that input matches the expected shape."""
-    if inputs.shape == expected_shape:
-        return True
-    if allow_batch and inputs.shape[1:] == expected_shape:
-        return True
-    return False
+    return inputs.shape == expected_shape or (
+        allow_batch and inputs.shape[1:] == expected_shape
+    )
 
 
 def softmax(x: np.ndarray, axis: int = -1) -> np.ndarray:
@@ -75,9 +70,7 @@ def softmax(x: np.ndarray, axis: int = -1) -> np.ndarray:
     return e_x / e_x.sum(axis=axis, keepdims=True)
 
 
-def top_k(
-    predictions: np.ndarray, k: int = 5
-) -> list[tuple]:
+def top_k(predictions: np.ndarray, k: int = 5) -> list[tuple]:
     """Get top-K predictions with indices."""
     indices = np.argsort(predictions)[-k:][::-1]
     values = predictions[indices]

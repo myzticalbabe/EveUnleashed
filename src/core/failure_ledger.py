@@ -17,10 +17,9 @@ technique runtime re-exports as ``technique_runtime.note_failure``.
 from __future__ import annotations
 
 import threading
-from typing import Dict, Optional
 
 #: Swallowed failures, by "where:ExcType". Populated by every fail-open handler.
-_FAILURE_NOTES: Dict[str, int] = {}
+_FAILURE_NOTES: dict[str, int] = {}
 _FAILURE_LOCK = threading.Lock()
 
 #: Times the recorder itself could not record. Non-zero means the real count is
@@ -28,7 +27,7 @@ _FAILURE_LOCK = threading.Lock()
 _LOST_NOTES = [0]
 
 
-def note_failure(where: str, exc: Optional[BaseException] = None) -> None:
+def note_failure(where: str, exc: BaseException | None = None) -> None:
     """Record a swallowed failure. Cheap, bounded, thread-safe, never raises.
 
     NOTE (2026-10-09): the mechanical recorder-conversion pass inserted a
@@ -37,14 +36,16 @@ def note_failure(where: str, exc: Optional[BaseException] = None) -> None:
     The recorder may never call itself; the lost-note counter is the only signal.
     """
     try:
-        key = "%s:%s" % (where, type(exc).__name__ if exc is not None else "unknown")
+        key = "{}:{}".format(
+            where, type(exc).__name__ if exc is not None else "unknown"
+        )
         with _FAILURE_LOCK:
             _FAILURE_NOTES[key] = _FAILURE_NOTES.get(key, 0) + 1
-    except Exception:                             # never raise from the recorder
+    except Exception:  # noqa: BLE001 -- note_failure: best-effort _LOST_NOTES[0] += 1
         _LOST_NOTES[0] += 1
 
 
-def failure_notes() -> Dict[str, int]:
+def failure_notes() -> dict[str, int]:
     """A snapshot of recorded swallowed failures (empty = nothing degraded).
 
     The reserved key ``__lost__:recorder`` is present only when the recorder

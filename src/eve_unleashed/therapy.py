@@ -9,6 +9,7 @@ fallback). This module holds the pieces both sides share:
 - fallback_response: offline grounding script, always available.
 - parse_voice_command: transcript -> allowlisted dev/therapy action.
 """
+
 GROUNDING_STEPS = [
     "Name 5 things you can see right now.",
     "Name 4 things you can touch.",
@@ -17,8 +18,7 @@ GROUNDING_STEPS = [
     "Name 1 thing you can taste.",
 ]
 
-BREATHING = ("Breathe in 4 counts, hold 4, out 6. "
-             "We will do two rounds together.")
+BREATHING = "Breathe in 4 counts, hold 4, out 6. " "We will do two rounds together."
 
 
 def build_prompt(mood, note):
@@ -27,33 +27,36 @@ def build_prompt(mood, note):
     note = (note or "").strip()[:500]
     return (
         "You are Eve, a warm supportive companion, not a clinician. "
-        "The user feels %s. They shared: %s. "
+        "The user feels {}. They shared: {}. "
         "Give a short supportive reply (under 120 words): validate the "
         "feeling, one 60-second grounding step, one breathing cue, and "
         "one tiny next action. Reply directly to the user; do not narrate "
         "your reasoning process. No diagnosis, no medical advice, no "
-        "emergency claims. End by asking what they need next."
-        % (mood, note or "nothing more yet"))
+        "emergency claims. End by asking what they need next.".format(
+            mood, note or "nothing more yet"
+        )
+    )
 
 
 def fallback_response(mood, note):
     """Static grounding response when the swarm is unreachable."""
     mood = (mood or "stressed").strip()
     lines = [
-        "I hear you. Feeling %s makes sense, and you showed up anyway."
-        % mood,
+        f"I hear you. Feeling {mood} makes sense, and you showed up anyway.",
         "",
         BREATHING,
         "",
-        "Grounding (pick one step): %s" % GROUNDING_STEPS[0],
+        f"Grounding (pick one step): {GROUNDING_STEPS[0]}",
         "",
-        "Tiny next action: drink water, unclench your jaw, "
-        "look 20 feet away for 20 seconds.",
+        (
+            "Tiny next action: drink water, unclench your jaw, "
+            "look 20 feet away for 20 seconds."
+        ),
         "",
         "I am here with you. What do you need next?",
     ]
     if note:
-        lines.insert(1, "You shared: %s" % note[:200])
+        lines.insert(1, f"You shared: {note[:200]}")
     return "\n".join(lines)
 
 
@@ -64,8 +67,9 @@ def parse_voice_command(transcript):
     apply-best, revert, next, help, unknown. Never executes anything.
     """
     t = (transcript or "").lower()
-    if any(k in t for k in ("therap", "calm", "anxious", "stressed",
-                            "ground me", "feel")):
+    if any(
+        k in t for k in ("therap", "calm", "anxious", "stressed", "ground me", "feel")
+    ):
         return {"action": "therapy"}
     if "breath" in t or "breathe" in t:
         return {"action": "breathe"}

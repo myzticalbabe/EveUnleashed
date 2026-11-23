@@ -13,15 +13,18 @@ Sources today: Regulations.gov document search (read-only GET,
 DEMO_KEY works at low volume; set REGULATIONS_GOV_API_KEY for
 real use). A source that needs a secret is prepared, not faked.
 """
+
 import json
 import time
 from pathlib import Path
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
+
 
 WATCH_DIR = Path.home() / ".azazael" / "watch"
 _WATCHLIST = "watchlist.json"
@@ -38,7 +41,7 @@ def _load_watchlist():
         return []
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
         note_failure("watch:load", exc)
         return []
 
@@ -54,8 +57,12 @@ def add_watch(term):
         raise ValueError("nothing to watch: empty term")
     items = _load_watchlist()
     if term not in [w["term"] for w in items]:
-        items.append({"term": term, "added_utc": time.strftime(
-            "%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+        items.append(
+            {
+                "term": term,
+                "added_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+        )
         _save_watchlist(items)
     return {"term": term, "watches": len(items)}
 
@@ -69,37 +76,41 @@ def remove_watch(term):
 
 def _snapshot_path(term):
     safe = "".join(c if c.isalnum() else "_" for c in term)[:40]
-    return _wdir() / ("snap_%s.json" % safe)
+    return _wdir() / (f"snap_{safe}.json")
 
 
 def check_watches():
     """Poll every watched term, diff against snapshots. Returns news."""
     from .redress import search_dockets
+
     news = []
     for w in _load_watchlist():
         term = w["term"]
         try:
             current = search_dockets(term)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("watch:poll", e)
             news.append({"term": term, "error": str(e)[:200]})
             continue
-        ids = sorted(d.get("id", "") for d in current
-                     if d.get("id"))
+        ids = sorted(d.get("id", "") for d in current if d.get("id"))
         snap = _snapshot_path(term)
         before = []
         if snap.is_file():
             try:
                 before = json.loads(snap.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("watch:snap", exc)
         new = [i for i in ids if i not in before]
         try:
             snap.write_text(json.dumps(ids, indent=2), encoding="utf-8")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("watch:write", exc)
-        news.append({"term": term, "seen": len(ids),
-                     "new": new,
-                     "checked_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ",
-                                                  time.gmtime())})
+        news.append(
+            {
+                "term": term,
+                "seen": len(ids),
+                "new": new,
+                "checked_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+        )
     return news

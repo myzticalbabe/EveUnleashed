@@ -1,24 +1,26 @@
 """Windows service + daemon wrapper for the always-on llama-server (Eve Unleashed Phase 1)."""
 
 import os
-import signal
 import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
 import urllib.request
+from pathlib import Path
 
 try:
-    from CORE.failure_ledger import note_failure
+    from core.failure_ledger import note_failure
 except ImportError:
+
     def note_failure(where, exc=None):
         pass
+
 
 try:
     import win32event  # pyright: ignore[reportMissingModuleSource]
     import win32service  # pyright: ignore[reportMissingModuleSource]
     import win32serviceutil  # pyright: ignore[reportMissingModuleSource]
+
     _WIN32_SERVICE_AVAILABLE = True
 except ImportError as exc:
     note_failure("service_manager:win32service", exc)
@@ -37,7 +39,9 @@ FALLBACK_CHAIN = (
 
 def _resolve_paths():
     base = Path(os.environ.get("AZAZAEL_ROOT", r"C:\Azazael\azazael"))
-    llama = os.environ.get("LLAMA_SERVER_EXE") or str(base / "tools" / "llama-server.exe")
+    llama = os.environ.get("LLAMA_SERVER_EXE") or str(
+        base / "tools" / "llama-server.exe"
+    )
     default_model = os.environ.get("EVE_DEFAULT_MODEL") or str(
         base / "models" / FALLBACK_CHAIN[0]
     )
@@ -63,20 +67,36 @@ class LlamaServerManager:
         with self._lock:
             self._stop.clear()
             self._proc = self._spawn(self.exe, self.model, self.port)
-        t = threading.Thread(target=self._supervisor, name="llama-supervisor", daemon=True)
+        t = threading.Thread(
+            target=self._supervisor, name="llama-supervisor", daemon=True
+        )
         t.start()
 
     def _spawn(self, exe, model, port):
         if not os.path.exists(exe):
             raise FileNotFoundError(f"llama-server binary not found: {exe}")
-        args = [exe, "-m", model, "--port", str(port), "--host", "127.0.0.1", "-ngl", "0"]
-        return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # scanner:ignore
+        args = [
+            exe,
+            "-m",
+            model,
+            "--port",
+            str(port),
+            "--host",
+            "127.0.0.1",
+            "-ngl",
+            "0",
+        ]
+        return subprocess.Popen(
+            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )  # scanner:ignore
 
     def _healthy(self):
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/health", timeout=3) as r:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{self.port}/health", timeout=3
+            ) as r:
                 return r.status == 200
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
             note_failure("service_manager:healthy", exc)
             return False
 
@@ -93,7 +113,7 @@ class LlamaServerManager:
                         if self._proc is not None and self._proc.poll() is None:
                             pass
                         self._proc = self._spawn(self.exe, self.model, self.port)
-                except Exception:
+                except Exception:  # noqa: BLE001 -- best-effort _supervisor
                     time.sleep(2)
                     continue
             # health check
@@ -118,7 +138,7 @@ class LlamaServerManager:
                 try:
                     self._proc.terminate()
                     self._proc.wait(timeout=10)
-                except Exception:
+                except Exception:  # noqa: BLE001 -- stop: best-effort self._proc.kill()
                     self._proc.kill()
             self._proc = None
 
@@ -142,58 +162,85 @@ class LlamaServerManager:
 
     def benchmark_inference(self, prompt: str, iterations: int = 5):
         """Benchmark per-token inference latency against the running server."""
-        import json, time, urllib.request, urllib.error
+        import json
+        import time
+        import urllib.error
+        import urllib.request
+
         times = []
         for _ in range(iterations):
-            payload = json.dumps({
-                "prompt": prompt, "max_tokens": 32, "stream": False
-            }).encode("utf-8")
+            payload = json.dumps(
+                {"prompt": prompt, "max_tokens": 32, "stream": False}
+            ).encode("utf-8")
             t0 = time.perf_counter()
             try:
                 req = urllib.request.Request(
-                    f"http://127.0.0.1:{self.port}/completion", data=payload,
-                    headers={"Content-Type": "application/json"})
+                    f"http://127.0.0.1:{self.port}/completion",
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                )
                 with urllib.request.urlopen(req, timeout=self.health_timeout) as resp:
-                    body = json.loads(resp.read().decode("utf-8", "replace"))
+                    json.loads(
+                        resp.read().decode("utf-8", "replace")
+                    )  # body must be JSON; content unused
                 ms = (time.perf_counter() - t0) * 1000
                 self.record_latency(ms)
                 times.append(ms)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                 try:
-                    from CORE.failure_ledger import note_failure
+                    from core.failure_ledger import note_failure
+
                     note_failure("service_manager:benchmark_inference", exc)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 -- logged below, guard broad
                     note_failure("service_manager:benchmark", exc)
-                    pass
                 times.append(None)
         return times
 
 
 if _WIN32_SERVICE_AVAILABLE:
-    class EveLlamaService(win32serviceutil.ServiceFramework):  # pyright: ignore[reportOptionalMemberAccess]
+
+    class EveLlamaService(
+        win32serviceutil.ServiceFramework
+    ):  # pyright: ignore[reportOptionalMemberAccess]
         _svc_name_ = "EveUnleashedLlamaServer"
         _svc_display_name_ = "Eve Unleashed - llama-server"
-        _svc_description_ = "Auto-starting llama-server supervised by Eve Unleashed Phase 1."
+        _svc_description_ = (
+            "Auto-starting llama-server supervised by Eve Unleashed Phase 1."
+        )
 
         def __init__(self, args):
             super().__init__(args)
-            self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)  # pyright: ignore[reportOptionalMemberAccess]
+            self.hWaitStop = win32event.CreateEvent(
+                None, 0, 0, None
+            )  # pyright: ignore[reportOptionalMemberAccess]
             exe, model, port = _resolve_paths()
             self.manager = LlamaServerManager(exe, model, port)
 
         def SvcStop(self):
-            self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)  # pyright: ignore[reportOptionalMemberAccess]
-            win32event.SetEvent(self.hWaitStop)  # pyright: ignore[reportOptionalMemberAccess]
+            self.ReportServiceStatus(
+                win32service.SERVICE_STOP_PENDING
+            )  # pyright: ignore[reportOptionalMemberAccess]
+            win32event.SetEvent(
+                self.hWaitStop
+            )  # pyright: ignore[reportOptionalMemberAccess]
             self.manager.stop()
 
         def SvcDoRun(self):
             self.manager.start()
-            win32event.WaitForSingleObject(self.hWaitStop, win32event.INFINITE)  # pyright: ignore[reportOptionalMemberAccess]
+            win32event.WaitForSingleObject(
+                self.hWaitStop, win32event.INFINITE
+            )  # pyright: ignore[reportOptionalMemberAccess]
 
 
 if __name__ == "__main__":
-    if _WIN32_SERVICE_AVAILABLE and len(sys.argv) >= 2 and sys.argv[1].lower() in {"install", "start", "stop", "remove"}:
-        win32serviceutil.HandleCommandLine(EveLlamaService)  # pyright: ignore[reportOptionalMemberAccess]
+    if (
+        _WIN32_SERVICE_AVAILABLE
+        and len(sys.argv) >= 2
+        and sys.argv[1].lower() in {"install", "start", "stop", "remove"}
+    ):
+        win32serviceutil.HandleCommandLine(
+            EveLlamaService
+        )  # pyright: ignore[reportOptionalMemberAccess]
     else:
         # daemon mode (non-service) for dev/testing
         exe, model, port = _resolve_paths()

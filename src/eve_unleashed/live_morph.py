@@ -23,25 +23,30 @@ Instructions understood (case-insensitive):
 - undo | revert          (pop the stack)
 Anything else is logged as UNUNDERSTOOD, never applied.
 """
-import html as _html
+
 import json as _json
 import re as _re
 import threading as _threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
 
-_REPLACE_RE = _re.compile(r"^\s*(?:replace|change)\s+(.+?)\s+(?:with|to)\s+(.+?)\s*$",
-                          _re.I)
-_CASE_RE = _re.compile(r"^\s*(upper|lower)\s*case\s*(?:in\s+(.+?))?\s*$", _re.I)
-_UNDO_RE = _re.compile(r"^\s*(undo|revert|go back)\s*$", _re.I)
-_STEPS_RE = _re.compile(r"^\s*(make steps|tutorial|steps)\s*$", _re.I)
-_OUTLINE_RE = _re.compile(r"^\s*(outline|headings|show outline)\s*$", _re.I)
-_MUTATE_RE = _re.compile(r"^\s*(mutate|remix|vary)\s*$", _re.I)
+
+_REPLACE_RE = _re.compile(
+    r"^\s*(?:replace|change)\s+(.+?)\s+(?:with|to)\s+(.+?)\s*$", _re.IGNORECASE
+)
+_CASE_RE = _re.compile(
+    r"^\s*(upper|lower)\s*case\s*(?:in\s+(.+?))?\s*$", _re.IGNORECASE
+)
+_UNDO_RE = _re.compile(r"^\s*(undo|revert|go back)\s*$", _re.IGNORECASE)
+_STEPS_RE = _re.compile(r"^\s*(make steps|tutorial|steps)\s*$", _re.IGNORECASE)
+_OUTLINE_RE = _re.compile(r"^\s*(outline|headings|show outline)\s*$", _re.IGNORECASE)
+_MUTATE_RE = _re.compile(r"^\s*(mutate|remix|vary)\s*$", _re.IGNORECASE)
 
 
 def parse_instruction(text):
@@ -57,9 +62,12 @@ def parse_instruction(text):
         return {"op": "replace", "old": old, "new": new, "raw": s}
     m = _CASE_RE.match(s)
     if m:
-        return {"op": "case",
-                "upper": m.group(1).lower() == "upper",
-                "section": (m.group(2) or "").strip() or None, "raw": s}
+        return {
+            "op": "case",
+            "upper": m.group(1).lower() == "upper",
+            "section": (m.group(2) or "").strip() or None,
+            "raw": s,
+        }
     if _UNDO_RE.match(s):
         return {"op": "undo", "raw": s}
     if _STEPS_RE.match(s):
@@ -68,9 +76,11 @@ def parse_instruction(text):
         return {"op": "outline", "raw": s}
     if _MUTATE_RE.match(s):
         return {"op": "mutate", "raw": s}
-    raise ValueError("not understood: %s -- try 'replace X with Y', "
-                     "'uppercase', 'make steps', 'outline', 'mutate', "
-                     "'undo'" % s[:80])
+    raise ValueError(
+        f"not understood: {s[:80]} -- try 'replace X with Y', "
+        "'uppercase', 'make steps', 'outline', 'mutate', "
+        "'undo'"
+    )
 
 
 def _section_span(lines, heading):
@@ -81,8 +91,11 @@ def _section_span(lines, heading):
     start, level = None, None
     for i, line in enumerate(lines):
         s = line.strip()
-        head = (s.lstrip("# ").strip().lower() if s.startswith("#")
-                else s.lower() if s.isupper() and len(s) < 70 else None)
+        head = (
+            s.lstrip("# ").strip().lower()
+            if s.startswith("#")
+            else s.lower() if s.isupper() and len(s) < 70 else None
+        )
         if head is None:
             continue
         if start is None and head == want:
@@ -103,28 +116,33 @@ def apply_op(text, op):
     if kind == "replace":
         new = text.replace(op["old"], op["new"])
         n = text.count(op["old"])
-        return new, "replaced %d occurrence(s) of %r" % (n, op["old"][:40])
+        return new, "replaced {:d} occurrence(s) of {!r}".format(n, op["old"][:40])
     if kind == "case":
         lo, hi = _section_span(lines, op.get("section"))
         for i in range(lo, hi):
             lines[i] = lines[i].upper() if op["upper"] else lines[i].lower()
-        where = "section %r" % op["section"] if op.get("section") else "all"
-        return "\n".join(lines), "cased %d line(s) %s" % (hi - lo, where)
+        where = "section {!r}".format(op["section"]) if op.get("section") else "all"
+        return "\n".join(lines), f"cased {hi - lo:d} line(s) {where}"
     if kind == "steps":
         from .doc_tutor import tutorial as _tut
+
         tut = _tut(text)
         out = ["# Steps (from your words)", ""]
         for n, st in enumerate(tut["steps"][:20], 1):
-            out.append("%d. %s" % (n, st["action"]))
-        return "\n".join(out), "%d step(s) extracted" % min(
-            len(tut["steps"]), 20)
+            out.append("{:d}. {}".format(n, st["action"]))
+        return "\n".join(out), "{:d} step(s) extracted".format(
+            min(len(tut["steps"]), 20)
+        )
     if kind == "outline":
         from .doc_tutor import outline as _out
+
         heads = _out(text)
-        return text, "outline: %s" % (" | ".join(
-            h["title"] for h in heads[:10]) or "(no headings)")
+        return text, "outline: %s" % (
+            " | ".join(h["title"] for h in heads[:10]) or "(no headings)"
+        )
     if kind == "mutate":
         import random as _random
+
         rng = _random.Random(len(text))
         idx = [i for i, ln in enumerate(lines) if len(ln.split()) >= 4]
         if not idx:
@@ -134,8 +152,8 @@ def apply_op(text, op):
         j = rng.randrange(len(words))
         words[j] = words[j][::-1]
         lines[i] = " ".join(words)
-        return "\n".join(lines), "mutated line %d (one word reversed)" % (i + 1)
-    raise ValueError("cannot apply: %s" % kind)
+        return "\n".join(lines), f"mutated line {i + 1:d} (one word reversed)"
+    raise ValueError(f"cannot apply: {kind}")
 
 
 class LiveState:
@@ -152,41 +170,48 @@ class LiveState:
         try:
             op = parse_instruction(raw)
         except ValueError as e:
-            entry = {"instruction": raw, "result": "UNUNDERSTOOD",
-                     "detail": str(e)[:160]}
+            entry = {
+                "instruction": raw,
+                "result": "UNUNDERSTOOD",
+                "detail": str(e)[:160],
+            }
             self.log.append(entry)
-            return {"ok": False, "text": self.text, "entry": entry,
-                    "log": self.log}
+            return {"ok": False, "text": self.text, "entry": entry, "log": self.log}
         if op["op"] == "undo":
             if not self.history:
-                entry = {"instruction": raw, "result": "NOTHING_TO_UNDO",
-                         "detail": "the stack is empty"}
+                entry = {
+                    "instruction": raw,
+                    "result": "NOTHING_TO_UNDO",
+                    "detail": "the stack is empty",
+                }
                 self.log.append(entry)
-                return {"ok": False, "text": self.text, "entry": entry,
-                        "log": self.log}
+                return {"ok": False, "text": self.text, "entry": entry, "log": self.log}
             self.text = self.history.pop()
-            entry = {"instruction": raw, "result": "UNDONE",
-                     "detail": "one step back, %d left" % len(self.history)}
+            entry = {
+                "instruction": raw,
+                "result": "UNDONE",
+                "detail": f"one step back, {len(self.history):d} left",
+            }
             self.log.append(entry)
-            return {"ok": True, "text": self.text, "entry": entry,
-                    "log": self.log}
+            return {"ok": True, "text": self.text, "entry": entry, "log": self.log}
         try:
             new_text, detail = apply_op(self.text, op)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- logged below, guard broad
             note_failure("live_morph:apply", e)
-            entry = {"instruction": raw, "result": "FAILED",
-                     "detail": str(e)[:160]}
+            entry = {"instruction": raw, "result": "FAILED", "detail": str(e)[:160]}
             self.log.append(entry)
-            return {"ok": False, "text": self.text, "entry": entry,
-                    "log": self.log}
+            return {"ok": False, "text": self.text, "entry": entry, "log": self.log}
         self.history.append(self.text)
         self.text = new_text
-        entry = {"instruction": raw, "result": "APPLIED", "detail": detail,
-                 "before_lines": len(self.history[-1].splitlines()),
-                 "after_lines": len(new_text.splitlines())}
+        entry = {
+            "instruction": raw,
+            "result": "APPLIED",
+            "detail": detail,
+            "before_lines": len(self.history[-1].splitlines()),
+            "after_lines": len(new_text.splitlines()),
+        }
         self.log.append(entry)
-        return {"ok": True, "text": self.text, "entry": entry,
-                "log": self.log}
+        return {"ok": True, "text": self.text, "entry": entry, "log": self.log}
 
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
@@ -258,9 +283,11 @@ def make_app(state):
             if self.path == "/":
                 self._send(PAGE, "text/html; charset=utf-8")
             elif self.path == "/api/doc":
-                self._send(_json.dumps({"name": state.name,
-                                        "text": state.text,
-                                        "log": state.log}))
+                self._send(
+                    _json.dumps(
+                        {"name": state.name, "text": state.text, "log": state.log}
+                    )
+                )
             else:
                 self.send_error(404)
 
@@ -271,19 +298,28 @@ def make_app(state):
             try:
                 n = int(self.headers.get("Content-Length", 0))
                 payload = _json.loads(self.rfile.read(n) or b"{}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- logged below, guard broad
                 note_failure("live_morph:payload", e)
                 payload = {}
             res = state.instruct(payload.get("text", ""))
-            self._send(_json.dumps({"ok": res["ok"], "text": res["text"],
-                                    "entry": res["entry"], "log": res["log"]}))
+            self._send(
+                _json.dumps(
+                    {
+                        "ok": res["ok"],
+                        "text": res["text"],
+                        "entry": res["entry"],
+                        "log": res["log"],
+                    }
+                )
+            )
+
     return Handler
 
 
 def serve(state, port=0):
     """Serve the live window on loopback. Returns (server, url)."""
     server = ThreadingHTTPServer(("127.0.0.1", port), make_app(state))
-    url = "http://127.0.0.1:%d/" % server.server_address[1]
+    url = f"http://127.0.0.1:{server.server_address[1]:d}/"
     t = _threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     return server, url

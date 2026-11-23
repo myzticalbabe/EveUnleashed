@@ -7,6 +7,7 @@ game byte-identical. JSON configs take dotted keys; anything else takes
 KEY=VALUE lines. This is the first modding slice: data and assets, never
 executables -- Eve mods files, not binaries.
 """
+
 import json
 import random
 import shutil
@@ -16,15 +17,14 @@ from .model_registry import note_failure
 
 
 def _read_mod(mod_dir):
-    spec = json.loads((Path(mod_dir) / "mod.json").read_text(
-        encoding="utf-8"))
+    spec = json.loads((Path(mod_dir) / "mod.json").read_text(encoding="utf-8"))
     return spec.get("patches", []), spec.get("assets", [])
 
 
 def _backup(game_dir, rel, bak_dir):
     src = Path(game_dir) / rel
     if not src.is_file():
-        raise ValueError("game file missing: %s" % rel)
+        raise ValueError(f"game file missing: {rel}")
     dst = Path(bak_dir) / rel
     dst.parent.mkdir(parents=True, exist_ok=True)
     if not dst.exists():
@@ -49,12 +49,12 @@ def _patch_kv(path, key, value):
     lines, hit = [], False
     for line in text.splitlines():
         if line.split("=")[0].strip() == key:
-            lines.append("%s=%s" % (key, value))
+            lines.append(f"{key}={value}")
             hit = True
         else:
             lines.append(line)
     if not hit:
-        lines.append("%s=%s" % (key, value))
+        lines.append(f"{key}={value}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -80,8 +80,7 @@ def apply_mod(game_dir, mod_dir):
         blob = (mod / a["src"]).read_bytes()
         target.write_bytes(blob)
         manifest.append(a["dst"])
-    (bak / "manifest.json").write_text(json.dumps(manifest, indent=2),
-                                       encoding="utf-8")
+    (bak / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
 
 
@@ -98,39 +97,35 @@ def evolve_mod(game_dir, mod_dir, generations=5, seed=7, fitness=None):
     evo.mkdir(parents=True)
     rng = random.Random(seed)
     patches, assets = _read_mod(mod_dir)
-    numeric = [p for p in patches
-               if isinstance(p["value"], (int, float))]
+    numeric = [p for p in patches if isinstance(p["value"], (int, float))]
     if not numeric:
         raise ValueError("evolution needs at least one numeric patch")
     history = []
     for g in range(generations):
-        gen_dir = evo / ("gen%d" % g)
-        shutil.copytree(game, gen_dir,
-                        ignore=shutil.ignore_patterns(".evebak",
-                                                     ".eveevo"))
+        gen_dir = evo / (f"gen{g:d}")
+        shutil.copytree(
+            game, gen_dir, ignore=shutil.ignore_patterns(".evebak", ".eveevo")
+        )
         trial = []
         for p in patches:
             q = dict(p)
             if q in numeric and g > 0:
                 span = abs(q["value"]) or 1.0
-                q["value"] = round(q["value"] + rng.uniform(-span,
-                                                              span), 3)
+                q["value"] = round(q["value"] + rng.uniform(-span, span), 3)
             trial.append(q)
-        gen_mod = evo / ("mod%d" % g)
+        gen_mod = evo / (f"mod{g:d}")
         gen_mod.mkdir()
         (gen_mod / "mod.json").write_text(
-            json.dumps({"patches": trial, "assets": assets}),
-            encoding="utf-8")
+            json.dumps({"patches": trial, "assets": assets}), encoding="utf-8"
+        )
         for a in assets:
             blob = (Path(mod_dir) / a["src"]).read_bytes()
             (gen_mod / a["src"]).write_bytes(blob)
         apply_mod(gen_dir, gen_mod)
         score = _score(gen_dir, trial, fitness)
-        history.append({"gen": g, "score": score,
-                        "patches": trial})
+        history.append({"gen": g, "score": score, "patches": trial})
     best = max(history, key=lambda h: h["score"])
-    (evo / "best.json").write_text(json.dumps(best, indent=2),
-                                     encoding="utf-8")
+    (evo / "best.json").write_text(json.dumps(best, indent=2), encoding="utf-8")
     return best["gen"], best["score"], history
 
 
@@ -139,7 +134,7 @@ def _score(gen_dir, trial, fitness):
     for p in trial:
         if not isinstance(p["value"], (int, float)):
             continue
-        target = (fitness or {}).get("%s::%s" % (p["file"], p["key"]))
+        target = (fitness or {}).get("{}::{}".format(p["file"], p["key"]))
         if target is None:
             total += float(p["value"])
         else:
@@ -150,23 +145,22 @@ def _score(gen_dir, trial, fitness):
 def apply_best(game_dir):
     """Apply the evolved best generation onto the live game dir."""
     import tempfile
+
     game = Path(game_dir)
-    best = json.loads((game / ".eveevo" / "best.json").read_text(
-        encoding="utf-8"))
+    best = json.loads((game / ".eveevo" / "best.json").read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory(prefix="evebest") as tmp:
         mod = Path(tmp) / "best"
         mod.mkdir()
         (mod / "mod.json").write_text(
-            json.dumps({"patches": best["patches"], "assets": []}),
-            encoding="utf-8")
+            json.dumps({"patches": best["patches"], "assets": []}), encoding="utf-8"
+        )
         return apply_mod(game, mod)
 
 
 def revert_mod(game_dir):
     """Restore every file in the backup manifest. Returns restored count."""
     bak = Path(game_dir) / ".evebak"
-    manifest = json.loads((bak / "manifest.json").read_text(
-        encoding="utf-8"))
+    manifest = json.loads((bak / "manifest.json").read_text(encoding="utf-8"))
     n = 0
     for rel in manifest:
         src = bak / rel

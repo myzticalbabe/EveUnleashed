@@ -3,6 +3,7 @@
 Real toolchains, tiny files: good files check clean, bad files fail by
 name, formatting fixes formatting, and backups exist before any write.
 """
+
 import sys
 from pathlib import Path
 
@@ -10,17 +11,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pytest
 
-from eve_unleashed.langs import check, detect, fix, fmt, have_tools
-from eve_unleashed.langs import ARCH_CONTRACTS, check_arch
+from eve_unleashed.langs import (
+    ARCH_CONTRACTS,
+    check,
+    check_arch,
+    fix,
+    fmt,
+    have_tools,
+)
 
-GOOD_RS = 'pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n'
-BAD_RS = 'pub fn add(a: i32, b: i32) -> i32 {\n    a + \n}\n'
-GOOD_GO = 'package main\n\nfunc Add(a, b int) int {\n\treturn a + b\n}\n'
-BADFMT_GO = 'package main\n\nfunc Add(a, b int) int {\nreturn a + b\n}\n'
+GOOD_RS = "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n"
+BAD_RS = "pub fn add(a: i32, b: i32) -> i32 {\n    a + \n}\n"
+GOOD_GO = "package main\n\nfunc Add(a, b int) int {\n\treturn a + b\n}\n"
+BADFMT_GO = "package main\n\nfunc Add(a, b int) int {\nreturn a + b\n}\n"
 
 
 def test_detect_three_ways():
     from eve_unleashed.langs import detect as d
+
     assert d("x.rs") == "rust" and d("x.go") == "go"
     assert d("x.py") == "python"
     with pytest.raises(ValueError):

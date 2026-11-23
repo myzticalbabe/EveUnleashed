@@ -8,26 +8,27 @@ live artifacts -- PASS only when every input is present and unchanged.
 
 from __future__ import annotations
 
-from typing import Dict
 
-
-def funnel_proof(inputs: Dict[str, str], rule: str) -> Dict:
+def funnel_proof(inputs: dict[str, str], rule: str) -> dict:
     """Seal a verdict: {input name: digest} + the reduction rule."""
     if not inputs:
         raise ValueError("a funnel with no inputs proves nothing")
     if not rule:
         raise ValueError("a funnel with no stated rule proves nothing")
-    return {"inputs": dict(inputs), "rule": rule,
-            "n_inputs": len(inputs)}
+    return {"inputs": dict(inputs), "rule": rule, "n_inputs": len(inputs)}
 
 
-def verify_funnel(proof: Dict, artifacts: Dict[str, str]) -> Dict:
+def verify_funnel(proof: dict, artifacts: dict[str, str]) -> dict:
     """Replay the seal against live artifacts. Digests decide, not prose."""
     want = proof.get("inputs", {})
     missing = sorted(k for k in want if k not in artifacts)
-    mismatched = sorted(k for k in want
-                        if k in artifacts and artifacts[k] != want[k])
+    mismatched = sorted(k for k in want if k in artifacts and artifacts[k] != want[k])
     ok = not missing and not mismatched
-    return {"verdict": "PASS" if ok else "FAIL", "clean": True,
-            "n_inputs": len(want), "missing": missing,
-            "mismatched": mismatched, "rule": proof.get("rule", "")}
+    return {
+        "verdict": "PASS" if ok else "FAIL",
+        "clean": True,
+        "n_inputs": len(want),
+        "missing": missing,
+        "mismatched": mismatched,
+        "rule": proof.get("rule", ""),
+    }

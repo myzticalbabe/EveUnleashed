@@ -15,7 +15,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from INTERPRETERS.sh_runner import _bash_flavor, _to_bash_path
+from interpreters.sh_runner import _bash_flavor, _to_bash_path
 
 # `_to_bash_path` translates a DRIVE LETTER, so off Windows it returns its input
 # unchanged by design: there is no `C:` to rewrite. The flavor tests that do not
@@ -23,7 +23,8 @@ from INTERPRETERS.sh_runner import _bash_flavor, _to_bash_path
 # translation are pinned to Windows.
 windows_only = pytest.mark.skipif(
     os.name != "nt",
-    reason="_to_bash_path is a no-op off Windows: no drive prefix to map")
+    reason="_to_bash_path is a no-op off Windows: no drive prefix to map",
+)
 
 
 def _win(p):
@@ -60,6 +61,7 @@ def test_posix_paths_pass_through():
 
 
 def test_bash_runs_after_fix():
-    from INTERPRETERS.sh_runner import ShRunner
-    res = ShRunner().run_code('echo AZAZAEL-GOLDEN-OK')
+    from interpreters.sh_runner import ShRunner
+
+    res = ShRunner().run_code("echo AZAZAEL-GOLDEN-OK")
     assert res.success and "AZAZAEL-GOLDEN-OK" in res.stdout

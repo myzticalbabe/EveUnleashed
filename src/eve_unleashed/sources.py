@@ -34,54 +34,105 @@ per run unless the caller asks again.
 from urllib.parse import urlparse
 
 try:
-    from CORE.failure_ledger import note_failure
-except Exception:
+    from core.failure_ledger import note_failure
+except Exception:  # noqa: BLE001 -- <module>: error recorded below, guard stays broad
+
     def note_failure(where, exc=None):
         pass
 
+
 #: Host suffixes that are primary/official by construction.
 TIER_A_SUFFIXES = (
-    ".gov", ".mil", ".gov.uk", ".gc.ca", ".europa.eu", ".gov.au",
-    "who.int", "un.org", "worldbank.org", "imf.org",
+    ".gov",
+    ".mil",
+    ".gov.uk",
+    ".gc.ca",
+    ".europa.eu",
+    ".gov.au",
+    "who.int",
+    "un.org",
+    "worldbank.org",
+    "imf.org",
 )
 #: Published machine-use APIs and archives: consented by their own terms.
 TIER_A_APIS = (
-    "wikipedia.org", "wikidata.org", "openlibrary.org", "crossref.org",
-    "stackexchange.com", "archive.org", "loc.gov", "commoncrawl.org",
-    "doi.org", "arxiv.org", "pubmed.ncbi.nlm.nih.gov",
+    "wikipedia.org",
+    "wikidata.org",
+    "openlibrary.org",
+    "crossref.org",
+    "stackexchange.com",
+    "archive.org",
+    "loc.gov",
+    "commoncrawl.org",
+    "doi.org",
+    "arxiv.org",
+    "pubmed.ncbi.nlm.nih.gov",
 )
 #: Official indexes / catalogs: identity evidence, not content proof.
 TIER_B_HOSTS = (
-    "sitemaps.org", "opengovus.com", "opencorporates.com", "guidestar.org",
-    "propublica.org", "courtlistener.com", "npi registry".replace(" ", "-"),
+    "sitemaps.org",
+    "opengovus.com",
+    "opencorporates.com",
+    "guidestar.org",
+    "propublica.org",
+    "courtlistener.com",
+    "npi registry".replace(" ", "-"),
 )
 #: Credible secondary: news, NGOs, archives with provenance.
 TIER_C_HOSTS = (
-    "reuters.com", "apnews.com", "bbc.co.uk", "npr.org", "patch.com",
-    "web.archive.org", "archive.today", "documentcloud.org",
+    "reuters.com",
+    "apnews.com",
+    "bbc.co.uk",
+    "npr.org",
+    "patch.com",
+    "web.archive.org",
+    "archive.today",
+    "documentcloud.org",
 )
 #: Snippet-only classes: leads, never proof.
-TIER_D_SUFFIXES = ("facebook.com", "x.com", "twitter.com", "instagram.com",
-                   "tiktok.com", "reddit.com", "linkedin.com", "youtube.com")
+TIER_D_SUFFIXES = (
+    "facebook.com",
+    "x.com",
+    "twitter.com",
+    "instagram.com",
+    "tiktok.com",
+    "reddit.com",
+    "linkedin.com",
+    "youtube.com",
+)
 
 #: Path/host markers that mean a human-verification gate.
-CHALLENGE_MARKERS = ("captcha", "challenge", "are-you-a-robot", "turnstile",
-                     "cf-chl", "px-captcha", "hcaptcha", "recaptcha")
-PAYWALL_MARKERS = ("/subscribe", "/paywall", "premium-content", "/login",
-                   "/signin", "/account")
+CHALLENGE_MARKERS = (
+    "captcha",
+    "challenge",
+    "are-you-a-robot",
+    "turnstile",
+    "cf-chl",
+    "px-captcha",
+    "hcaptcha",
+    "recaptcha",
+)
+PAYWALL_MARKERS = (
+    "/subscribe",
+    "/paywall",
+    "premium-content",
+    "/login",
+    "/signin",
+    "/account",
+)
 
 
 def _host(url):
     try:
         return (urlparse(str(url)).hostname or "").lower()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- logged below, guard broad
         note_failure("sources:host", e)
         return ""
 
 
 def _matches(host, table):
     for entry in table:
-        if host == entry or host.endswith("." + entry) or host.endswith(entry):
+        if host == entry or host.endswith((entry, "." + entry)):
             return entry
     return None
 
@@ -100,27 +151,44 @@ def classify(url, robots=None, gated=False):
     host = _host(url)
     path = (urlparse(url).path or "/").lower()
     if not host:
-        return {"url": url, "tier": "D", "allowed": False, "wall": "unparseable",
-                "reason": "no host to grade"}
+        return {
+            "url": url,
+            "tier": "D",
+            "allowed": False,
+            "wall": "unparseable",
+            "reason": "no host to grade",
+        }
     for marker in CHALLENGE_MARKERS:
         if marker in path or marker in url.lower():
-            return {"url": url, "tier": None, "allowed": False,
-                    "wall": "human-verification",
-                    "reason": "a gate that asks a human to prove they are "
-                              "human is named and skipped, never solved"}
+            return {
+                "url": url,
+                "tier": None,
+                "allowed": False,
+                "wall": "human-verification",
+                "reason": "a gate that asks a human to prove they are "
+                "human is named and skipped, never solved",
+            }
     if gated or any(m in path for m in PAYWALL_MARKERS):
-        return {"url": url, "tier": "D", "allowed": False, "wall": "paywall",
-                "reason": "report the wall, try the free mirror"}
+        return {
+            "url": url,
+            "tier": "D",
+            "allowed": False,
+            "wall": "paywall",
+            "reason": "report the wall, try the free mirror",
+        }
     if robots:
         for rule in robots:
             rule = str(rule or "").strip()
             if rule and path.startswith(rule.rstrip("*").lower()):
-                return {"url": url, "tier": None, "allowed": False,
-                        "wall": "robots-disallow",
-                        "reason": "the site declared this path off-limits; "
-                                  "an explicit refusal is honoured"}
-    if _matches(host, TIER_A_APIS) or any(host.endswith(s)
-                                          for s in TIER_A_SUFFIXES):
+                return {
+                    "url": url,
+                    "tier": None,
+                    "allowed": False,
+                    "wall": "robots-disallow",
+                    "reason": "the site declared this path off-limits; "
+                    "an explicit refusal is honoured",
+                }
+    if _matches(host, TIER_A_APIS) or any(host.endswith(s) for s in TIER_A_SUFFIXES):
         tier, why = "A", "primary published artefact or consented API"
     elif _matches(host, TIER_B_HOSTS):
         tier, why = "B", "official index: identity evidence, not content proof"
@@ -130,8 +198,14 @@ def classify(url, robots=None, gated=False):
         tier, why = "C", "credible secondary: pairs with A/B before a claim"
     else:
         tier, why = "C", "unlisted host graded as secondary by default"
-    return {"url": url, "tier": tier, "allowed": True, "wall": None,
-            "reason": why, "host": host}
+    return {
+        "url": url,
+        "tier": tier,
+        "allowed": True,
+        "wall": None,
+        "reason": why,
+        "host": host,
+    }
 
 
 def grade(tier):
@@ -159,5 +233,9 @@ def policy_report(urls, robots_map=None, gated=None):
     for r in rows:
         key = r["tier"] or "refused"
         counts[key] = counts.get(key, 0) + 1
-    return {"rows": rows, "counts": counts, "refused": refused,
-            "standard": "ultra-loose: any lawful source; tier decides grade"}
+    return {
+        "rows": rows,
+        "counts": counts,
+        "refused": refused,
+        "standard": "ultra-loose: any lawful source; tier decides grade",
+    }

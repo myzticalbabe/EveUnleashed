@@ -16,10 +16,11 @@ Built with: pythran _replay_kernel.py  (MSVC on PATH via VsDevCmd).
 Absent compiled module -> native_replay falls back to the same math in
 Python; parity is tested, not asserted.
 """
+
 import numpy as np
 
 
-#pythran export score_pairs(int list, int list, int list, int list, int)
+# pythran export score_pairs(int list, int list, int list, int list, int)
 def score_pairs(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs):
     pairs = len(pred_rung)
     hits = 0
@@ -29,7 +30,7 @@ def score_pairs(pred_rung, pred_kind, ans_rung, ans_ok, n_rungs):
         if pred_kind[i] == 0:
             won = (ans_rung[i] == pred_rung[i]) and (ans_ok[i] == 1)
         else:
-            agree = ((pred_kind[i] == 1) == (ans_ok[i] == 1))
+            agree = (pred_kind[i] == 1) == (ans_ok[i] == 1)
             won = agree and (pred_rung[i] < 0 or ans_rung[i] == pred_rung[i])
         if won:
             hits += 1

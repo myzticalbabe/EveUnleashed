@@ -17,39 +17,41 @@ Format:
 This is NOT a changelog. This is a death certificate.
 """
 
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
-from typing import Optional
 import json
-import sys
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+
 
 @dataclass
 class RequiemEntry:
     """A single death record."""
+
     what: str
     when: str
     why: str
     last_words: str
-    successor: Optional[str] = None
-    artifacts: Optional[list[str]] = None
+    successor: str | None = None
+    artifacts: list[str] | None = None
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2)
 
+
 # The ledger — append only, never delete
 REQUIEM: list[RequiemEntry] = []
+
 
 def record_death(
     what: str,
     why: str,
     last_words: str,
-    successor: Optional[str] = None,
-    artifacts: Optional[list[str]] = None,
+    successor: str | None = None,
+    artifacts: list[str] | None = None,
 ) -> RequiemEntry:
     """Record a death in the ledger."""
     entry = RequiemEntry(
         what=what,
-        when=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        when=datetime.now(UTC).isoformat(timespec="seconds"),
         why=why,
         last_words=last_words,
         successor=successor,
@@ -57,6 +59,7 @@ def record_death(
     )
     REQUIEM.append(entry)
     return entry
+
 
 def print_requiem() -> None:
     """Print all recorded deaths."""
@@ -73,6 +76,7 @@ def print_requiem() -> None:
             print(f"NEXT:  {entry.successor}")
         if entry.artifacts:
             print(f"REFS:  {', '.join(entry.artifacts)}")
+
 
 # Example usage (remove when adding real entries):
 if __name__ == "__main__":

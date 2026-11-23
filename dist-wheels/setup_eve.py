@@ -11,9 +11,11 @@ Floor is 3.10 (measured: grammar clean to 3.8, runtime X|Y unions need
 Usage (any interpreter with setuptools+wheel, no network):
   python dist-wheels/setup_eve.py bdist_wheel --dist-dir dist-wheels
 """
+
 import os
 import tomllib
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "..", "src")
